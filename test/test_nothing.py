@@ -10,4 +10,5 @@ def test_nothing() -> None:
 def test_main_module_runs() -> None:
     from app import main  # noqa: PLC0415
 
-    main.main()
+    # Call with empty args list — should print help and return without starting a server
+    main.main(args=[])

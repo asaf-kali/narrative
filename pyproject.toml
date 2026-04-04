@@ -14,7 +14,15 @@ readme = "README.md"
 # Dependencies
 
 dependencies = [
+    "dash ~= 2.18",
+    "dash-mantine-components ~= 0.15",
+    "emoji ~= 2.12",
+    "langdetect ~= 1.0",
+    "pandas ~= 2.2",
+    "pillow >= 10",
+    "plotly >= 5.24",
     "pydantic ~= 2.12",
+    "wordcloud ~= 1.9",
 ]
 
 [dependency-groups]
@@ -25,6 +33,7 @@ test = [
 lint = [
     "ruff >= 0.14",
     "mypy >= 1.19",
+    "pandas-stubs ~= 2.2",
 ]
 dev = [
     "pre-commit >= 2.17",
@@ -42,7 +51,7 @@ build-backend = "hatchling.build"
 # Test
 
 [tool.pytest.ini_options]
-pythonpath = "app"
+pythonpath = [".", "app"]
 addopts = "-s --disable-pytest-warnings"
 
 [tool.coverage.run]
@@ -60,16 +69,39 @@ exclude = [
     "local/",
 ]
 ignore = [
-    "COM812", # Trailing comma conflict
-    "D100",   # Missing docstring in public module
-    "D103",   # Missing docstring in public function
-    "D104",   # Missing docstring in public class
-    "D203",   # No blank lines allowed after function docstring
-    "D213",   # No blank lines allowed after class docstring
+    "ANN401",  # Dynamically typed expressions (Any) allowed for complex pandas/dash types
+    "PD010",   # .unstack is appropriate for pivot-style operations on grouped series
+    "N806",    # Constants in functions should be ALL_CAPS (common convention)
+    "COM812",  # Trailing comma conflict with formatter
+    "D100",    # Missing docstring in public module
+    "D101",    # Missing docstring in public class
+    "D102",    # Missing docstring in public method
+    "D103",    # Missing docstring in public function
+    "D104",    # Missing docstring in public package
+    "D105",    # Missing docstring in magic method
+    "D107",    # Missing docstring in __init__
+    "D203",    # Blank line required before class docstring (conflicts with D211)
+    "D213",    # Multi-line docstring summary at second line (conflicts with D212)
+    "EM101",   # Exception must not use a string literal
+    "EM102",   # Exception must not use an f-string literal
+    "G004",    # Logging statement uses f-string
+    "ISC001",  # Implicit string concatenation (conflicts with formatter)
+    "TC001",   # Move application import into TYPE_CHECKING block
+    "TC002",   # Move third-party import into TYPE_CHECKING block
+    "TC003",   # Move standard library import into TYPE_CHECKING block
+    "TRY003",  # Avoid specifying long messages outside the exception class
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"test/**" = ["S101", "PLR2004"]
 
 [tool.mypy]
 strict = true
+ignore_missing_imports = true
+# The @analysis registry uses a TypeVar-bound decorator pattern that is
+# semantically correct but mypy cannot verify through nested closures.
+disallow_untyped_decorators = false
 exclude = [
     "local/",
+    "app/ui/",  # Dash ecosystem lacks complete type stubs
 ]

@@ -54,6 +54,14 @@ cover: cover-html
     {{ OPEN_FILE_COMMAND }} htmlcov/index.html &
     {{ DEL_COMMAND }} .coverage*
 
+# Run
+
+run *args:
+    PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
+
+run-dev *args:
+    DASH_DEBUG=true PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
+
 # Lint
 
 format:
