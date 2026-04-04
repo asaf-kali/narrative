@@ -19,8 +19,10 @@ Examples:
 All processing is local. No data is sent to any external service.
 """,
     )
-    parser.add_argument("--msgstore", type=Path, default=None, help="Path to decrypted msgstore.db")
-    parser.add_argument("--wadb", type=Path, default=None, help="Path to decrypted wa.db (optional, for contact names)")
+    parser.add_argument("--msgstore", type=Path, default="msgstore.db", help="Path to decrypted msgstore.db")
+    parser.add_argument(
+        "--wadb", type=Path, default="wa.db", help="Path to decrypted wa.db (optional, for contact names)"
+    )
     parser.add_argument("--port", type=int, default=8050, help="Port to run the dashboard on (default: 8050)")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
 
