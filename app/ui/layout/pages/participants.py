@@ -1,6 +1,6 @@
 import logging
 
-import dash_mantine_components as dmc
+import dash_bootstrap_components as dbc
 from dash import dcc, html
 
 logger = logging.getLogger(__name__)
@@ -9,23 +9,23 @@ logger = logging.getLogger(__name__)
 def layout() -> html.Div:
     return html.Div(
         [
-            dmc.Title("Participants", order=2, mb="md"),
-            dmc.Card(
-                [
-                    dmc.Text("Message Distribution", fw=500, mb="sm"),
-                    dcc.Graph(id="participants-bar", config={"displayModeBar": False}),
-                ],
-                withBorder=True,
-                shadow="sm",
-                mb="md",
+            html.H2("Participants", className="mb-3"),
+            dbc.Card(
+                dbc.CardBody(
+                    [
+                        html.P("Message Distribution", className="fw-semibold mb-2"),
+                        dcc.Graph(id="participants-bar", config={"displayModeBar": False}),
+                    ]
+                ),
+                className="mb-3",
             ),
-            dmc.Card(
-                [
-                    dmc.Text("Detailed Stats", fw=500, mb="sm"),
-                    html.Div(id="participants-table"),
-                ],
-                withBorder=True,
-                shadow="sm",
+            dbc.Card(
+                dbc.CardBody(
+                    [
+                        html.P("Detailed Stats", className="fw-semibold mb-2"),
+                        html.Div(id="participants-table"),
+                    ]
+                ),
             ),
         ]
     )

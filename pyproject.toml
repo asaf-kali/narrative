@@ -15,7 +15,7 @@ readme = "README.md"
 
 dependencies = [
     "dash ~= 2.18",
-    "dash-mantine-components ~= 0.15",
+    "dash-bootstrap-components ~= 1.6",
     "emoji ~= 2.12",
     "langdetect ~= 1.0",
     "pandas ~= 2.2",

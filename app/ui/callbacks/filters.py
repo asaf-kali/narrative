@@ -1,3 +1,4 @@
+import json
 import logging
 
 from dash import ALL, MATCH, Dash, Input, Output, State, callback_context
@@ -18,15 +19,14 @@ def register(app: Dash) -> None:
             return current_config or {}
 
         triggered_id = ctx.triggered[0]["prop_id"]
-        # Parse the pattern-match ID: '{"index":42,"type":"chat-nav-item"}.n_clicks'
-        import json  # noqa: PLC0415
-
         try:
             raw = triggered_id.split(".n_clicks")[0]
             chat_id = json.loads(raw)["index"]
         except KeyError, ValueError:
+            logger.warning(f"Failed to parse triggered chat ID: {triggered_id}")
             return current_config or {}
 
+        logger.info(f"Chat selected: {chat_id}")
         config = dict(current_config or {})
         config["chat_id"] = chat_id
         return config

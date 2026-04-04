@@ -27,10 +27,12 @@ def register(app: Dash) -> None:
     )
     def render_page(pathname: str | None, config_data: dict) -> object:
         if not config_data or not config_data.get("chat_id"):
+            logger.debug("No chat selected — showing placeholder")
             return _NO_CHAT_SELECTED
 
         path = pathname or "/"
         layout_fn = _ROUTES.get(path, overview.layout)
+        logger.info(f"Rendering page: {path}")
         from ui.layout.shell import build_page_tabs  # noqa: PLC0415
 
         return [build_page_tabs(path), layout_fn()]

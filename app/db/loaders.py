@@ -192,7 +192,6 @@ def _empty_messages_df() -> pd.DataFrame:
         "message_type",
         "text_data",
         "starred",
-        "quoted_row_id",
         "sender_phone",
         "sender_server",
         "chat_subject",

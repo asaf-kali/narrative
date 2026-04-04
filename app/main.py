@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -19,7 +20,7 @@ Examples:
 All processing is local. No data is sent to any external service.
 """,
     )
-    parser.add_argument("--msgstore", type=Path, default="msgstore.db", help="Path to decrypted msgstore.db")
+    parser.add_argument("--msgstore", type=Path, default=None, help="Path to decrypted msgstore.db")
     parser.add_argument(
         "--wadb", type=Path, default="wa.db", help="Path to decrypted wa.db (optional, for contact names)"
     )

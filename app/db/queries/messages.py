@@ -18,7 +18,6 @@ SELECT
     m.message_type,
     m.text_data,
     m.starred,
-    m.quoted_row_id,
     COALESCE(sj.user, '')  AS sender_phone,
     COALESCE(sj.server, '') AS sender_server,
     c.subject              AS chat_subject,

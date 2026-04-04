@@ -1,6 +1,6 @@
 import logging
 
-import dash_mantine_components as dmc
+import dash_bootstrap_components as dbc
 from dash import dcc, html
 
 logger = logging.getLogger(__name__)
@@ -9,33 +9,33 @@ logger = logging.getLogger(__name__)
 def layout() -> html.Div:
     return html.Div(
         [
-            dmc.Title("Media", order=2, mb="md"),
-            dmc.Grid(
+            html.H2("Media", className="mb-3"),
+            dbc.Row(
                 [
-                    dmc.GridCol(
-                        dmc.Card(
-                            [
-                                dmc.Text("Media Breakdown", fw=500, mb="sm"),
-                                dcc.Graph(id="media-donut", config={"displayModeBar": False}),
-                            ],
-                            withBorder=True,
-                            shadow="sm",
+                    dbc.Col(
+                        dbc.Card(
+                            dbc.CardBody(
+                                [
+                                    html.P("Media Breakdown", className="fw-semibold mb-2"),
+                                    dcc.Graph(id="media-donut", config={"displayModeBar": False}),
+                                ]
+                            ),
                         ),
-                        span=5,
+                        width=5,
                     ),
-                    dmc.GridCol(
-                        dmc.Card(
-                            [
-                                dmc.Text("Media Over Time", fw=500, mb="sm"),
-                                dcc.Graph(id="media-timeline", config={"displayModeBar": False}),
-                            ],
-                            withBorder=True,
-                            shadow="sm",
+                    dbc.Col(
+                        dbc.Card(
+                            dbc.CardBody(
+                                [
+                                    html.P("Media Over Time", className="fw-semibold mb-2"),
+                                    dcc.Graph(id="media-timeline", config={"displayModeBar": False}),
+                                ]
+                            ),
                         ),
-                        span=7,
+                        width=7,
                     ),
                 ],
-                gutter="md",
+                className="g-2",
             ),
         ]
     )

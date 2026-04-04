@@ -1,6 +1,6 @@
 import logging
 
-import dash_mantine_components as dmc
+import dash_bootstrap_components as dbc
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +13,18 @@ _PAGE_TABS = [
 ]
 
 
-def build_page_tabs(active_path: str) -> dmc.Tabs:
-    return dmc.Tabs(
-        value=active_path,
-        id="page-tabs",
-        children=[
-            dmc.TabsList(
-                [dmc.TabsTab(tab["label"], value=tab["value"]) for tab in _PAGE_TABS],
-                mb="md",
-            ),
+def build_page_tabs(active_path: str) -> dbc.Nav:
+    return dbc.Nav(
+        [
+            dbc.NavItem(
+                dbc.NavLink(
+                    tab["label"],
+                    href=tab["value"],
+                    active=(active_path == tab["value"]),
+                )
+            )
+            for tab in _PAGE_TABS
         ],
+        pills=True,
+        className="mb-3",
     )

@@ -32,15 +32,19 @@ def _load_df(config: AnalysisConfig) -> pd.DataFrame:
     key = config.cache_key()
     cached = cache.get_cached(key)
     if cached is not None:
+        logger.debug(f"Cache hit for key={key}")
         return cached
 
     if _MSGSTORE_PATH is None:
+        logger.warning("_load_df called before configure_paths()")
         return pd.DataFrame()
 
+    logger.info(f"Cache miss — loading messages from DB (chat_id={config.chat_id})")
     with open_connection(_MSGSTORE_PATH, _WADB_PATH) as db:
         loader = DataLoader(db)
         df = loader.load_messages(config)
 
+    logger.info(f"Loaded {len(df)} messages for chat_id={config.chat_id}")
     cache.set_cached(key, df)
     return df
 
