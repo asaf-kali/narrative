@@ -22,11 +22,28 @@ function shortName(name: string, max = 20): string {
   return name.length > max ? name.slice(0, max - 1) + '…' : name
 }
 
-/** Format ISO timestamp for display. In day-only mode strip the date prefix. */
 function formatTime(ts: string, dayOnly: boolean): string {
-  // ts is "YYYY-MM-DDTHH:MM:SS"
-  if (dayOnly) return ts.slice(11, 16)          // "HH:MM"
-  return ts.slice(0, 10) + ' ' + ts.slice(11, 16) // "YYYY-MM-DD HH:MM"
+  if (dayOnly) return ts.slice(11, 16)
+  return ts.slice(0, 10) + ' ' + ts.slice(11, 16)
+}
+
+/** Split `text` on `term` (case-insensitive) and return spans with highlights. */
+function Highlighted({ text, term }: { text: string; term: string }) {
+  if (!term) return <>{text}</>
+  const parts = text.split(new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'))
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === term.toLowerCase() ? (
+          <mark key={i} className="bg-accent/30 text-accent-light rounded-sm px-0.5">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  )
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -36,9 +53,11 @@ interface RowProps {
   chatColor: string
   dayOnly: boolean
   showChat: boolean
+  highlight: string
 }
 
-function MessageRow({ msg, chatColor, dayOnly, showChat }: RowProps) {
+function MessageRow({ msg, chatColor, dayOnly, showChat, highlight }: RowProps) {
+  const isMedia = msg.text?.startsWith('[') ?? false
   return (
     <div className="flex items-baseline gap-3 px-3 py-1.5 hover:bg-white/[0.025] rounded transition-colors min-w-0">
       <span className="text-[11px] text-slate-500 tabular-nums flex-shrink-0 w-28">
@@ -56,8 +75,10 @@ function MessageRow({ msg, chatColor, dayOnly, showChat }: RowProps) {
       <span className="text-xs font-medium text-slate-300 flex-shrink-0 w-28 truncate" title={msg.sender_name}>
         {msg.sender_name}
       </span>
-      <span className={`text-xs min-w-0 truncate ${msg.text?.startsWith('[') ? 'text-slate-500 italic' : 'text-slate-400'}`}>
-        {msg.text ?? ''}
+      <span className={`text-xs min-w-0 truncate ${isMedia ? 'text-slate-500 italic' : 'text-slate-400'}`}>
+        {highlight && !isMedia
+          ? <Highlighted text={msg.text ?? ''} term={highlight} />
+          : (msg.text ?? '')}
       </span>
     </div>
   )
@@ -67,11 +88,12 @@ function MessageRow({ msg, chatColor, dayOnly, showChat }: RowProps) {
 
 interface Props {
   messages: FeedMessage[]
-  total: number             // total available (may be > messages.length if paginated)
-  senders: string[]         // ordered by frequency desc, for filter chips
-  showChat?: boolean        // show chat-name badge column (default: true)
-  dayOnly?: boolean         // timestamps are all same day → show only HH:MM (default: false)
-  height?: string           // css height of scroll container (default: "18rem")
+  total: number
+  senders: string[]
+  showChat?: boolean
+  dayOnly?: boolean
+  height?: string
+  highlight?: string   // term to highlight in message text
 }
 
 export default function MessageFeed({
@@ -81,6 +103,7 @@ export default function MessageFeed({
   showChat = true,
   dayOnly = false,
   height = '18rem',
+  highlight = '',
 }: Props) {
   const [activeSenders, setActiveSenders] = useState<Set<string>>(new Set())
   const feedRef = useRef<HTMLDivElement>(null)
@@ -159,6 +182,7 @@ export default function MessageFeed({
               chatColor={chatColorMap.get(msg.chat_name) ?? FALLBACK_COLOR}
               dayOnly={dayOnly}
               showChat={showChat}
+              highlight={highlight}
             />
           ))
         )}

@@ -54,6 +54,14 @@ export interface MediaData {
   timeline: Array<{ month: string; type_label: string; count: number }>
 }
 
+export interface SearchResult {
+  chat_id: number
+  chat_name: string
+  sender_name: string
+  timestamp: string   // "YYYY-MM-DDTHH:MM:SS"
+  text: string
+}
+
 export interface DayCount {
   date: string // "YYYY-MM-DD"
   count: number

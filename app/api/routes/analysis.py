@@ -193,6 +193,7 @@ def get_messages(
     date_to: datetime | None = None,
     limit: int = 2000,
     offset: int = 0,
+    search: str | None = None,
 ) -> dict[str, Any]:
     config = _config(chat_id, exclude_system, date_from, date_to)
     df = get_df(request, config)
@@ -200,6 +201,8 @@ def get_messages(
         return {"total": 0, "messages": []}
 
     df_sorted = df.sort_values("timestamp")
+    if search:
+        df_sorted = df_sorted[df_sorted["text_data"].str.contains(search, case=False, na=False)]
     total = len(df_sorted)
     page = df_sorted.iloc[offset : offset + limit]
 

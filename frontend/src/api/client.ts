@@ -8,6 +8,7 @@ import type {
   MediaData,
   OverviewData,
   Participant,
+  SearchResult,
   TimelinePoint,
   WordData,
 } from './types'
@@ -29,7 +30,14 @@ export const api = {
   words: (chatId: number): Promise<WordData> => get(`/api/chats/${chatId}/words`),
   emoji: (chatId: number): Promise<EmojiItem[]> => get(`/api/chats/${chatId}/emoji`),
   media: (chatId: number): Promise<MediaData> => get(`/api/chats/${chatId}/media`),
-  chatMessages: (chatId: number, limit = 2000, offset = 0): Promise<ChatMessagesResponse> =>
-    get(`/api/chats/${chatId}/messages?limit=${limit}&offset=${offset}`),
+  chatMessages: (chatId: number, limit = 2000, offset = 0, dateFrom?: string, dateTo?: string, search?: string): Promise<ChatMessagesResponse> => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+    if (dateFrom) params.set('date_from', dateFrom)
+    if (dateTo) params.set('date_to', dateTo)
+    if (search) params.set('search', search)
+    return get(`/api/chats/${chatId}/messages?${params}`)
+  },
+  search: (q: string, limit = 50): Promise<SearchResult[]> =>
+    get(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   dayDetail: (date: string): Promise<DayDetail> => get(`/api/day/${date}`),
 }
