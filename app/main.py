@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -38,11 +39,19 @@ All processing is local. No data is sent to any external service.
         logger.error(f"msgstore.db not found: {parsed.msgstore}")
         sys.exit(1)
 
-    from api.server import create_api  # noqa: PLC0415
-
-    api = create_api(msgstore_path=parsed.msgstore, wadb_path=parsed.wadb)
     logger.info(f"Starting WhatsApp Analyzer on http://{parsed.host}:{parsed.port}")
-    uvicorn.run(api, host=parsed.host, port=parsed.port, reload=parsed.reload)
+
+    if parsed.reload:
+        # uvicorn requires an import string to enable --reload; pass paths via env vars
+        os.environ["WHATSAPP_MSGSTORE"] = str(parsed.msgstore)
+        if parsed.wadb:
+            os.environ["WHATSAPP_WADB"] = str(parsed.wadb)
+        uvicorn.run("api.asgi:app", host=parsed.host, port=parsed.port, reload=True)
+    else:
+        from api.server import create_api  # noqa: PLC0415
+
+        api = create_api(msgstore_path=parsed.msgstore, wadb_path=parsed.wadb)
+        uvicorn.run(api, host=parsed.host, port=parsed.port)
 
 
 if __name__ == "__main__":
