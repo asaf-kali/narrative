@@ -9,6 +9,7 @@ import TimelinePage from './pages/TimelinePage'
 import ParticipantsPage from './pages/ParticipantsPage'
 import ContentPage from './pages/ContentPage'
 import MediaPage from './pages/MediaPage'
+import MessagesPage from './pages/MessagesPage'
 import ChatLayout from './components/ChatLayout'
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="participants" element={<ParticipantsPage />} />
               <Route path="content" element={<ContentPage />} />
               <Route path="media" element={<MediaPage />} />
+              <Route path="messages" element={<MessagesPage />} />
             </Route>
           </Routes>
         </main>

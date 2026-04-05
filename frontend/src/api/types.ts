@@ -58,3 +58,39 @@ export interface DayCount {
   date: string // "YYYY-MM-DD"
   count: number
 }
+
+export interface FeedMessage {
+  timestamp: string   // "YYYY-MM-DDTHH:MM:SS"
+  chat_name: string
+  sender_name: string
+  text: string | null
+  message_type: number
+}
+
+export interface ChatMessagesResponse {
+  total: number
+  messages: FeedMessage[]
+}
+
+export interface DayMessage {
+  time: string       // "HH:MM"
+  chat_name: string
+  sender_name: string
+  text: string | null
+  message_type: number
+}
+
+export interface DayBucket {
+  bucket: string     // "HH:MM" 5-min resolution
+  chat_name: string
+  count: number
+}
+
+export interface DayDetail {
+  date: string
+  total_messages: number
+  active_chats: number
+  senders: string[]  // sorted by frequency desc
+  timeline: DayBucket[]
+  messages: DayMessage[]
+}

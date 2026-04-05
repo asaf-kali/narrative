@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { DayCount } from '../api/types'
 import CalendarHeatmap from '../components/CalendarHeatmap'
+import DayDetail from '../components/DayDetail'
 
 type Range = '1M' | '3M' | '6M' | '1Y' | 'ALL'
 
@@ -90,22 +91,7 @@ export default function HomePage() {
       </div>
 
       {selectedDate && (
-        <div className="bg-app-surface border border-accent/30 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-slate-300">
-              {selectedDate} —{' '}
-              <span className="text-accent-light">
-                {allData.find((d) => d.date === selectedDate)?.count.toLocaleString()} messages
-              </span>
-            </h3>
-            <button onClick={() => setSelectedDate(null)} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
-              ✕
-            </button>
-          </div>
-          <p className="text-slate-500 text-xs italic">
-            Per-day chat breakdown coming soon — will show active chats, top senders, and hourly distribution.
-          </p>
-        </div>
+        <DayDetail date={selectedDate} onClose={() => setSelectedDate(null)} />
       )}
     </div>
   )

@@ -184,6 +184,54 @@ def get_emoji(
     return cast("list[dict[str, Any]]", emoji_counts(df, config).to_dict("records"))
 
 
+@router.get("/chats/{chat_id}/messages")
+def get_messages(
+    chat_id: int,
+    request: Request,
+    exclude_system: bool = True,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    limit: int = 2000,
+    offset: int = 0,
+) -> dict[str, Any]:
+    config = _config(chat_id, exclude_system, date_from, date_to)
+    df = get_df(request, config)
+    if df.empty:
+        return {"total": 0, "messages": []}
+
+    df_sorted = df.sort_values("timestamp")
+    total = len(df_sorted)
+    page = df_sorted.iloc[offset : offset + limit]
+
+    type_labels: dict[int, str] = {
+        MessageType.IMAGE: "[Image]",
+        MessageType.AUDIO: "[Audio]",
+        MessageType.VIDEO: "[Video]",
+        MessageType.CONTACT: "[Contact]",
+        MessageType.LOCATION: "[Location]",
+        MessageType.DOCUMENT: "[Document]",
+        MessageType.STICKER: "[Sticker]",
+        MessageType.GIF: "[GIF]",
+    }
+
+    messages = []
+    for _, row in page.iterrows():
+        text = row.get("text_data")
+        if not text:
+            text = type_labels.get(int(row["message_type"]))
+        messages.append(
+            {
+                "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "chat_name": str(row.get("chat_name", "")),
+                "sender_name": str(row["sender_name"]),
+                "text": str(text) if text else None,
+                "message_type": int(row["message_type"]),
+            }
+        )
+
+    return {"total": total, "messages": messages}
+
+
 @router.get("/chats/{chat_id}/media")
 def get_media(
     chat_id: int,

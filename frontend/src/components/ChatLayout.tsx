@@ -6,6 +6,7 @@ const TABS = [
   { label: 'Participants', path: 'participants' },
   { label: 'Words & Emoji', path: 'content' },
   { label: 'Media', path: 'media' },
+  { label: 'Messages', path: 'messages' },
 ]
 
 export default function ChatLayout() {
