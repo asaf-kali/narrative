@@ -8,6 +8,9 @@ logger = logging.getLogger(__name__)
 # - sender_jid_row_id is set for group messages (identifies who sent in the group).
 # - For 1-on-1 chats, sender is derived from the chat JID + from_me flag.
 # - text_data holds message text inline (message_text table is for link previews).
+# - Recent WhatsApp versions use LID JIDs (server='lid') for group senders instead
+#   of phone-based JIDs.  jid_map maps lid_row_id → jid_row_id for the phone JID,
+#   so we join through it and prefer the resolved phone number (pj) over the raw lid.
 _MESSAGES_SQL = """
 SELECT
     m._id            AS message_id,
@@ -18,16 +21,18 @@ SELECT
     m.message_type,
     m.text_data,
     m.starred,
-    COALESCE(sj.user, '')  AS sender_phone,
-    COALESCE(sj.server, '') AS sender_server,
+    COALESCE(pj.user, sj.user, '')   AS sender_phone,
+    COALESCE(pj.server, sj.server, '') AS sender_server,
     c.subject              AS chat_subject,
     cj.user                AS chat_phone,
     cj.server              AS chat_server,
     cj.type                AS chat_jid_type
 FROM message m
-LEFT JOIN jid sj  ON m.sender_jid_row_id = sj._id
-LEFT JOIN chat c  ON m.chat_row_id = c._id
-LEFT JOIN jid cj  ON c.jid_row_id = cj._id
+LEFT JOIN jid sj       ON m.sender_jid_row_id = sj._id
+LEFT JOIN jid_map lm   ON sj._id = lm.lid_row_id AND sj.server = 'lid'
+LEFT JOIN jid pj       ON lm.jid_row_id = pj._id
+LEFT JOIN chat c       ON m.chat_row_id = c._id
+LEFT JOIN jid cj       ON c.jid_row_id = cj._id
 WHERE m.chat_row_id > 0
 """
 
