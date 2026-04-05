@@ -42,7 +42,6 @@ export default function HomePage() {
   const activeDays = data.filter((d) => d.count > 0).length
   const peakDay = data.reduce((best, d) => (d.count > best.count ? d : best), { date: '—', count: 0 })
 
-  // Clear selected date if it falls outside the new range
   const handleRangeChange = (r: Range) => {
     setRange(r)
     if (selectedDate) {
@@ -52,10 +51,10 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="max-w-5xl space-y-5">
       <div>
-        <h2 className="text-2xl font-bold text-gray-800">All Chats</h2>
-        <p className="text-sm text-gray-400 mt-1">Activity across all conversations</p>
+        <h2 className="text-xl font-bold text-slate-100">All Chats</h2>
+        <p className="text-xs text-slate-500 mt-1">Activity across all conversations</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -64,18 +63,18 @@ export default function HomePage() {
         <StatCard label="Busiest Day" value={peakDay.date} sub={`${peakDay.count.toLocaleString()} messages`} icon="🔥" />
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <div className="bg-app-surface border border-app-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-600">Message Activity</h3>
-          <div className="flex gap-1">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Message Activity</h3>
+          <div className="flex gap-1.5">
             {RANGES.map((r) => (
               <button
                 key={r.value}
                 onClick={() => handleRangeChange(r.value)}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   range === r.value
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                    : 'bg-app-surface-2 text-slate-400 hover:text-slate-200 border border-app-border'
                 }`}
               >
                 {r.label}
@@ -84,26 +83,26 @@ export default function HomePage() {
           </div>
         </div>
         {isLoading ? (
-          <div className="h-36 bg-gray-100 rounded animate-pulse" />
+          <div className="h-36 bg-app-surface-2 rounded animate-pulse" />
         ) : (
           <CalendarHeatmap data={data} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
         )}
       </div>
 
       {selectedDate && (
-        <div className="bg-white rounded-xl border border-teal-200 shadow-sm p-6">
+        <div className="bg-app-surface border border-accent/30 rounded-xl p-5">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gray-700">
+            <h3 className="text-sm font-semibold text-slate-300">
               {selectedDate} —{' '}
-              <span className="text-teal-600">
+              <span className="text-accent-light">
                 {allData.find((d) => d.date === selectedDate)?.count.toLocaleString()} messages
               </span>
             </h3>
-            <button onClick={() => setSelectedDate(null)} className="text-gray-400 hover:text-gray-600 text-sm">
+            <button onClick={() => setSelectedDate(null)} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
               ✕
             </button>
           </div>
-          <p className="text-gray-400 text-sm italic">
+          <p className="text-slate-500 text-xs italic">
             Per-day chat breakdown coming soon — will show active chats, top senders, and hourly distribution.
           </p>
         </div>
@@ -114,12 +113,12 @@ export default function HomePage() {
 
 function StatCard({ label, value, sub, icon }: { label: string; value: string; sub?: string; icon: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-      <div className="text-gray-400 text-sm mb-1">
+    <div className="bg-app-surface border border-app-border rounded-xl p-4">
+      <div className="text-[11px] text-slate-400 mb-1.5">
         {icon} {label}
       </div>
-      <div className="text-2xl font-bold text-gray-800">{value}</div>
-      {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
+      <div className="text-2xl font-bold text-slate-100 tabular-nums">{value}</div>
+      {sub && <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>}
     </div>
   )
 }

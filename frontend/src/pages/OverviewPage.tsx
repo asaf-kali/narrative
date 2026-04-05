@@ -3,15 +3,17 @@ import { useQuery } from '@tanstack/react-query'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { api } from '../api/client'
 
-const DONUT_COLORS = ['#0d9488', '#0891b2', '#7c3aed', '#db2777', '#f59e0b', '#84cc16', '#6366f1', '#94a3b8']
+const DONUT_COLORS = ['#7c5af6', '#0891b2', '#db2777', '#f59e0b', '#84cc16', '#6366f1', '#0d9488', '#94a3b8']
+const TOOLTIP_STYLE = { background: '#0d0f17', border: '1px solid #1a1d2e', color: '#e2e8f0', borderRadius: 8, fontSize: 12 }
+const TICK_STYLE = { fill: '#64748b', fontSize: 11 }
 
 function StatCard({ icon, label, value }: { icon: string; label: string; value: string | number }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-      <div className="text-gray-400 text-sm mb-1">
+    <div className="bg-app-surface border border-app-border rounded-xl p-4">
+      <div className="text-[11px] text-slate-400 mb-1.5">
         {icon} {label}
       </div>
-      <div className="text-2xl font-bold text-gray-800">
+      <div className="text-2xl font-bold text-slate-100 tabular-nums">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </div>
     </div>
@@ -40,26 +42,27 @@ export default function OverviewPage() {
         <StatCard icon="📊" label="Types" value={data.type_breakdown.length} />
       </div>
       <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Activity (last 30 days)</h3>
+        <div className="col-span-2 bg-app-surface border border-app-border rounded-xl p-4">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Activity (last 30 days)</h3>
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={data.sparkline}>
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v: string) => v.slice(5)} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
+              <XAxis dataKey="date" tick={TICK_STYLE} tickFormatter={(v: string) => v.slice(5)} />
+              <YAxis tick={TICK_STYLE} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Area
                 type="monotone"
                 dataKey="count"
-                stroke="#0d9488"
-                fill="#99f6e4"
+                stroke="#7c5af6"
+                fill="#7c5af6"
+                fillOpacity={0.15}
                 strokeWidth={2}
                 name="Messages"
               />
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">Message Types</h3>
+        <div className="bg-app-surface border border-app-border rounded-xl p-4">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Message Types</h3>
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie
@@ -75,7 +78,7 @@ export default function OverviewPage() {
                   <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: number) => v.toLocaleString()} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => v.toLocaleString()} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -89,12 +92,12 @@ function LoadingState() {
     <div className="space-y-4 animate-pulse">
       <div className="grid grid-cols-6 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-gray-200 rounded-xl h-20" />
+          <div key={i} className="bg-app-surface border border-app-border rounded-xl h-20" />
         ))}
       </div>
       <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2 bg-gray-200 rounded-xl h-56" />
-        <div className="bg-gray-200 rounded-xl h-56" />
+        <div className="col-span-2 bg-app-surface border border-app-border rounded-xl h-56" />
+        <div className="bg-app-surface border border-app-border rounded-xl h-56" />
       </div>
     </div>
   )

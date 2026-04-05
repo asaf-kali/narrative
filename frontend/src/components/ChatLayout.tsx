@@ -12,18 +12,18 @@ export default function ChatLayout() {
   const { chatId } = useParams<{ chatId: string }>()
 
   return (
-    <div>
-      <nav className="flex gap-1 mb-6 border-b border-gray-200 pb-0">
+    <div className="flex flex-col h-full">
+      <nav className="flex gap-0.5 px-5 pt-4 border-b border-app-border flex-shrink-0">
         {TABS.map((tab) => (
           <NavLink
             key={tab.path}
             to={tab.path === '' ? `/chat/${chatId}` : `/chat/${chatId}/${tab.path}`}
             end={tab.path === ''}
             className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+              `px-3.5 py-2 text-xs font-medium rounded-t-md border-b-2 -mb-px transition-colors ${
                 isActive
-                  ? 'border-teal-600 text-teal-700 bg-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                  ? 'border-accent text-slate-100 bg-app-surface-2'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
               }`
             }
           >
@@ -31,7 +31,9 @@ export default function ChatLayout() {
           </NavLink>
         ))}
       </nav>
-      <Outlet />
+      <div className="flex-1 overflow-auto p-5">
+        <Outlet />
+      </div>
     </div>
   )
 }

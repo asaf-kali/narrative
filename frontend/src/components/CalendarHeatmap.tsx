@@ -17,7 +17,6 @@ interface Cell {
 /** Returns Monday of the ISO week containing `d`. */
 function toMonday(d: Date): Date {
   const result = new Date(d)
-  // getDay(): 0=Sun, 1=Mon … 6=Sat → shift so Mon=0
   const dow = (d.getDay() + 6) % 7
   result.setDate(d.getDate() - dow)
   result.setHours(0, 0, 0, 0)
@@ -61,8 +60,7 @@ function buildGrid(data: DayCount[]): { weeks: Cell[][]; monthLabels: { label: s
         week.push({ date: iso, count: countMap.get(iso) ?? 0 })
       }
     }
-    // Track month labels (label on first week of a new month)
-    const repDate = addDays(weekStart, 3) // mid-week representative
+    const repDate = addDays(weekStart, 3)
     if (repDate.getMonth() !== seenMonth) {
       seenMonth = repDate.getMonth()
       monthLabels.push({ label: MONTHS[seenMonth], colIndex: weeks.length })
@@ -75,13 +73,11 @@ function buildGrid(data: DayCount[]): { weeks: Cell[][]; monthLabels: { label: s
 }
 
 function cellColor(count: number, max: number, isSelected: boolean): string {
-  if (isSelected) return '#0369a1' // highlight blue
-  if (count === 0) return '#f1f5f9'
-  const t = Math.sqrt(count / max) // sqrt scale so low values are visible
-  const r = Math.round(240 - t * 225)
-  const g = Math.round(253 - t * 97)
-  const b = Math.round(244 - t * 100)
-  return `rgb(${r},${g},${b})`
+  if (isSelected) return '#7c5af6'
+  if (count === 0) return '#12151f'
+  const t = Math.sqrt(count / max)
+  const alpha = 0.15 + t * 0.85
+  return `rgba(124, 90, 246, ${alpha.toFixed(2)})`
 }
 
 export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Props) {
@@ -89,7 +85,7 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
   const max = Math.max(...data.map((d) => d.count), 1)
 
   if (weeks.length === 0) {
-    return <div className="text-gray-400 text-sm text-center py-8">No data</div>
+    return <div className="text-slate-500 text-sm text-center py-8">No data</div>
   }
 
   return (
@@ -99,7 +95,7 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
         {weeks.map((_, wi) => {
           const label = monthLabels.find((m) => m.colIndex === wi)
           return (
-            <div key={wi} className="text-xs text-gray-400 flex-shrink-0" style={{ width: '14px', marginRight: '2px' }}>
+            <div key={wi} className="text-xs text-slate-500 flex-shrink-0" style={{ width: '14px', marginRight: '2px' }}>
               {label ? label.label : ''}
             </div>
           )
@@ -113,7 +109,7 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
           {DAYS.map((d, i) => (
             <div
               key={d}
-              className="text-xs text-gray-400 flex items-center justify-end pr-1"
+              className="text-xs text-slate-500 flex items-center justify-end pr-1"
               style={{ height: '14px', marginBottom: '2px', width: '2rem', visibility: i % 2 === 0 ? 'visible' : 'hidden' }}
             >
               {d}
@@ -129,7 +125,7 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
                 key={di}
                 title={cell.date ? `${cell.date}: ${cell.count.toLocaleString()} messages` : ''}
                 onClick={() => cell.date && cell.count > 0 && onSelectDate(cell.date)}
-                className={`rounded-sm flex-shrink-0 ${cell.date && cell.count > 0 ? 'cursor-pointer hover:ring-2 hover:ring-teal-400 hover:ring-offset-1' : ''}`}
+                className={`rounded-sm flex-shrink-0 ${cell.date && cell.count > 0 ? 'cursor-pointer hover:ring-1 hover:ring-accent/60' : ''}`}
                 style={{
                   width: '14px',
                   height: '14px',
@@ -143,13 +139,13 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-1 mt-3 justify-end text-xs text-gray-400">
+      <div className="flex items-center gap-1 mt-3 justify-end text-xs text-slate-500">
         <span>Less</span>
         {[0, 0.2, 0.4, 0.7, 1].map((t) => (
           <div
             key={t}
             className="w-3 h-3 rounded-sm"
-            style={{ backgroundColor: t === 0 ? '#f1f5f9' : cellColor(Math.ceil(t * max), max, false) }}
+            style={{ backgroundColor: t === 0 ? '#12151f' : cellColor(Math.ceil(t * max), max, false) }}
           />
         ))}
         <span>More</span>

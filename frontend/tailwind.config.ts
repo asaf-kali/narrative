@@ -5,17 +5,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        teal: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
+        app: {
+          bg: '#07080d',
+          surface: '#0d0f17',
+          'surface-2': '#12151f',
+          border: '#1a1d2e',
+          muted: '#374061',
+        },
+        accent: {
+          DEFAULT: '#7c5af6',
+          light: '#a78bfa',
+          dark: '#5b21b6',
         },
       },
     },

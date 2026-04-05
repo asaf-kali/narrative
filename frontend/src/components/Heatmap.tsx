@@ -13,8 +13,8 @@ export default function Heatmap({ data }: Props) {
 
   function cellColor(count: number): string {
     const intensity = count / maxVal
-    const alpha = 0.08 + intensity * 0.9
-    return `rgba(13, 148, 136, ${alpha.toFixed(2)})`
+    const alpha = 0.06 + intensity * 0.94
+    return `rgba(124, 90, 246, ${alpha.toFixed(2)})`
   }
 
   return (
@@ -24,7 +24,7 @@ export default function Heatmap({ data }: Props) {
           <tr>
             <th className="w-24" />
             {HOURS.map((h) => (
-              <th key={h} className="text-center text-gray-400 font-normal pb-1 w-8">
+              <th key={h} className="text-center text-slate-500 font-normal pb-1 w-8">
                 {h % 4 === 0 ? `${h}h` : ''}
               </th>
             ))}
@@ -33,7 +33,7 @@ export default function Heatmap({ data }: Props) {
         <tbody>
           {DAYS.map((day) => (
             <tr key={day}>
-              <td className="text-gray-500 pr-2 text-right whitespace-nowrap">{day.slice(0, 3)}</td>
+              <td className="text-slate-500 pr-2 text-right whitespace-nowrap">{day.slice(0, 3)}</td>
               {HOURS.map((hour) => {
                 const count = lookup.get(`${day}-${hour}`) ?? 0
                 return (

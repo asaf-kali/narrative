@@ -12,19 +12,16 @@ import MediaPage from './pages/MediaPage'
 import ChatLayout from './components/ChatLayout'
 
 export default function App() {
-  const { data: chats = [], isLoading } = useQuery({
-    queryKey: ['chats'],
-    queryFn: api.chats,
-  })
+  const { data: chats = [], isLoading } = useQuery({ queryKey: ['chats'], queryFn: api.chats })
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-app-bg text-slate-200">
       <Sidebar chats={chats} isLoading={isLoading} />
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-auto p-6 bg-gray-50">
+        <main className="flex-1 overflow-hidden">
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<div className="h-full overflow-auto p-6"><HomePage /></div>} />
             <Route path="/chat/:chatId" element={<ChatLayout />}>
               <Route index element={<OverviewPage />} />
               <Route path="timeline" element={<TimelinePage />} />
