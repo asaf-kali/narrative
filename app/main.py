@@ -58,6 +58,9 @@ All processing is local. No data is sent to any external service.
     )
     parser.add_argument("--msgstore", type=Path, default=None, help="Path to decrypted msgstore.db")
     parser.add_argument("--wadb", type=Path, default=None, help="Path to decrypted wa.db (optional, for contact names)")
+    parser.add_argument(
+        "--contacts", type=Path, default=None, help="Google Contacts CSV export (optional, overrides wa.db for names)"
+    )
     parser.add_argument("--port", type=int, default=8050, help="Port to run on (default: 8050)")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload (development mode)")
@@ -79,11 +82,13 @@ All processing is local. No data is sent to any external service.
         os.environ["WHATSAPP_MSGSTORE"] = str(parsed.msgstore)
         if parsed.wadb:
             os.environ["WHATSAPP_WADB"] = str(parsed.wadb)
+        if parsed.contacts:
+            os.environ["WHATSAPP_CONTACTS"] = str(parsed.contacts)
         uvicorn.run("api.asgi:app", host=parsed.host, port=parsed.port, reload=True, log_config=_UVICORN_LOG_CONFIG)
     else:
         from api.server import create_api  # noqa: PLC0415
 
-        api = create_api(msgstore_path=parsed.msgstore, wadb_path=parsed.wadb)
+        api = create_api(msgstore_path=parsed.msgstore, wadb_path=parsed.wadb, contacts_path=parsed.contacts)
         uvicorn.run(api, host=parsed.host, port=parsed.port, log_config=_UVICORN_LOG_CONFIG)
 
 

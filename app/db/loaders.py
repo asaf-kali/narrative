@@ -27,12 +27,15 @@ _JID_SUFFIX = "@s.whatsapp.net"
 
 
 class DataLoader:
-    def __init__(self, db: DBConnection) -> None:
+    def __init__(self, db: DBConnection, contact_names: dict[str, str] | None = None) -> None:
         self._db = db
-        self._contact_names: dict[str, str] = {}
+        # When contact_names is explicitly provided (e.g. from a Google CSV), use it
+        # directly and skip wa.db entirely.  None means "try wa.db as fallback".
+        self._contact_names: dict[str, str] = contact_names if contact_names is not None else {}
+        self._contacts_preloaded = contact_names is not None
 
     def load_contact_names(self) -> dict[str, str]:
-        if self._contact_names:
+        if self._contacts_preloaded or self._contact_names:
             return self._contact_names
         if self._db.wadb is None:
             return {}

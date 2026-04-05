@@ -19,9 +19,10 @@ def get_df(request: Request, config: AnalysisConfig) -> pd.DataFrame:
         return cast("pd.DataFrame", cached)
     msgstore: Path = request.app.state.msgstore_path
     wadb: Path | None = request.app.state.wadb_path
+    contact_names: dict[str, str] | None = request.app.state.contact_names
     logger.info(f"Loading messages for chat_id={config.chat_id}")
     with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        df = DataLoader(db).load_messages(config)
+        df = DataLoader(db, contact_names=contact_names).load_messages(config)
     logger.info(f"Loaded {len(df)} messages")
     cache.set_cached(key, df)
     return cast("pd.DataFrame", df)

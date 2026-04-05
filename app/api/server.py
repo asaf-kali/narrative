@@ -13,11 +13,21 @@ logger = logging.getLogger(__name__)
 _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 
-def create_api(msgstore_path: Path, wadb_path: Path | None = None) -> FastAPI:
+def create_api(
+    msgstore_path: Path,
+    wadb_path: Path | None = None,
+    contacts_path: Path | None = None,
+) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
         app.state.msgstore_path = msgstore_path
         app.state.wadb_path = wadb_path
+        if contacts_path is not None:
+            from db.contacts import load_contacts_csv  # noqa: PLC0415
+
+            app.state.contact_names = load_contacts_csv(contacts_path)
+        else:
+            app.state.contact_names = None  # signal: fall back to wa.db
         logger.info(f"API initialized: msgstore={msgstore_path}")
         yield
 

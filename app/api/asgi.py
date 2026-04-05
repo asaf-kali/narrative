@@ -13,8 +13,10 @@ logger = logging.getLogger(__name__)
 
 _msgstore = os.environ.get("WHATSAPP_MSGSTORE", "")
 _wadb = os.environ.get("WHATSAPP_WADB")
+_contacts = os.environ.get("WHATSAPP_CONTACTS")
 
 app = create_api(
     msgstore_path=Path(_msgstore),
     wadb_path=Path(_wadb) if _wadb else None,
+    contacts_path=Path(_contacts) if _contacts else None,
 )
