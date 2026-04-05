@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, Link } from 'react-router-dom'
 import type { Chat } from '../api/types'
 
 interface Props {
@@ -21,7 +21,9 @@ export default function Sidebar({ chats, isLoading }: Props) {
   return (
     <aside className="w-72 bg-slate-900 text-slate-100 flex flex-col flex-shrink-0 overflow-hidden">
       <div className="p-4 border-b border-slate-700">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Chats ({chats.length})</p>
+        <Link to="/" className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 hover:text-teal-400 transition-colors">
+          ← All Chats ({chats.length})
+        </Link>
         <input
           type="text"
           placeholder="Search chats..."

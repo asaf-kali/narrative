@@ -1,8 +1,9 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from './api/client'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
+import HomePage from './pages/HomePage'
 import OverviewPage from './pages/OverviewPage'
 import TimelinePage from './pages/TimelinePage'
 import ParticipantsPage from './pages/ParticipantsPage'
@@ -23,16 +24,7 @@ export default function App() {
         <Header />
         <main className="flex-1 overflow-auto p-6 bg-gray-50">
           <Routes>
-            <Route
-              path="/"
-              element={
-                chats.length > 0 ? (
-                  <Navigate to={`/chat/${chats[0].chat_id}`} replace />
-                ) : (
-                  <EmptyState message="Loading chats..." />
-                )
-              }
-            />
+            <Route path="/" element={<HomePage />} />
             <Route path="/chat/:chatId" element={<ChatLayout />}>
               <Route index element={<OverviewPage />} />
               <Route path="timeline" element={<TimelinePage />} />
@@ -45,8 +37,4 @@ export default function App() {
       </div>
     </div>
   )
-}
-
-function EmptyState({ message }: { message: string }) {
-  return <div className="flex items-center justify-center h-full text-gray-400 text-lg">{message}</div>
 }

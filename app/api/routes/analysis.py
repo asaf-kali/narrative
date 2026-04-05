@@ -1,7 +1,9 @@
 import logging
+import subprocess
 from base64 import b64encode
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
@@ -207,10 +209,38 @@ def _generate_wordcloud(df: pd.DataFrame) -> str:
         text = build_word_cloud_text(df)
         if not text.strip():
             return ""
-        wc = WordCloud(width=800, height=400, background_color="white", colormap="viridis").generate(text)
+        wc = WordCloud(
+            width=800,
+            height=400,
+            background_color="white",
+            colormap="viridis",
+            font_path=str(_find_unicode_font()),
+        ).generate(text)
         buf = BytesIO()
         wc.to_image().save(buf, format="PNG")
         return "data:image/png;base64," + b64encode(buf.getvalue()).decode()
     except Exception:
         logger.exception("Word cloud generation failed")
         return ""
+
+
+def _find_unicode_font() -> Path | None:
+    """Return a font file that covers Hebrew (and other non-Latin scripts).
+
+    Tries fc-list for a Hebrew-capable font; falls back to DejaVu Sans which
+    is bundled on most Linux distros and covers the Hebrew Unicode block.
+    """
+    try:
+        fc_list = "/usr/bin/fc-list"  # absolute path avoids S607
+        out = subprocess.check_output([fc_list, ":lang=he", "--format=%{file}\n"], text=True, timeout=3)  # noqa: S603
+        for line in out.splitlines():
+            p = Path(line.strip())
+            if p.is_file():
+                logger.debug(f"Word cloud font: {p}")
+                return p
+    except OSError:
+        logger.debug("fc-list not available; falling back to DejaVu Sans")
+    fallback = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    if fallback.is_file():
+        return fallback
+    return None

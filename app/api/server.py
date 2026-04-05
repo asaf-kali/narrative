@@ -30,9 +30,10 @@ def create_api(msgstore_path: Path, wadb_path: Path | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    from api.routes import analysis, chats  # noqa: PLC0415
+    from api.routes import analysis, chats, stats  # noqa: PLC0415
 
     app.include_router(chats.router, prefix="/api")
+    app.include_router(stats.router, prefix="/api")
     app.include_router(analysis.router, prefix="/api")
 
     if _DIST.exists():

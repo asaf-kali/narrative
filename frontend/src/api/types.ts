@@ -53,3 +53,8 @@ export interface MediaData {
   breakdown: Array<{ type_label: string; count: number }>
   timeline: Array<{ month: string; type_label: string; count: number }>
 }
+
+export interface DayCount {
+  date: string // "YYYY-MM-DD"
+  count: number
+}
