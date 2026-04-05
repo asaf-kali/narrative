@@ -1,25 +1,19 @@
 # Variables
-
-PYTHON_TEST_COMMAND := "pytest"
 OPEN_FILE_COMMAND := "wslview"
-DEL_COMMAND := "gio trash"
 RUN := "uv run"
+NPM := "npm --prefix frontend"
 
 # Install
 
 install-run:
     uv sync --no-default-groups
 
-install-test:
-    uv sync --no-default-groups --group test
-
-install-all:
-    uv sync --all-groups
-
-install-dev: install-all
+install-dev:
+    uv sync --group lint --group dev
     {{ RUN }} pre-commit install
+    {{ NPM }} install
 
-install: install-dev lint cover-base
+install: install-dev lint
 
 # UV
 
@@ -32,27 +26,16 @@ lock-upgrade:
 lock-check:
     uv lock --check
 
-# Test
+# Frontend
 
-test *args:
-    {{ RUN }} python -m {{ PYTHON_TEST_COMMAND }} {{ args }}
+frontend-install:
+    {{ NPM }} install
 
-cover-base *args:
-    {{ RUN }} coverage run -m {{ PYTHON_TEST_COMMAND }} {{ args }}
-    {{ RUN }} coverage report
+frontend-build:
+    {{ NPM }} run build
 
-cover-xml: cover-base
-    {{ RUN }} coverage xml
-
-cover-html: cover-base
-    {{ RUN }} coverage html
-
-cover-percentage:
-    {{ RUN }} coverage report --precision 3 | grep TOTAL | awk '{print $4}' | sed 's/%//'
-
-cover: cover-html
-    {{ OPEN_FILE_COMMAND }} htmlcov/index.html &
-    {{ DEL_COMMAND }} .coverage*
+frontend-dev:
+    {{ NPM }} run dev
 
 # Run
 
@@ -60,7 +43,7 @@ run *args:
     PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
 
 run-dev *args:
-    DASH_DEBUG=true PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
+    PYTHONPATH=app {{ RUN }} python app/main.py --reload {{ args }}
 
 # Lint
 

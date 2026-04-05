@@ -1,0 +1,216 @@
+import logging
+from base64 import b64encode
+from datetime import datetime
+from io import BytesIO
+from typing import Any, cast
+
+import pandas as pd
+from analysis.content import build_word_cloud_text, emoji_counts, word_frequencies
+from analysis.media import media_breakdown, media_over_time
+from analysis.participants import per_sender_stats
+from analysis.timeline import active_days_count, daily_timeline, hourly_heatmap, monthly_timeline
+from api.deps import get_df
+from fastapi import APIRouter, Request
+from models.config import AnalysisConfig
+from models.message import AUDIO_TYPES, MEDIA_TYPES, MessageType
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+def _config(
+    chat_id: int,
+    exclude_system: bool,
+    date_from: datetime | None,
+    date_to: datetime | None,
+) -> AnalysisConfig:
+    return AnalysisConfig(
+        chat_id=chat_id,
+        exclude_system=exclude_system,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+@router.get("/chats/{chat_id}/overview")
+def get_overview(
+    chat_id: int,
+    request: Request,
+    exclude_system: bool = True,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> dict[str, Any]:
+    config = _config(chat_id, exclude_system, date_from, date_to)
+    df = get_df(request, config)
+    if df.empty:
+        return {
+            "total_messages": 0,
+            "active_days": 0,
+            "total_media": 0,
+            "total_audio": 0,
+            "total_links": 0,
+            "sparkline": [],
+            "type_breakdown": [],
+        }
+
+    total_media = int(df["message_type"].isin({t.value for t in MEDIA_TYPES}).sum())
+    total_audio = int(df["message_type"].isin({t.value for t in AUDIO_TYPES}).sum())
+    total_links = int(df["text_data"].dropna().str.contains("http", na=False).sum())
+
+    # Sparkline: daily totals for last 30 days
+    last_30 = df[df["timestamp"] >= df["timestamp"].max() - pd.Timedelta(days=30)]
+    sparkline_df = last_30.groupby("date").size().reset_index(name="count")
+    sparkline = [{"date": str(r["date"]), "count": int(r["count"])} for _, r in sparkline_df.iterrows()]
+
+    # Type breakdown
+    type_labels = {t.value: t.name.capitalize() for t in MessageType}
+    type_counts = df["message_type"].value_counts().reset_index()
+    type_counts.columns = pd.Index(["type", "count"])
+    type_breakdown = [
+        {"label": type_labels.get(int(r["type"]), "Other"), "count": int(r["count"])} for _, r in type_counts.iterrows()
+    ]
+
+    return {
+        "total_messages": len(df),
+        "active_days": active_days_count(df),
+        "total_media": total_media,
+        "total_audio": total_audio,
+        "total_links": total_links,
+        "sparkline": sparkline,
+        "type_breakdown": type_breakdown,
+    }
+
+
+@router.get("/chats/{chat_id}/timeline")
+def get_timeline(
+    chat_id: int,
+    request: Request,
+    period: str = "daily",
+    exclude_system: bool = True,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[dict[str, Any]]:
+    config = _config(chat_id, exclude_system, date_from, date_to)
+    df = get_df(request, config)
+    if df.empty:
+        return []
+    if period == "monthly":
+        result = monthly_timeline(df, config)
+        return [
+            {"x": str(r["month"]), "sender_name": str(r["sender_name"]), "count": int(r["count"])}
+            for _, r in result.iterrows()
+        ]
+    result = daily_timeline(df, config)
+    return [
+        {
+            "x": str(r["date"].date() if hasattr(r["date"], "date") else r["date"]),
+            "sender_name": str(r["sender_name"]),
+            "count": int(r["count"]),
+        }
+        for _, r in result.iterrows()
+    ]
+
+
+@router.get("/chats/{chat_id}/heatmap")
+def get_heatmap(
+    chat_id: int,
+    request: Request,
+    exclude_system: bool = True,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[dict[str, Any]]:
+    config = _config(chat_id, exclude_system, date_from, date_to)
+    df = get_df(request, config)
+    if df.empty:
+        return []
+    heatmap_df = hourly_heatmap(df, config)
+    return [
+        {"day": str(day), "hour": int(hour), "count": int(heatmap_df.loc[day, hour])}
+        for day in heatmap_df.index
+        for hour in heatmap_df.columns
+    ]
+
+
+@router.get("/chats/{chat_id}/participants")
+def get_participants(
+    chat_id: int,
+    request: Request,
+    exclude_system: bool = True,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[dict[str, Any]]:
+    config = _config(chat_id, exclude_system, date_from, date_to)
+    df = get_df(request, config)
+    if df.empty:
+        return []
+    stats = per_sender_stats(df, config)
+    return cast("list[dict[str, Any]]", stats.fillna(0).to_dict("records"))
+
+
+@router.get("/chats/{chat_id}/words")
+def get_words(
+    chat_id: int,
+    request: Request,
+    exclude_system: bool = True,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> dict[str, Any]:
+    config = _config(chat_id, exclude_system, date_from, date_to)
+    df = get_df(request, config)
+    if df.empty:
+        return {"frequencies": [], "wordcloud_png": ""}
+    freqs = word_frequencies(df, config)
+    wordcloud_png = _generate_wordcloud(df)
+    return {
+        "frequencies": freqs.to_dict("records"),
+        "wordcloud_png": wordcloud_png,
+    }
+
+
+@router.get("/chats/{chat_id}/emoji")
+def get_emoji(
+    chat_id: int,
+    request: Request,
+    exclude_system: bool = True,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[dict[str, Any]]:
+    config = _config(chat_id, exclude_system, date_from, date_to)
+    df = get_df(request, config)
+    if df.empty:
+        return []
+    return cast("list[dict[str, Any]]", emoji_counts(df, config).to_dict("records"))
+
+
+@router.get("/chats/{chat_id}/media")
+def get_media(
+    chat_id: int,
+    request: Request,
+    exclude_system: bool = True,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> dict[str, Any]:
+    config = _config(chat_id, exclude_system, date_from, date_to)
+    df = get_df(request, config)
+    if df.empty:
+        return {"breakdown": [], "timeline": []}
+    return {
+        "breakdown": media_breakdown(df, config).to_dict("records"),
+        "timeline": media_over_time(df, config).to_dict("records"),
+    }
+
+
+def _generate_wordcloud(df: pd.DataFrame) -> str:
+    try:
+        from wordcloud import WordCloud  # noqa: PLC0415
+
+        text = build_word_cloud_text(df)
+        if not text.strip():
+            return ""
+        wc = WordCloud(width=800, height=400, background_color="white", colormap="viridis").generate(text)
+        buf = BytesIO()
+        wc.to_image().save(buf, format="PNG")
+        return "data:image/png;base64," + b64encode(buf.getvalue()).decode()
+    except Exception:
+        logger.exception("Word cloud generation failed")
+        return ""
