@@ -26,7 +26,6 @@ class RawMessageRow(_RowBase):
     chat_subject: str | None
     chat_phone: str
     chat_server: str
-    chat_jid_type: str | None
 
 
 class RawChatRow(_RowBase):
@@ -35,7 +34,6 @@ class RawChatRow(_RowBase):
     created_timestamp: int | None
     chat_phone: str
     chat_server: str
-    chat_jid_type: str | None
     message_count: int
     first_timestamp: int | None
     last_timestamp: int | None
