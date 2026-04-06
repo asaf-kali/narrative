@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from typing import cast
 
 from db.loaders import DataLoader, open_connection
 from fastapi import APIRouter, Request
@@ -18,6 +17,6 @@ def list_chats(request: Request) -> list[ChatSummary]:
     registry: SenderRegistry = request.app.state.sender_registry
     logger.info("Loading chat list")
     with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        chats = DataLoader(db, registry=registry).load_chats()
+        chats: list[ChatSummary] = DataLoader(db, registry=registry).load_chats()
     logger.info(f"Returning {len(chats)} chats")
-    return cast("list[ChatSummary]", chats)
+    return chats
