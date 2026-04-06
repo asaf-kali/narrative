@@ -29,6 +29,7 @@ def create_api(
             app.state.sender_registry = build_sender_registry(
                 wadb=db.wadb,
                 csv_path=contacts_path,
+                msgstore=db.msgstore,
             )
         logger.info(f"API initialized: msgstore={msgstore_path}")
         yield

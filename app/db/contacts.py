@@ -16,16 +16,20 @@ _MAX_PHONE_DIGITS = 15
 def build_sender_registry(
     wadb: sqlite3.Connection | None,
     csv_path: Path | None,
+    msgstore: sqlite3.Connection | None = None,
 ) -> SenderRegistry:
     """Merge all contact sources into a single SenderRegistry.
 
     Priority (highest wins): CSV > wa_contacts > bare phone number.
+    LID JIDs (WhatsApp privacy IDs) are resolved via jid_map in msgstore.
     """
     contacts: dict[str, str] = {}
     if wadb is not None:
         contacts.update(_load_wa_contacts(wadb))
     if csv_path is not None:
         contacts.update(load_contacts_csv(csv_path))
+    if msgstore is not None:
+        contacts.update(_resolve_lids(msgstore, contacts))
     logger.info(f"SenderRegistry built: {len(contacts)} contacts")
     return SenderRegistry(contacts=contacts)
 
@@ -87,6 +91,34 @@ def _add_csv_row(contacts: dict[str, str], row: dict[str, str]) -> None:
         return
     for phone in _row_phones(row):
         _add_contact(contacts, phone, name)
+
+
+def _resolve_lids(msgstore: sqlite3.Connection, contacts: dict[str, str]) -> dict[str, str]:
+    """Build {lid_user: display_name} for LIDs whose phone is already in contacts.
+
+    jid_map maps lid_row_id → jid_row_id (the real phone JID), allowing LID-based
+    chats to be resolved via the existing contacts dict.
+    """
+    try:
+        rows = msgstore.execute("""
+            SELECT lid_jid.user AS lid_user, phone_jid.user AS phone_user
+            FROM jid_map jm
+            JOIN jid lid_jid   ON jm.lid_row_id = lid_jid._id
+            JOIN jid phone_jid ON jm.jid_row_id  = phone_jid._id
+            WHERE lid_jid.server = 'lid'
+              AND phone_jid.server = 's.whatsapp.net'
+        """).fetchall()
+    except sqlite3.OperationalError:
+        logger.debug("jid_map not available — skipping LID resolution.")
+        return {}
+
+    resolved: dict[str, str] = {}
+    for row in rows:
+        name = contacts.get(row["phone_user"])
+        if name:
+            resolved[row["lid_user"]] = name
+    logger.info(f"Resolved {len(resolved)} LID contacts via jid_map")
+    return resolved
 
 
 def _load_wa_contacts(wadb: sqlite3.Connection) -> dict[str, str]:
