@@ -5,6 +5,8 @@ export interface Chat {
   message_count: number
   date_first: string | null
   date_last: string | null
+  phone: string | null
+  is_lid: boolean
 }
 
 export interface OverviewData {

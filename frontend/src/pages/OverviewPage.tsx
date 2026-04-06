@@ -43,10 +43,10 @@ export default function OverviewPage() {
       </div>
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2 bg-app-surface border border-app-border rounded-xl p-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Activity (last 30 days)</h3>
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Activity</h3>
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={data.sparkline}>
-              <XAxis dataKey="date" tick={TICK_STYLE} tickFormatter={(v: string) => v.slice(5)} />
+              <XAxis dataKey="date" tick={TICK_STYLE} tickFormatter={(v: string) => v.slice(0, 7)} interval="preserveStartEnd" />
               <YAxis tick={TICK_STYLE} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Area

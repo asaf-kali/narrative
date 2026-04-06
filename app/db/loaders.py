@@ -80,6 +80,9 @@ def _row_to_chat_summary(row: RawChatRow, registry: SenderRegistry) -> ChatSumma
     first_ts = row.first_timestamp
     last_ts = row.last_timestamp
 
+    is_lid = server == "lid"
+    phone_val = phone if chat_type == ChatType.DIRECT else None
+
     return ChatSummary(
         chat_id=row.chat_id,
         display_name=display_name,
@@ -88,6 +91,8 @@ def _row_to_chat_summary(row: RawChatRow, registry: SenderRegistry) -> ChatSumma
         participant_count=None,
         date_first=pd.to_datetime(first_ts, unit="ms", utc=True).to_pydatetime() if first_ts else None,
         date_last=pd.to_datetime(last_ts, unit="ms", utc=True).to_pydatetime() if last_ts else None,
+        phone=phone_val,
+        is_lid=is_lid,
     )
 
 

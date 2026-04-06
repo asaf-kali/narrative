@@ -59,9 +59,8 @@ def get_overview(
     total_audio = int(df["message_type"].isin({t.value for t in AUDIO_TYPES}).sum())
     total_links = int(df["text_data"].dropna().str.contains("http", na=False).sum())
 
-    # Sparkline: daily totals for last 30 days
-    last_30 = df[df["timestamp"] >= df["timestamp"].max() - pd.Timedelta(days=30)]
-    sparkline_df = last_30.groupby("date").size().reset_index(name="count")
+    # Sparkline: daily totals for the full date range
+    sparkline_df = df.groupby("date").size().reset_index(name="count")
     sparkline = [{"date": str(r["date"]), "count": int(r["count"])} for _, r in sparkline_df.iterrows()]
 
     # Type breakdown

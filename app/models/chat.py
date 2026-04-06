@@ -21,3 +21,5 @@ class ChatSummary(BaseModel):
     participant_count: int | None
     date_first: datetime | None
     date_last: datetime | None
+    phone: str | None  # phone digits for direct chats; None for groups/broadcasts
+    is_lid: bool  # True when `phone` is a WhatsApp LID, not a real phone number
