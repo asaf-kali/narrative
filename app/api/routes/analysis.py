@@ -146,7 +146,12 @@ def get_participants(
     if df.empty:
         return []
     stats = per_sender_stats(df, config)
-    return cast("list[dict[str, Any]]", stats.fillna(0).to_dict("records"))
+    records = stats.fillna(0).to_dict("records")
+    for rec in records:
+        name = str(rec.get("sender_name", ""))
+        phone = str(rec.get("sender_phone", "") or "")
+        rec["sender_id"] = "me" if name == "Me" else (phone or name)
+    return cast("list[dict[str, Any]]", records)
 
 
 @router.get("/chats/{chat_id}/words")
@@ -194,6 +199,7 @@ def get_messages(
     limit: int = 2000,
     offset: int = 0,
     search: str | None = None,
+    sender_id: str | None = None,
 ) -> dict[str, Any]:
     config = _config(chat_id, exclude_system, date_from, date_to)
     df = get_df(request, config)
@@ -203,6 +209,11 @@ def get_messages(
     df_sorted = df.sort_values("timestamp")
     if search:
         df_sorted = df_sorted[df_sorted["text_data"].str.contains(search, case=False, na=False)]
+    if sender_id:
+        if sender_id == "me":
+            df_sorted = df_sorted[df_sorted["from_me"] == 1]
+        else:
+            df_sorted = df_sorted[df_sorted["sender_phone"] == sender_id]
     total = len(df_sorted)
     page = df_sorted.iloc[offset : offset + limit]
 
@@ -222,11 +233,15 @@ def get_messages(
         text = row.get("text_data")
         if not text:
             text = type_labels.get(int(row["message_type"]))
+        phone = str(row.get("sender_phone", "") or "")
+        from_me = int(row.get("from_me", 0))
+        s_id = "me" if from_me else (phone or str(row["sender_name"]))
         messages.append(
             {
                 "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
                 "chat_name": str(row.get("chat_name", "")),
                 "sender_name": str(row["sender_name"]),
+                "sender_id": s_id,
                 "text": str(text) if text else None,
                 "message_type": int(row["message_type"]),
             }

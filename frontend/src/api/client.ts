@@ -30,11 +30,20 @@ export const api = {
   words: (chatId: number): Promise<WordData> => get(`/api/chats/${chatId}/words`),
   emoji: (chatId: number): Promise<EmojiItem[]> => get(`/api/chats/${chatId}/emoji`),
   media: (chatId: number): Promise<MediaData> => get(`/api/chats/${chatId}/media`),
-  chatMessages: (chatId: number, limit = 2000, offset = 0, dateFrom?: string, dateTo?: string, search?: string): Promise<ChatMessagesResponse> => {
+  chatMessages: (
+    chatId: number,
+    limit = 2000,
+    offset = 0,
+    dateFrom?: string,
+    dateTo?: string,
+    search?: string,
+    senderId?: string,
+  ): Promise<ChatMessagesResponse> => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (dateFrom) params.set('date_from', dateFrom)
     if (dateTo) params.set('date_to', dateTo)
     if (search) params.set('search', search)
+    if (senderId) params.set('sender_id', senderId)
     return get(`/api/chats/${chatId}/messages?${params}`)
   },
   search: (q: string, limit = 50): Promise<SearchResult[]> =>

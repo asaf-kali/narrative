@@ -27,6 +27,10 @@ def per_sender_stats(df: pd.DataFrame, config: AnalysisConfig) -> pd.DataFrame:
                     "media": media_mask.loc[g.index].sum(),
                     "audio": audio_mask.loc[g.index].sum(),
                     "has_text": text_mask.loc[g.index].sum(),
+                    # first non-empty phone; used by API to build a stable sender_id
+                    "sender_phone": g.loc[g["sender_phone"].notna() & (g["sender_phone"] != ""), "sender_phone"].iloc[0]
+                    if (g["sender_phone"] != "").any()
+                    else "",
                 }
             ),
             include_groups=False,

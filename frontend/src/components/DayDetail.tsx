@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart,
@@ -49,6 +49,7 @@ function dayMessageToFeed(msg: DayMessage): FeedMessage {
   return {
     timestamp: '1970-01-01T' + msg.time + ':00',
     chat_name: msg.chat_name,
+    sender_id: msg.sender_name,  // day API doesn't expose phone; use name as fallback ID
     sender_name: msg.sender_name,
     text: msg.text,
     message_type: msg.message_type,
@@ -104,6 +105,30 @@ export default function DayDetail({ date, onClose }: Props) {
     () => (data?.messages ?? []).map(dayMessageToFeed),
     [data]
   )
+
+  // Chat names sorted by message count (same order as topChats + others)
+  const allChatNames: string[] = useMemo(() => {
+    if (!data) return []
+    const freq = new Map<string, number>()
+    for (const b of data.timeline) freq.set(b.chat_name, (freq.get(b.chat_name) ?? 0) + b.count)
+    return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c)
+  }, [data])
+
+  const [activeChats, setActiveChats] = useState<Set<string>>(new Set())
+
+  const visibleMessages = useMemo(
+    () => (activeChats.size === 0 ? feedMessages : feedMessages.filter((m) => activeChats.has(m.chat_name))),
+    [feedMessages, activeChats]
+  )
+
+  function toggleChat(chat: string) {
+    setActiveChats((prev) => {
+      const next = new Set(prev)
+      if (next.has(chat)) next.delete(chat)
+      else next.add(chat)
+      return next
+    })
+  }
 
   return (
     <div className="bg-app-surface border border-accent/25 rounded-xl overflow-hidden">
@@ -167,10 +192,40 @@ export default function DayDetail({ date, onClose }: Props) {
             </ResponsiveContainer>
           </div>
 
+          {/* Chat filter chips */}
+          {allChatNames.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest flex-shrink-0">Chats</span>
+              {allChatNames.map((chat) => (
+                <button
+                  key={chat}
+                  onClick={() => toggleChat(chat)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border truncate max-w-[160px] ${
+                    activeChats.has(chat)
+                      ? 'border-accent/50 text-accent-light'
+                      : 'bg-app-surface-2 border-app-border text-slate-400 hover:text-slate-200'
+                  }`}
+                  style={activeChats.has(chat) ? { backgroundColor: (colorMap.get(chat) ?? '#7c5af6') + '22' } : undefined}
+                  title={chat}
+                >
+                  {shortName(chat, 20)}
+                </button>
+              ))}
+              {activeChats.size > 0 && (
+                <button
+                  onClick={() => setActiveChats(new Set())}
+                  className="px-2 py-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Message feed */}
           <MessageFeed
-            messages={feedMessages}
-            total={data.total_messages}
+            messages={visibleMessages}
+            total={visibleMessages.length}
             senders={data.senders}
             showChat
             dayOnly

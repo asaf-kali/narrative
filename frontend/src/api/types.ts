@@ -30,6 +30,7 @@ export interface HeatmapPoint {
 }
 
 export interface Participant {
+  sender_id: string    // "me" | phone number — stable across renames
   sender_name: string
   messages: number
   pct: number
@@ -68,8 +69,9 @@ export interface DayCount {
 }
 
 export interface FeedMessage {
-  timestamp: string   // "YYYY-MM-DDTHH:MM:SS"
+  timestamp: string    // "YYYY-MM-DDTHH:MM:SS"
   chat_name: string
+  sender_id: string    // "me" | phone number
   sender_name: string
   text: string | null
   message_type: number
