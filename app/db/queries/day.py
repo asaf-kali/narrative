@@ -1,5 +1,8 @@
 import logging
 import sqlite3
+from collections.abc import Generator
+
+from db.row_types import RawDayMessageRow
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,7 @@ ORDER BY m.timestamp
 """
 
 
-def fetch_day_messages(conn: sqlite3.Connection, date: str) -> list[sqlite3.Row]:
-    """Return all non-system messages for `date` (YYYY-MM-DD) sorted by time."""
-    return conn.execute(_DAY_MESSAGES_SQL, (date,)).fetchall()
+def fetch_day_messages(conn: sqlite3.Connection, date: str) -> Generator[RawDayMessageRow]:
+    """Yield all non-system messages for `date` (YYYY-MM-DD) sorted by time."""
+    for row in conn.execute(_DAY_MESSAGES_SQL, (date,)):
+        yield RawDayMessageRow.model_validate(dict(row))

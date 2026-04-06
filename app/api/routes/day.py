@@ -5,12 +5,11 @@ from db.loaders import open_connection
 from db.queries.day import fetch_day_messages
 from fastapi import APIRouter, HTTPException, Request
 from models.message import MessageType
+from models.sender import GROUP_SERVER, SenderRegistry
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-_GROUP_SERVER = "g.us"
 
 _TYPE_LABELS: dict[int, str] = {
     MessageType.IMAGE: "[Image]",
@@ -55,11 +54,11 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
 
     msgstore: Path = request.app.state.msgstore_path
     wadb: Path | None = request.app.state.wadb_path
-    contact_names: dict[str, str] = request.app.state.contact_names or {}
+    registry: SenderRegistry = request.app.state.sender_registry
 
     logger.info(f"Loading day detail for {date}")
     with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        rows = fetch_day_messages(db.msgstore, date)
+        rows = list(fetch_day_messages(db.msgstore, date))
 
     if not rows:
         return DayDetail(date=date, total_messages=0, active_chats=0, senders=[], timeline=[], messages=[])
@@ -69,26 +68,31 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
     chat_name_set: set[str] = set()
     sender_freq: dict[str, int] = {}
 
-    for row in rows:
-        r = dict(row)
-        chat_name = _resolve_chat_name(r, contact_names)
-        sender_name = _resolve_sender(r, contact_names)
-        text = _message_text(r)
+    for r in rows:
+        is_group = r.chat_server == GROUP_SERVER
+        chat_name = registry.resolve_chat_name(r.chat_subject, r.chat_server, r.chat_phone or "")
+        sender = registry.resolve_sender(
+            phone=r.sender_phone,
+            from_me=bool(r.from_me),
+            chat_phone=r.chat_phone or "",
+            is_group=is_group,
+        )
+        text = _message_text(r.text_data, r.message_type)
 
         chat_name_set.add(chat_name)
-        sender_freq[sender_name] = sender_freq.get(sender_name, 0) + 1
+        sender_freq[sender.display_name] = sender_freq.get(sender.display_name, 0) + 1
 
-        hh, mm = r["time"].split(":")
+        hh, mm = r.time.split(":")
         bucket = f"{hh}:{int(mm) // 5 * 5:02d}"
         bucket_counts[(bucket, chat_name)] = bucket_counts.get((bucket, chat_name), 0) + 1
 
         messages.append(
             DayMessage(
-                time=r["time"],
+                time=r.time,
                 chat_name=chat_name,
-                sender_name=sender_name,
+                sender_name=sender.display_name,
                 text=text,
-                message_type=r["message_type"],
+                message_type=r.message_type,
             )
         )
 
@@ -111,33 +115,7 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
 # ── private helpers ───────────────────────────────────────────────────────────
 
 
-def _resolve_chat_name(r: dict[str, object], contact_names: dict[str, str]) -> str:
-    subject = str(r.get("chat_subject") or "")
-    server = str(r.get("chat_server") or "")
-    phone = str(r.get("chat_phone") or "")
-    if subject:
-        return subject
-    if server == _GROUP_SERVER:
-        return f"Group ({phone})"
-    return contact_names.get(phone) or phone or "Unknown"
-
-
-def _resolve_sender(r: dict[str, object], contact_names: dict[str, str]) -> str:
-    if r.get("from_me") == 1:
-        return "Me"
-    phone = str(r.get("sender_phone") or "")
-    chat_server = str(r.get("chat_server") or "")
-    # Direct chat: sender_phone is empty; use the chat phone instead
-    if not phone and chat_server != _GROUP_SERVER:
-        chat_phone = str(r.get("chat_phone") or "")
-        return contact_names.get(chat_phone) or chat_phone or "Unknown"
-    return contact_names.get(phone) or phone or "Unknown"
-
-
-def _message_text(r: dict[str, object]) -> str | None:
-    text = r.get("text_data")
-    if text:
-        return str(text)
-    raw = r.get("message_type")
-    msg_type = int(raw) if isinstance(raw, (int, float)) else 0
-    return _TYPE_LABELS.get(msg_type)
+def _message_text(text_data: str | None, message_type: int) -> str | None:
+    if text_data:
+        return text_data
+    return _TYPE_LABELS.get(message_type)

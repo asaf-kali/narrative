@@ -20,14 +20,16 @@ def create_api(
 ) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
+        from db.connection import DBConnection  # noqa: PLC0415
+        from db.contacts import build_sender_registry  # noqa: PLC0415
+
         app.state.msgstore_path = msgstore_path
         app.state.wadb_path = wadb_path
-        if contacts_path is not None:
-            from db.contacts import load_contacts_csv  # noqa: PLC0415
-
-            app.state.contact_names = load_contacts_csv(contacts_path)
-        else:
-            app.state.contact_names = None  # signal: fall back to wa.db
+        with DBConnection(msgstore_path=msgstore_path, wadb_path=wadb_path) as db:
+            app.state.sender_registry = build_sender_registry(
+                wadb=db.wadb,
+                csv_path=contacts_path,
+            )
         logger.info(f"API initialized: msgstore={msgstore_path}")
         yield
 

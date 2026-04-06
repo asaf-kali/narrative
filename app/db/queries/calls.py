@@ -1,5 +1,8 @@
 import logging
 import sqlite3
+from collections.abc import Generator
+
+from db.row_types import RawCallRow
 
 logger = logging.getLogger(__name__)
 
@@ -8,7 +11,6 @@ logger = logging.getLogger(__name__)
 _CALLS_SQL = """
 SELECT
     cl._id          AS call_id,
-    cl.jid_row_id,
     cl.timestamp,
     cl.call_result,
     cl.duration,
@@ -20,10 +22,9 @@ LEFT JOIN jid j ON cl.jid_row_id = j._id
 """
 
 
-def fetch_calls(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+def fetch_calls(conn: sqlite3.Connection) -> Generator[RawCallRow]:
     try:
-        cursor = conn.execute(_CALLS_SQL)
-        return cursor.fetchall()
+        for row in conn.execute(_CALLS_SQL):
+            yield RawCallRow.model_validate(dict(row))
     except sqlite3.OperationalError:
         logger.debug("call_log table not found — skipping.")
-        return []

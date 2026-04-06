@@ -1,5 +1,8 @@
 import logging
 import sqlite3
+from collections.abc import Generator
+
+from db.row_types import RawSearchRow
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,7 @@ def _escape_like(term: str) -> str:
     return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def search_messages(conn: sqlite3.Connection, query: str, limit: int = 50) -> list[sqlite3.Row]:
+def search_messages(conn: sqlite3.Connection, query: str, limit: int = 50) -> Generator[RawSearchRow]:
     pattern = f"%{_escape_like(query)}%"
-    return conn.execute(_SEARCH_SQL, (pattern, limit)).fetchall()
+    for row in conn.execute(_SEARCH_SQL, (pattern, limit)):
+        yield RawSearchRow.model_validate(dict(row))

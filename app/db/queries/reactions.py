@@ -1,5 +1,8 @@
 import logging
 import sqlite3
+from collections.abc import Generator
+
+from db.row_types import RawReactionRow
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +21,9 @@ LEFT JOIN jid sj ON ao.sender_jid_row_id = sj._id
 """
 
 
-def fetch_reactions(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+def fetch_reactions(conn: sqlite3.Connection) -> Generator[RawReactionRow]:
     try:
-        cursor = conn.execute(_REACTIONS_SQL)
-        return cursor.fetchall()
+        for row in conn.execute(_REACTIONS_SQL):
+            yield RawReactionRow.model_validate(dict(row))
     except sqlite3.OperationalError:
         logger.debug("Reactions tables not found — skipping.")
-        return []

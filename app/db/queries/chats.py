@@ -1,5 +1,8 @@
 import logging
 import sqlite3
+from collections.abc import Generator
+
+from db.row_types import RawChatRow
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,6 @@ ORDER BY last_timestamp DESC
 """
 
 
-def fetch_chats(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    cursor = conn.execute(_CHATS_SQL)
-    return cursor.fetchall()
+def fetch_chats(conn: sqlite3.Connection) -> Generator[RawChatRow]:
+    for row in conn.execute(_CHATS_SQL):
+        yield RawChatRow.model_validate(dict(row))

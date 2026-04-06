@@ -1,5 +1,8 @@
 import logging
 import sqlite3
+from collections.abc import Generator
+
+from db.row_types import RawMessageRow
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +40,12 @@ WHERE m.chat_row_id > 0
 """
 
 
-def fetch_all_messages(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    cursor = conn.execute(_MESSAGES_SQL)
-    return cursor.fetchall()
+def fetch_all_messages(conn: sqlite3.Connection) -> Generator[RawMessageRow]:
+    for row in conn.execute(_MESSAGES_SQL):
+        yield RawMessageRow.model_validate(dict(row))
 
 
-def fetch_messages_for_chat(conn: sqlite3.Connection, chat_id: int) -> list[sqlite3.Row]:
+def fetch_messages_for_chat(conn: sqlite3.Connection, chat_id: int) -> Generator[RawMessageRow]:
     sql = _MESSAGES_SQL + " AND m.chat_row_id = ?"
-    cursor = conn.execute(sql, (chat_id,))
-    return cursor.fetchall()
+    for row in conn.execute(sql, (chat_id,)):
+        yield RawMessageRow.model_validate(dict(row))
