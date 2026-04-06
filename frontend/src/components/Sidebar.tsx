@@ -8,7 +8,11 @@ const TYPE_ICONS: Record<string, string> = { group: '⬡', direct: '◎', broadc
 
 export default function Sidebar({ chats, isLoading }: Props) {
   const [search, setSearch] = useState('')
-  const filtered = chats.filter((c) => c.display_name.toLowerCase().includes(search.toLowerCase()))
+  const [hideEmpty, setHideEmpty] = useState(true)
+  const filtered = chats.filter((c) => {
+    if (hideEmpty && c.message_count === 0) return false
+    return c.display_name.toLowerCase().includes(search.toLowerCase())
+  })
 
   return (
     <aside className="w-64 bg-[#06070c] border-r border-app-border flex flex-col flex-shrink-0 h-full">
@@ -34,11 +38,20 @@ export default function Sidebar({ chats, isLoading }: Props) {
         </div>
       </div>
 
-      {/* Chat count label */}
-      <div className="px-5 pt-3 pb-1">
+      {/* Chat count label + hide-empty toggle */}
+      <div className="px-5 pt-3 pb-1 flex items-center justify-between">
         <span className="text-[10px] font-semibold text-app-muted uppercase tracking-widest">
           {filtered.length} chats
         </span>
+        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={hideEmpty}
+            onChange={(e) => setHideEmpty(e.target.checked)}
+            className="w-3 h-3 accent-accent"
+          />
+          <span className="text-[10px] text-app-muted">Hide empty</span>
+        </label>
       </div>
 
       {/* Chat list */}

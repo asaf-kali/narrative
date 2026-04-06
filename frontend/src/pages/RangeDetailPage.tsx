@@ -1,17 +1,11 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { api } from '../api/client'
-import type { DayMessage, FeedMessage } from '../api/types'
-import MessageFeed, { buildChatColorMap, CHAT_COLORS } from './MessageFeed'
+import type { FeedMessage, RangeMessage } from '../api/types'
+import MessageFeed, { buildChatColorMap, CHAT_COLORS } from '../components/MessageFeed'
+import DatetimeInput, { DATETIME_RE, toApiDatetime } from '../components/DatetimeInput'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -22,11 +16,41 @@ const TICK_STYLE = { fill: '#64748b', fontSize: 10 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+type Bucket = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+
+// Granularities ordered finest→coarsest, with their size in hours
+const GRANULARITIES: { bucket: Bucket; hours: number }[] = [
+  { bucket: 'hourly',  hours: 1 },
+  { bucket: 'daily',   hours: 24 },
+  { bucket: 'weekly',  hours: 24 * 7 },
+  { bucket: 'monthly', hours: 24 * 30 },
+  { bucket: 'yearly',  hours: 24 * 365 },
+]
+
+/** Pick the granularity whose bucket count is closest to TARGET_BUCKETS. */
+function chooseBucket(from: string, to: string): Bucket {
+  const TARGET = 30
+  const rangeHours = (new Date(to.replace(' ', 'T')).getTime() - new Date(from.replace(' ', 'T')).getTime()) / 3_600_000
+  return GRANULARITIES.reduce((best, g) => {
+    const count = rangeHours / g.hours
+    const bestCount = rangeHours / best.hours
+    return Math.abs(count - TARGET) < Math.abs(bestCount - TARGET) ? g : best
+  }).bucket
+}
+
+function formatTick(bucket: Bucket): (v: string) => string {
+  if (bucket === 'hourly')  return (v) => v.slice(11, 16)  // "HH:00"
+  if (bucket === 'daily')   return (v) => v.slice(5)        // "MM-DD"
+  if (bucket === 'weekly')  return (v) => v.slice(5)        // "W##"
+  if (bucket === 'monthly') return (v) => v                  // "YYYY-MM"
+  return (v) => v                                             // "YYYY"
+}
+
 type TimelineRow = { bucket: string } & Record<string, number | string>
 
 function buildTimelineRows(
   timeline: { bucket: string; chat_name: string; count: number }[],
-  topChats: string[]
+  topChats: string[],
 ): TimelineRow[] {
   const topSet = new Set(topChats)
   const map = new Map<string, TimelineRow>()
@@ -39,23 +63,15 @@ function buildTimelineRows(
   return [...map.values()]
 }
 
-function nextDay(date: string): string {
-  const d = new Date(date + 'T00:00:00')
-  d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
-}
-
 function shortName(name: string, max = 22): string {
   return name.length > max ? name.slice(0, max - 1) + '…' : name
 }
 
-function dayMessageToFeed(msg: DayMessage): FeedMessage {
-  // DayDetail messages have "HH:MM" time; synthesize a full timestamp with dummy date
-  // so MessageFeed's dayOnly=true mode can slice the time back out
+function rangeMessageToFeed(msg: RangeMessage): FeedMessage {
   return {
-    timestamp: '1970-01-01T' + msg.time + ':00',
+    timestamp: msg.timestamp + ':00',
     chat_name: msg.chat_name,
-    sender_id: msg.sender_name,  // day API doesn't expose phone; use name as fallback ID
+    sender_id: msg.sender_name,
     sender_name: msg.sender_name,
     text: msg.text,
     message_type: msg.message_type,
@@ -75,18 +91,32 @@ function StatPill({ label, value }: { label: string; value: string | number }) {
   )
 }
 
-// ── main component ────────────────────────────────────────────────────────────
+// ── main page ─────────────────────────────────────────────────────────────────
 
-interface Props {
-  date: string
-  onClose: () => void
-}
+export default function RangeDetailPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const from = searchParams.get('from') ?? ''
+  const to = searchParams.get('to') ?? ''
 
-export default function DayDetail({ date, onClose }: Props) {
+  const [activeChats, setActiveChats] = useState<Set<string>>(new Set())
+
+  const fromValid = DATETIME_RE.test(from)
+  const toValid = DATETIME_RE.test(to)
+  const rangeInvalid = fromValid && toValid && to < from
+  const canFetch = fromValid && toValid && !rangeInvalid
+
+  const bucket: Bucket = canFetch ? chooseBucket(from, to) : 'daily'
+
   const { data, isLoading } = useQuery({
-    queryKey: ['day', date],
-    queryFn: () => api.dayDetail(date),
+    queryKey: ['range', from, to, bucket],
+    queryFn: () => api.rangeDetail(toApiDatetime(from), toApiDatetime(to), bucket),
+    enabled: canFetch,
   })
+
+  function handleChange(newFrom: string, newTo: string) {
+    setSearchParams({ from: newFrom, to: newTo }, { replace: true })
+    setActiveChats(new Set())
+  }
 
   const topChats: string[] = useMemo(() => {
     if (!data) return []
@@ -99,7 +129,7 @@ export default function DayDetail({ date, onClose }: Props) {
 
   const timelineRows = useMemo(
     () => (data ? buildTimelineRows(data.timeline, topChats) : []),
-    [data, topChats]
+    [data, topChats],
   )
 
   const barKeys: string[] = useMemo(() => {
@@ -108,11 +138,10 @@ export default function DayDetail({ date, onClose }: Props) {
   }, [topChats, data])
 
   const feedMessages: FeedMessage[] = useMemo(
-    () => (data?.messages ?? []).map(dayMessageToFeed),
-    [data]
+    () => (data?.messages ?? []).map(rangeMessageToFeed),
+    [data],
   )
 
-  // Chat names sorted by message count (same order as topChats + others)
   const allChatNames: string[] = useMemo(() => {
     if (!data) return []
     const freq = new Map<string, number>()
@@ -120,11 +149,9 @@ export default function DayDetail({ date, onClose }: Props) {
     return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c)
   }, [data])
 
-  const [activeChats, setActiveChats] = useState<Set<string>>(new Set())
-
   const visibleMessages = useMemo(
     () => (activeChats.size === 0 ? feedMessages : feedMessages.filter((m) => activeChats.has(m.chat_name))),
-    [feedMessages, activeChats]
+    [feedMessages, activeChats],
   )
 
   function toggleChat(chat: string) {
@@ -137,65 +164,73 @@ export default function DayDetail({ date, onClose }: Props) {
   }
 
   return (
-    <div className="bg-app-surface border border-accent/25 rounded-xl overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-app-border">
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-semibold text-slate-200">{date}</span>
+    <div className="max-w-5xl space-y-4">
+      <div>
+        <h2 className="text-xl font-bold text-slate-100">Messages</h2>
+        <p className="text-xs text-slate-500 mt-1">All messages across all chats in a time range</p>
+      </div>
+
+      {/* Date pickers */}
+      <div className="bg-app-surface border border-app-border rounded-xl p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex-shrink-0">Range</span>
+          <div className="flex items-center gap-2 text-xs">
+            <DatetimeInput
+              value={from}
+              onChange={(v) => handleChange(v, to)}
+              isInvalid={(!!from && !fromValid) || !!rangeInvalid}
+            />
+            <span className={rangeInvalid ? 'text-red-400' : 'text-slate-500'}>→</span>
+            <DatetimeInput
+              value={to}
+              onChange={(v) => handleChange(from, v)}
+              isInvalid={(!!to && !toValid) || !!rangeInvalid}
+            />
+            {rangeInvalid && <span className="text-red-400 text-[11px]">End must be after start</span>}
+            {!canFetch && !rangeInvalid && (
+              <span className="text-slate-500 text-[11px]">Enter a date range to load messages</span>
+            )}
+          </div>
           {data && (
-            <>
+            <div className="ml-auto flex gap-3">
               <StatPill label="messages" value={data.total_messages} />
               <StatPill label="chats" value={data.active_chats} />
-            </>
+            </div>
           )}
-        </div>
-        <div className="flex items-center gap-3">
-          <a
-            href={`/messages?from=${encodeURIComponent(date + ' 00:00')}&to=${encodeURIComponent(nextDay(date) + ' 00:00')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-slate-500 hover:text-accent-light transition-colors"
-            title="Open in new window"
-          >
-            ↗ Open
-          </a>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-300 transition-colors text-lg leading-none"
-          >
-            ✕
-          </button>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="p-5 space-y-3 animate-pulse">
-          <div className="h-32 bg-app-surface-2 rounded" />
-          <div className="h-64 bg-app-surface-2 rounded" />
+      {isLoading && (
+        <div className="space-y-3 animate-pulse">
+          <div className="bg-app-surface border border-app-border rounded-xl h-40" />
+          <div className="bg-app-surface border border-app-border rounded-xl h-64" />
         </div>
-      ) : !data || data.total_messages === 0 ? (
-        <div className="p-8 text-center text-slate-500 text-sm">No messages on this day</div>
-      ) : (
-        <div className="p-5 space-y-4">
+      )}
+
+      {data && data.total_messages === 0 && (
+        <div className="bg-app-surface border border-app-border rounded-xl p-8 text-center text-slate-500 text-sm">
+          No messages in this range
+        </div>
+      )}
+
+      {data && data.total_messages > 0 && (
+        <>
           {/* Activity chart */}
-          <div>
+          <div className="bg-app-surface border border-app-border rounded-xl p-4">
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
-              Activity (5-min buckets)
+              Activity ({bucket})
             </p>
-            <ResponsiveContainer width="100%" height={140}>
+            <ResponsiveContainer width="100%" height={160}>
               <BarChart data={timelineRows} barCategoryGap="10%">
                 <XAxis
                   dataKey="bucket"
                   tick={TICK_STYLE}
-                  interval={11}
-                  tickFormatter={(v: string) => v.slice(0, 2) + 'h'}
+                  interval="preserveStartEnd"
+                  tickFormatter={formatTick(bucket)}
                 />
                 <YAxis tick={TICK_STYLE} width={28} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend
-                  wrapperStyle={{ fontSize: 11, color: '#94a3b8' }}
-                  formatter={(v: string) => shortName(v)}
-                />
+                <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} formatter={(v: string) => shortName(v)} />
                 {barKeys.map((key, i) => (
                   <Bar
                     key={key}
@@ -240,15 +275,17 @@ export default function DayDetail({ date, onClose }: Props) {
           )}
 
           {/* Message feed */}
-          <MessageFeed
-            messages={visibleMessages}
-            total={visibleMessages.length}
-            senders={data.senders}
-            showChat
-            dayOnly
-            height="20rem"
-          />
-        </div>
+          <div className="bg-app-surface border border-app-border rounded-xl overflow-hidden">
+            <MessageFeed
+              messages={visibleMessages}
+              total={visibleMessages.length}
+              senders={data.senders}
+              showChat
+              dayOnly={false}
+              height="calc(100vh - 420px)"
+            />
+          </div>
+        </>
       )}
     </div>
   )

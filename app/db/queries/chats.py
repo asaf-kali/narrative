@@ -14,7 +14,7 @@ SELECT
     cj.user            AS chat_phone,
     cj.server          AS chat_server,
     cj.type            AS chat_jid_type,
-    COUNT(m._id)       AS message_count,
+    COUNT(CASE WHEN m.message_type != 7 THEN 1 END) AS message_count,
     MIN(m.timestamp)   AS first_timestamp,
     MAX(m.timestamp)   AS last_timestamp
 FROM chat c

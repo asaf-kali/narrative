@@ -52,6 +52,20 @@ class RawDayMessageRow(_RowBase):
     chat_server: str
 
 
+class RawRangeMessageRow(_RowBase):
+    timestamp: int
+    local_dt: str  # "YYYY-MM-DDTHH:MM" in local time
+    date_bucket: str  # "YYYY-MM-DD" for daily grouping
+    message_type: int
+    from_me: int
+    text_data: str | None
+    sender_phone: str
+    sender_server: str
+    chat_subject: str | None
+    chat_phone: str
+    chat_server: str
+
+
 class RawSearchRow(_RowBase):
     chat_id: int
     chat_subject: str | None

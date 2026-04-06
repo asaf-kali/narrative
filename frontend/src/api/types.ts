@@ -104,3 +104,27 @@ export interface DayDetail {
   timeline: DayBucket[]
   messages: DayMessage[]
 }
+
+export interface RangeMessage {
+  timestamp: string   // "YYYY-MM-DDTHH:MM" local time
+  chat_name: string
+  sender_name: string
+  text: string | null
+  message_type: number
+}
+
+export interface RangeBucket {
+  bucket: string      // "YYYY-MM-DD"
+  chat_name: string
+  count: number
+}
+
+export interface RangeDetail {
+  date_from: string
+  date_to: string
+  total_messages: number
+  active_chats: number
+  senders: string[]
+  timeline: RangeBucket[]
+  messages: RangeMessage[]
+}

@@ -10,6 +10,7 @@ import ParticipantsPage from './pages/ParticipantsPage'
 import ContentPage from './pages/ContentPage'
 import MediaPage from './pages/MediaPage'
 import MessagesPage from './pages/MessagesPage'
+import RangeDetailPage from './pages/RangeDetailPage'
 import ChatLayout from './components/ChatLayout'
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
         <main className="flex-1 overflow-hidden">
           <Routes>
             <Route path="/" element={<div className="h-full overflow-auto p-6"><HomePage /></div>} />
+            <Route path="/messages" element={<div className="h-full overflow-auto p-6"><RangeDetailPage /></div>} />
             <Route path="/chat/:chatId" element={<ChatLayout />}>
               <Route index element={<OverviewPage />} />
               <Route path="timeline" element={<TimelinePage />} />

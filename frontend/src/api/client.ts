@@ -8,6 +8,7 @@ import type {
   MediaData,
   OverviewData,
   Participant,
+  RangeDetail,
   SearchResult,
   TimelinePoint,
   WordData,
@@ -49,4 +50,8 @@ export const api = {
   search: (q: string, limit = 50): Promise<SearchResult[]> =>
     get(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   dayDetail: (date: string): Promise<DayDetail> => get(`/api/day/${date}`),
+  rangeDetail: (from: string, to: string, bucket: string): Promise<RangeDetail> => {
+    const params = new URLSearchParams({ date_from: from, date_to: to, bucket })
+    return get(`/api/range?${params}`)
+  },
 }
