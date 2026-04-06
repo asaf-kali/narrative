@@ -17,12 +17,26 @@ const PRESETS: { label: string; value: Preset }[] = [
   { label: 'All', value: 'all' },
 ]
 
+/** Format a Date as the value string required by <input type="datetime-local">. */
+function toDatetimeLocal(d: Date): string {
+  // "YYYY-MM-DDTHH:MM" in local time
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    d.getFullYear() + '-' +
+    pad(d.getMonth() + 1) + '-' +
+    pad(d.getDate()) + 'T' +
+    pad(d.getHours()) + ':' +
+    pad(d.getMinutes())
+  )
+}
+
 function presetDates(preset: Preset): { from: string; to: string } {
   if (preset === 'all') return { from: '', to: '' }
   const days = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 }[preset]
   const from = new Date()
   from.setDate(from.getDate() - days)
-  return { from: from.toISOString().slice(0, 10), to: '' }
+  from.setHours(0, 0, 0, 0)
+  return { from: toDatetimeLocal(from), to: '' }
 }
 
 export default function MessagesPage() {
@@ -34,6 +48,9 @@ export default function MessagesPage() {
   const [offset, setOffset] = useState(0)
 
   const searchTerm = useDebounce(searchInput, 300)
+
+  // Validate that "to" is not before "from" when both are set
+  const rangeInvalid = !!(dateFrom && dateTo && dateTo < dateFrom)
 
   // Load participants for the sender dropdown (no date filter — show all senders ever)
   const { data: participants = [] } = useQuery({
@@ -54,7 +71,7 @@ export default function MessagesPage() {
         searchTerm || undefined,
         senderId || undefined,
       ),
-    enabled: !!chatId,
+    enabled: !!chatId && !rangeInvalid,
   })
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
@@ -96,25 +113,35 @@ export default function MessagesPage() {
         {/* Date range */}
         <div className="flex items-center gap-2 text-xs">
           <input
-            type="date"
+            type="datetime-local"
             value={dateFrom}
+            max={dateTo || undefined}
             onChange={(e) => { setDateFrom(e.target.value); reset() }}
-            className="bg-app-surface-2 border border-app-border rounded px-2 py-1.5 text-slate-300 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+            className={`bg-app-surface-2 border rounded px-2 py-1.5 text-slate-300 focus:outline-none focus:ring-1 ${
+              rangeInvalid ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/20' : 'border-app-border focus:border-accent/50 focus:ring-accent/20'
+            }`}
           />
-          <span className="text-slate-500">→</span>
+          <span className={rangeInvalid ? 'text-red-400' : 'text-slate-500'}>→</span>
           <input
-            type="date"
+            type="datetime-local"
             value={dateTo}
+            min={dateFrom || undefined}
             onChange={(e) => { setDateTo(e.target.value); reset() }}
-            className="bg-app-surface-2 border border-app-border rounded px-2 py-1.5 text-slate-300 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+            className={`bg-app-surface-2 border rounded px-2 py-1.5 text-slate-300 focus:outline-none focus:ring-1 ${
+              rangeInvalid ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/20' : 'border-app-border focus:border-accent/50 focus:ring-accent/20'
+            }`}
           />
+          {rangeInvalid && (
+            <span className="text-red-400 text-[11px]">End must be after start</span>
+          )}
         </div>
 
         {/* Preset shortcuts */}
         <div className="flex gap-1">
           {PRESETS.map((p) => {
+            // Compare date portion only so the active state isn't thrown off by seconds
             const { from } = presetDates(p.value)
-            const active = from === dateFrom && (p.value === 'all' ? !dateTo : true)
+            const active = from.slice(0, 10) === dateFrom.slice(0, 10) && (p.value === 'all' ? !dateTo : !dateTo || true)
             return (
               <button
                 key={p.value}

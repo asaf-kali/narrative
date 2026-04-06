@@ -6,7 +6,7 @@ interface Props {
   onSelectDate: (date: string) => void
 }
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 interface Cell {
@@ -14,11 +14,10 @@ interface Cell {
   count: number
 }
 
-/** Returns Monday of the ISO week containing `d`. */
-function toMonday(d: Date): Date {
+/** Returns Sunday of the week containing `d`. */
+function toSunday(d: Date): Date {
   const result = new Date(d)
-  const dow = (d.getDay() + 6) % 7
-  result.setDate(d.getDate() - dow)
+  result.setDate(d.getDate() - d.getDay()) // getDay(): 0=Sun, so subtract directly
   result.setHours(0, 0, 0, 0)
   return result
 }
@@ -41,8 +40,8 @@ function buildGrid(data: DayCount[]): { weeks: Cell[][]; monthLabels: { label: s
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const start = toMonday(firstDate)
-  const end = toMonday(today)
+  const start = toSunday(firstDate)
+  const end = toSunday(today)
 
   const weeks: Cell[][] = []
   const monthLabels: { label: string; colIndex: number }[] = []
