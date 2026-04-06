@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
@@ -17,16 +17,72 @@ const PRESETS: { label: string; value: Preset }[] = [
   { label: 'All', value: 'all' },
 ]
 
-/** Format a Date as the value string required by <input type="datetime-local">. */
-function toDatetimeLocal(d: Date): string {
-  // "YYYY-MM-DDTHH:MM" in local time
+const DATETIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/
+
+/** Format a Date as "YYYY-MM-DD HH:MM" in local time. */
+function formatDatetime(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return (
     d.getFullYear() + '-' +
     pad(d.getMonth() + 1) + '-' +
-    pad(d.getDate()) + 'T' +
+    pad(d.getDate()) + ' ' +
     pad(d.getHours()) + ':' +
     pad(d.getMinutes())
+  )
+}
+
+/** Convert "YYYY-MM-DD HH:MM" to ISO "YYYY-MM-DDTHH:MM" for the API. */
+function toApiDatetime(s: string): string {
+  return s.replace(' ', 'T')
+}
+
+interface DatetimeInputProps {
+  value: string
+  onChange: (v: string) => void
+  isInvalid?: boolean
+  placeholder?: string
+}
+
+function DatetimeInput({ value, onChange, isInvalid = false, placeholder = 'yyyy-mm-dd HH:MM' }: DatetimeInputProps) {
+  const pickerRef = useRef<HTMLInputElement>(null)
+
+  // Sync text value → hidden picker when text is a valid datetime
+  const pickerValue = DATETIME_RE.test(value) ? value.replace(' ', 'T') : ''
+
+  function handlePickerChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.value) return
+    const d = new Date(e.target.value)
+    onChange(formatDatetime(d))
+  }
+
+  function openPicker() {
+    pickerRef.current?.showPicker()
+  }
+
+  const borderClass = isInvalid
+    ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/20'
+    : 'border-app-border focus:border-accent/50 focus:ring-accent/20'
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        onClick={openPicker}
+        className={`bg-app-surface-2 border rounded px-2 py-1.5 text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-1 w-40 cursor-pointer ${borderClass}`}
+      />
+      <input
+        ref={pickerRef}
+        type="datetime-local"
+        value={pickerValue}
+        onChange={handlePickerChange}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+      />
+    </div>
   )
 }
 
@@ -36,7 +92,7 @@ function presetDates(preset: Preset): { from: string; to: string } {
   const from = new Date()
   from.setDate(from.getDate() - days)
   from.setHours(0, 0, 0, 0)
-  return { from: toDatetimeLocal(from), to: '' }
+  return { from: formatDatetime(from), to: '' }
 }
 
 export default function MessagesPage() {
@@ -49,8 +105,10 @@ export default function MessagesPage() {
 
   const searchTerm = useDebounce(searchInput, 300)
 
+  const fromValid = !dateFrom || DATETIME_RE.test(dateFrom)
+  const toValid = !dateTo || DATETIME_RE.test(dateTo)
   // Validate that "to" is not before "from" when both are set
-  const rangeInvalid = !!(dateFrom && dateTo && dateTo < dateFrom)
+  const rangeInvalid = !!(dateFrom && dateTo && fromValid && toValid && dateTo < dateFrom)
 
   // Load participants for the sender dropdown (no date filter — show all senders ever)
   const { data: participants = [] } = useQuery({
@@ -66,12 +124,12 @@ export default function MessagesPage() {
         Number(chatId),
         PAGE_SIZE,
         offset,
-        dateFrom || undefined,
-        dateTo || undefined,
+        dateFrom && fromValid ? toApiDatetime(dateFrom) : undefined,
+        dateTo && toValid ? toApiDatetime(dateTo) : undefined,
         searchTerm || undefined,
         senderId || undefined,
       ),
-    enabled: !!chatId && !rangeInvalid,
+    enabled: !!chatId && !rangeInvalid && fromValid && toValid,
   })
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
@@ -112,27 +170,21 @@ export default function MessagesPage() {
 
         {/* Date range */}
         <div className="flex items-center gap-2 text-xs">
-          <input
-            type="datetime-local"
+          <DatetimeInput
             value={dateFrom}
-            max={dateTo || undefined}
-            onChange={(e) => { setDateFrom(e.target.value); reset() }}
-            className={`bg-app-surface-2 border rounded px-2 py-1.5 text-slate-300 focus:outline-none focus:ring-1 ${
-              rangeInvalid ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/20' : 'border-app-border focus:border-accent/50 focus:ring-accent/20'
-            }`}
+            onChange={(v) => { setDateFrom(v); reset() }}
+            isInvalid={(!!dateFrom && !fromValid) || rangeInvalid}
           />
           <span className={rangeInvalid ? 'text-red-400' : 'text-slate-500'}>→</span>
-          <input
-            type="datetime-local"
+          <DatetimeInput
             value={dateTo}
-            min={dateFrom || undefined}
-            onChange={(e) => { setDateTo(e.target.value); reset() }}
-            className={`bg-app-surface-2 border rounded px-2 py-1.5 text-slate-300 focus:outline-none focus:ring-1 ${
-              rangeInvalid ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/20' : 'border-app-border focus:border-accent/50 focus:ring-accent/20'
-            }`}
+            onChange={(v) => { setDateTo(v); reset() }}
+            isInvalid={(!!dateTo && !toValid) || rangeInvalid}
           />
-          {rangeInvalid && (
-            <span className="text-red-400 text-[11px]">End must be after start</span>
+          {(rangeInvalid || (dateFrom && !fromValid) || (dateTo && !toValid)) && (
+            <span className="text-red-400 text-[11px]">
+              {rangeInvalid ? 'End must be after start' : 'Use yyyy-mm-dd HH:MM'}
+            </span>
           )}
         </div>
 

@@ -1,4 +1,5 @@
 # Variables
+
 OPEN_FILE_COMMAND := "wslview"
 RUN := "uv run"
 NPM := "npm --prefix frontend"
@@ -37,13 +38,16 @@ frontend-build:
 frontend-dev:
     {{ NPM }} run dev
 
-# Run
+# Backend
+
+backend-dev *args:
+    PYTHONPATH=app {{ RUN }} python app/main.py --reload {{ args }}
 
 run *args:
     PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
 
 run-dev *args:
-    PYTHONPATH=app {{ RUN }} python app/main.py --reload {{ args }}
+    just backend-dev {{ args }} & just frontend-dev
 
 # Lint
 

@@ -17,7 +17,3 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: #252840; }
 
 .recharts-tooltip-wrapper { outline: none !important; }
-
-/* Force 24-hour display on datetime-local inputs regardless of OS locale */
-input[type="datetime-local"]::-webkit-datetime-edit-ampm-field { display: none; }
-input[type="datetime-local"] { --webkit-locale: "en-GB"; }
