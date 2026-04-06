@@ -125,6 +125,7 @@ export interface RangeDetail {
   total_messages: number
   active_chats: number
   senders: string[]
+  buckets: string[]     // all 30 bucket start labels ("YYYY-MM-DDTHH:MM")
   timeline: RangeBucket[]
   messages: RangeMessage[]
 }

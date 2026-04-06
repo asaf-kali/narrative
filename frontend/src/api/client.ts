@@ -50,8 +50,8 @@ export const api = {
   search: (q: string, limit = 50): Promise<SearchResult[]> =>
     get(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   dayDetail: (date: string): Promise<DayDetail> => get(`/api/day/${date}`),
-  rangeDetail: (from: string, to: string, bucket: string): Promise<RangeDetail> => {
-    const params = new URLSearchParams({ date_from: from, date_to: to, bucket })
+  rangeDetail: (from: string, to: string): Promise<RangeDetail> => {
+    const params = new URLSearchParams({ date_from: from, date_to: to })
     return get(`/api/range?${params}`)
   },
 }

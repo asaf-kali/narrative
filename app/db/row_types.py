@@ -55,7 +55,6 @@ class RawDayMessageRow(_RowBase):
 class RawRangeMessageRow(_RowBase):
     timestamp: int
     local_dt: str  # "YYYY-MM-DDTHH:MM" in local time
-    date_bucket: str  # "YYYY-MM-DD" for daily grouping
     message_type: int
     from_me: int
     text_data: str | None

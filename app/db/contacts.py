@@ -9,8 +9,8 @@ from models.sender import SenderRegistry
 logger = logging.getLogger(__name__)
 
 _NON_DIGIT = re.compile(r"\D")
-_PHONE_COLS = [f"Phone {i} - Value" for i in range(1, 5)]
-_JID_SUFFIX = "@s.whatsapp.net"
+_MIN_PHONE_DIGITS = 7
+_MAX_PHONE_DIGITS = 15
 
 
 def build_sender_registry(
@@ -33,31 +33,60 @@ def build_sender_registry(
 def load_contacts_csv(path: Path) -> dict[str, str]:
     """Parse a Google Contacts CSV export into {normalized_phone: display_name}.
 
-    Phone numbers are stripped of all non-digit characters so they can be
-    joined against WhatsApp's jid.user field (which is digits only, e.g.
-    '972501234567').  Numbers exported in international format (+972 50-123-4567)
-    will match reliably; local-format numbers (050-123-4567) will not unless
-    they happen to share the same digit string as the JID.
+    Scans every column in each row; values whose digit-only form falls within
+    [_MIN_PHONE_DIGITS, _MAX_PHONE_DIGITS] are treated as phone numbers.
+    Numbers exported in international format (+972 50-123-4567) will match
+    reliably; local-format numbers (050-123-4567) will not unless they happen
+    to share the same digit string as the JID.
     """
     contacts: dict[str, str] = {}
     try:
         with path.open(encoding="utf-8-sig") as f:  # utf-8-sig strips BOM from Google export
             for row in csv.DictReader(f):
-                name = _display_name(row)
-                if not name:
-                    continue
-                for col in _PHONE_COLS:
-                    phone = row.get(col, "").strip()
-                    if not phone:
-                        continue
-                    normalized = _NON_DIGIT.sub("", phone)
-                    if normalized:
-                        contacts[normalized] = name
+                _add_csv_row(contacts, row)
     except OSError:
         logger.exception(f"Could not read contacts CSV: {path}")
         return {}
     logger.info(f"Loaded {len(contacts)} phone→name entries from {path.name}")
     return contacts
+
+
+def _parse_phone(value: str) -> str | None:
+    """Return digit-only form of value if it looks like a phone number, else None."""
+    normalized = _NON_DIGIT.sub("", value.strip())
+    if _MIN_PHONE_DIGITS <= len(normalized) <= _MAX_PHONE_DIGITS:
+        return normalized
+    return None
+
+
+def _row_phones(row: dict[str, str]) -> set[str]:
+    """Extract all phone-like values from a CSV row."""
+    phones = set()
+    for value in row.values():
+        if not value:
+            continue
+        phone = _parse_phone(value)
+        if phone:
+            phones.add(phone)
+    return phones
+
+
+def _add_contact(contacts: dict[str, str], phone: str, name: str) -> None:
+    """Insert phone→name, warning and skipping if the phone is already mapped to a different name."""
+    if phone not in contacts:
+        contacts[phone] = name
+        return
+    if contacts[phone] != name:
+        logger.warning(f"Duplicate phone {phone}: keeping '{contacts[phone]}', skipping '{name}'")
+
+
+def _add_csv_row(contacts: dict[str, str], row: dict[str, str]) -> None:
+    """Resolve name and phones from one CSV row and merge into contacts."""
+    name = _display_name(row)
+    if not name:
+        return
+    for phone in _row_phones(row):
+        _add_contact(contacts, phone, name)
 
 
 def _load_wa_contacts(wadb: sqlite3.Connection) -> dict[str, str]:
@@ -66,7 +95,7 @@ def _load_wa_contacts(wadb: sqlite3.Connection) -> dict[str, str]:
         rows = wadb.execute(
             "SELECT jid, display_name FROM wa_contacts WHERE display_name IS NOT NULL AND display_name != ''"
         ).fetchall()
-        return {row["jid"].replace(_JID_SUFFIX, ""): row["display_name"] for row in rows}
+        return {row["jid"].split("@")[0]: row["display_name"] for row in rows}
     except sqlite3.OperationalError:
         logger.debug("wa_contacts table not found — no contact name resolution from wa.db.")
         return {}

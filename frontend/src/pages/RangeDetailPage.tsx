@@ -16,34 +16,14 @@ const TICK_STYLE = { fill: '#64748b', fontSize: 10 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-type Bucket = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+const DAY_MS = 86_400_000
 
-// Granularities ordered finest→coarsest, with their size in hours
-const GRANULARITIES: { bucket: Bucket; hours: number }[] = [
-  { bucket: 'hourly',  hours: 1 },
-  { bucket: 'daily',   hours: 24 },
-  { bucket: 'weekly',  hours: 24 * 7 },
-  { bucket: 'monthly', hours: 24 * 30 },
-  { bucket: 'yearly',  hours: 24 * 365 },
-]
-
-/** Pick the granularity whose bucket count is closest to TARGET_BUCKETS. */
-function chooseBucket(from: string, to: string): Bucket {
-  const TARGET = 30
-  const rangeHours = (new Date(to.replace(' ', 'T')).getTime() - new Date(from.replace(' ', 'T')).getTime()) / 3_600_000
-  return GRANULARITIES.reduce((best, g) => {
-    const count = rangeHours / g.hours
-    const bestCount = rangeHours / best.hours
-    return Math.abs(count - TARGET) < Math.abs(bestCount - TARGET) ? g : best
-  }).bucket
-}
-
-function formatTick(bucket: Bucket): (v: string) => string {
-  if (bucket === 'hourly')  return (v) => v.slice(11, 16)  // "HH:00"
-  if (bucket === 'daily')   return (v) => v.slice(5)        // "MM-DD"
-  if (bucket === 'weekly')  return (v) => v.slice(5)        // "W##"
-  if (bucket === 'monthly') return (v) => v                  // "YYYY-MM"
-  return (v) => v                                             // "YYYY"
+/** Format bucket label ("YYYY-MM-DDTHH:MM") based on bucket size in ms. */
+function formatTick(bucketSizeMs: number): (v: string) => string {
+  if (bucketSizeMs < DAY_MS)         return (v) => v.slice(11, 16)  // "HH:MM"
+  if (bucketSizeMs < DAY_MS * 30)    return (v) => v.slice(5, 10)   // "MM-DD"
+  if (bucketSizeMs < DAY_MS * 365)   return (v) => v.slice(0, 7)    // "YYYY-MM"
+  return (v) => v.slice(0, 4)                                         // "YYYY"
 }
 
 type TimelineRow = { bucket: string } & Record<string, number | string>
@@ -51,11 +31,12 @@ type TimelineRow = { bucket: string } & Record<string, number | string>
 function buildTimelineRows(
   timeline: { bucket: string; chat_name: string; count: number }[],
   topChats: string[],
+  allBuckets: string[],
 ): TimelineRow[] {
   const topSet = new Set(topChats)
   const map = new Map<string, TimelineRow>()
+  for (const b of allBuckets) map.set(b, { bucket: b })
   for (const b of timeline) {
-    if (!map.has(b.bucket)) map.set(b.bucket, { bucket: b.bucket })
     const row = map.get(b.bucket)!
     const key = topSet.has(b.chat_name) ? b.chat_name : 'Other'
     row[key] = ((row[key] as number | undefined) ?? 0) + b.count
@@ -105,11 +86,13 @@ export default function RangeDetailPage() {
   const rangeInvalid = fromValid && toValid && to < from
   const canFetch = fromValid && toValid && !rangeInvalid
 
-  const bucket: Bucket = canFetch ? chooseBucket(from, to) : 'daily'
+  const bucketSizeMs = canFetch
+    ? (new Date(to.replace(' ', 'T')).getTime() - new Date(from.replace(' ', 'T')).getTime()) / 30
+    : DAY_MS
 
   const { data, isLoading } = useQuery({
-    queryKey: ['range', from, to, bucket],
-    queryFn: () => api.rangeDetail(toApiDatetime(from), toApiDatetime(to), bucket),
+    queryKey: ['range', from, to],
+    queryFn: () => api.rangeDetail(toApiDatetime(from), toApiDatetime(to)),
     enabled: canFetch,
   })
 
@@ -128,7 +111,7 @@ export default function RangeDetailPage() {
   const colorMap = useMemo(() => buildChatColorMap(topChats), [topChats])
 
   const timelineRows = useMemo(
-    () => (data ? buildTimelineRows(data.timeline, topChats) : []),
+    () => (data ? buildTimelineRows(data.timeline, topChats, data.buckets) : []),
     [data, topChats],
   )
 
@@ -218,7 +201,7 @@ export default function RangeDetailPage() {
           {/* Activity chart */}
           <div className="bg-app-surface border border-app-border rounded-xl p-4">
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
-              Activity ({bucket})
+              Activity (30 buckets)
             </p>
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={timelineRows} barCategoryGap="10%">
@@ -226,7 +209,7 @@ export default function RangeDetailPage() {
                   dataKey="bucket"
                   tick={TICK_STYLE}
                   interval="preserveStartEnd"
-                  tickFormatter={formatTick(bucket)}
+                  tickFormatter={formatTick(bucketSizeMs)}
                 />
                 <YAxis tick={TICK_STYLE} width={28} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} />

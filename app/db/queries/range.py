@@ -7,20 +7,10 @@ from db.row_types import RawRangeMessageRow
 
 logger = logging.getLogger(__name__)
 
-# Safe mapping — never interpolate user input directly into SQL
-_BUCKET_EXPR: dict[str, str] = {
-    "hourly": "strftime('%Y-%m-%dT%H:00', m.timestamp / 1000, 'unixepoch', 'localtime')",
-    "daily": "date(m.timestamp / 1000, 'unixepoch', 'localtime')",
-    "weekly": "strftime('%Y-W%W', m.timestamp / 1000, 'unixepoch', 'localtime')",
-    "monthly": "strftime('%Y-%m', m.timestamp / 1000, 'unixepoch', 'localtime')",
-    "yearly": "strftime('%Y', m.timestamp / 1000, 'unixepoch', 'localtime')",
-}
-
-_RANGE_MESSAGES_SQL_TEMPLATE = """
+_RANGE_MESSAGES_SQL = """
 SELECT
     m.timestamp,
     strftime('%Y-%m-%dT%H:%M', m.timestamp / 1000, 'unixepoch', 'localtime') AS local_dt,
-    {bucket_expr}                                                               AS date_bucket,
     m.message_type,
     m.from_me,
     m.text_data,
@@ -47,12 +37,9 @@ def fetch_range_messages(
     conn: sqlite3.Connection,
     date_from: datetime,
     date_to: datetime,
-    bucket: str = "daily",
 ) -> Generator[RawRangeMessageRow]:
     """Yield all non-system messages between date_from and date_to (inclusive)."""
-    bucket_expr = _BUCKET_EXPR.get(bucket, _BUCKET_EXPR["daily"])
-    sql = _RANGE_MESSAGES_SQL_TEMPLATE.format(bucket_expr=bucket_expr)
     from_ms = int(date_from.timestamp() * 1000)
     to_ms = int(date_to.timestamp() * 1000)
-    for row in conn.execute(sql, (from_ms, to_ms)):
+    for row in conn.execute(_RANGE_MESSAGES_SQL, (from_ms, to_ms)):
         yield RawRangeMessageRow.model_validate(dict(row))
