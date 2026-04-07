@@ -1,22 +1,21 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { api } from '../api/client'
 import type { FeedMessage, RangeMessage } from '../api/types'
-import MessageFeed, { buildChatColorMap, CHAT_COLORS } from '../components/MessageFeed'
+import { buildChatColorMap } from '../components/MessageFeed'
 import DatetimeInput, { DATETIME_RE, toApiDatetime } from '../components/DatetimeInput'
+import ActivityCard, { buildTimelineRows } from '../components/messages/ActivityCard'
+import ChatsFilterCard from '../components/messages/ChatsFilterCard'
+import SenderFilterCard from '../components/messages/SenderFilterCard'
+import MessagesCard from '../components/messages/MessagesCard'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
 const MAX_LABELED_CHATS = 7
-const OTHER_COLOR = '#374061'
-const TOOLTIP_STYLE = { background: '#0d0f17', border: '1px solid #1a1d2e', color: '#e2e8f0', borderRadius: 8, fontSize: 12 }
-const TICK_STYLE = { fill: '#64748b', fontSize: 10 }
+const DAY_MS = 86_400_000
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-const DAY_MS = 86_400_000
 
 /** Format bucket label ("YYYY-MM-DDTHH:MM") based on bucket size in ms. */
 function formatTick(bucketSizeMs: number): (v: string) => string {
@@ -24,28 +23,6 @@ function formatTick(bucketSizeMs: number): (v: string) => string {
   if (bucketSizeMs < DAY_MS * 30)    return (v) => v.slice(5, 10)   // "MM-DD"
   if (bucketSizeMs < DAY_MS * 365)   return (v) => v.slice(0, 7)    // "YYYY-MM"
   return (v) => v.slice(0, 4)                                         // "YYYY"
-}
-
-type TimelineRow = { bucket: string } & Record<string, number | string>
-
-function buildTimelineRows(
-  timeline: { bucket: string; chat_name: string; count: number }[],
-  topChats: string[],
-  allBuckets: string[],
-): TimelineRow[] {
-  const topSet = new Set(topChats)
-  const map = new Map<string, TimelineRow>()
-  for (const b of allBuckets) map.set(b, { bucket: b })
-  for (const b of timeline) {
-    const row = map.get(b.bucket)!
-    const key = topSet.has(b.chat_name) ? b.chat_name : 'Other'
-    row[key] = ((row[key] as number | undefined) ?? 0) + b.count
-  }
-  return [...map.values()]
-}
-
-function shortName(name: string, max = 22): string {
-  return name.length > max ? name.slice(0, max - 1) + '…' : name
 }
 
 function rangeMessageToFeed(msg: RangeMessage): FeedMessage {
@@ -80,6 +57,7 @@ export default function RangeDetailPage() {
   const to = searchParams.get('to') ?? ''
 
   const [activeChats, setActiveChats] = useState<Set<string>>(new Set())
+  const [activeSenders, setActiveSenders] = useState<Set<string>>(new Set())
 
   const fromValid = DATETIME_RE.test(from)
   const toValid = DATETIME_RE.test(to)
@@ -99,6 +77,7 @@ export default function RangeDetailPage() {
   function handleChange(newFrom: string, newTo: string) {
     setSearchParams({ from: newFrom, to: newTo }, { replace: true })
     setActiveChats(new Set())
+    setActiveSenders(new Set())
   }
 
   const topChats: string[] = useMemo(() => {
@@ -120,11 +99,6 @@ export default function RangeDetailPage() {
     return [...topChats, ...(hasOther ? ['Other'] : [])]
   }, [topChats, data])
 
-  const feedMessages: FeedMessage[] = useMemo(
-    () => (data?.messages ?? []).map(rangeMessageToFeed),
-    [data],
-  )
-
   const allChatNames: string[] = useMemo(() => {
     if (!data) return []
     const freq = new Map<string, number>()
@@ -132,16 +106,32 @@ export default function RangeDetailPage() {
     return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c)
   }, [data])
 
-  const visibleMessages = useMemo(
-    () => (activeChats.size === 0 ? feedMessages : feedMessages.filter((m) => activeChats.has(m.chat_name))),
-    [feedMessages, activeChats],
+  const feedMessages: FeedMessage[] = useMemo(
+    () => (data?.messages ?? []).map(rangeMessageToFeed),
+    [data],
   )
+
+  const visibleMessages = useMemo(() => {
+    let msgs = feedMessages
+    if (activeChats.size > 0) msgs = msgs.filter((m) => activeChats.has(m.chat_name))
+    if (activeSenders.size > 0) msgs = msgs.filter((m) => activeSenders.has(m.sender_name))
+    return msgs
+  }, [feedMessages, activeChats, activeSenders])
 
   function toggleChat(chat: string) {
     setActiveChats((prev) => {
       const next = new Set(prev)
       if (next.has(chat)) next.delete(chat)
       else next.add(chat)
+      return next
+    })
+  }
+
+  function toggleSender(sender: string) {
+    setActiveSenders((prev) => {
+      const next = new Set(prev)
+      if (next.has(sender)) next.delete(sender)
+      else next.add(sender)
       return next
     })
   }
@@ -153,7 +143,7 @@ export default function RangeDetailPage() {
         <p className="text-xs text-slate-500 mt-1">All messages across all chats in a time range</p>
       </div>
 
-      {/* Date pickers */}
+      {/* Range card */}
       <div className="bg-app-surface border border-app-border rounded-xl p-4">
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex-shrink-0">Range</span>
@@ -186,6 +176,7 @@ export default function RangeDetailPage() {
       {isLoading && (
         <div className="space-y-3 animate-pulse">
           <div className="bg-app-surface border border-app-border rounded-xl h-40" />
+          <div className="bg-app-surface border border-app-border rounded-xl h-12" />
           <div className="bg-app-surface border border-app-border rounded-xl h-64" />
         </div>
       )}
@@ -198,76 +189,40 @@ export default function RangeDetailPage() {
 
       {data && data.total_messages > 0 && (
         <>
-          {/* Activity chart */}
-          <div className="bg-app-surface border border-app-border rounded-xl p-4">
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
-              Activity (30 buckets)
-            </p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={timelineRows} barCategoryGap="10%">
-                <XAxis
-                  dataKey="bucket"
-                  tick={TICK_STYLE}
-                  interval="preserveStartEnd"
-                  tickFormatter={formatTick(bucketSizeMs)}
-                />
-                <YAxis tick={TICK_STYLE} width={28} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} formatter={(v: string) => shortName(v)} />
-                {barKeys.map((key, i) => (
-                  <Bar
-                    key={key}
-                    dataKey={key}
-                    stackId="a"
-                    fill={key === 'Other' ? OTHER_COLOR : (colorMap.get(key) ?? CHAT_COLORS[i % CHAT_COLORS.length])}
-                    isAnimationActive={false}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {/* Activity graph card */}
+          <ActivityCard
+            rows={timelineRows}
+            barKeys={barKeys}
+            colorMap={colorMap}
+            label="Activity (30 buckets)"
+            tickFormatter={formatTick(bucketSizeMs)}
+          />
 
-          {/* Chat filter chips */}
-          {allChatNames.length > 1 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] text-slate-500 uppercase tracking-widest flex-shrink-0">Chats</span>
-              {allChatNames.map((chat) => (
-                <button
-                  key={chat}
-                  onClick={() => toggleChat(chat)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border truncate max-w-[160px] ${
-                    activeChats.has(chat)
-                      ? 'border-accent/50 text-accent-light'
-                      : 'bg-app-surface-2 border-app-border text-slate-400 hover:text-slate-200'
-                  }`}
-                  style={activeChats.has(chat) ? { backgroundColor: (colorMap.get(chat) ?? '#7c5af6') + '22' } : undefined}
-                  title={chat}
-                >
-                  {shortName(chat, 20)}
-                </button>
-              ))}
-              {activeChats.size > 0 && (
-                <button
-                  onClick={() => setActiveChats(new Set())}
-                  className="px-2 py-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          )}
+          {/* Chats filter card */}
+          <ChatsFilterCard
+            chatNames={allChatNames}
+            activeChats={activeChats}
+            colorMap={colorMap}
+            onToggle={toggleChat}
+            onClear={() => setActiveChats(new Set())}
+          />
 
-          {/* Message feed */}
-          <div className="bg-app-surface border border-app-border rounded-xl overflow-hidden">
-            <MessageFeed
-              messages={visibleMessages}
-              total={visibleMessages.length}
-              senders={data.senders}
-              showChat
-              dayOnly={false}
-              height="calc(100vh - 420px)"
-            />
-          </div>
+          {/* Sender filter card */}
+          <SenderFilterCard
+            senders={data.senders}
+            activeSenders={activeSenders}
+            onToggle={toggleSender}
+            onClear={() => setActiveSenders(new Set())}
+          />
+
+          {/* Messages card */}
+          <MessagesCard
+            messages={visibleMessages}
+            total={visibleMessages.length}
+            showChat
+            dayOnly={false}
+            height="calc(100vh - 420px)"
+          />
         </>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef } from 'react'
 import type { FeedMessage } from '../api/types'
 
 // ── palette ──────────────────────────────────────────────────────────────────
@@ -89,23 +89,20 @@ function MessageRow({ msg, chatColor, dayOnly, showChat, highlight }: RowProps) 
 interface Props {
   messages: FeedMessage[]
   total: number
-  senders: string[]
   showChat?: boolean
   dayOnly?: boolean
   height?: string
-  highlight?: string   // term to highlight in message text
+  highlight?: string
 }
 
 export default function MessageFeed({
   messages,
   total,
-  senders,
   showChat = true,
   dayOnly = false,
   height = '18rem',
   highlight = '',
 }: Props) {
-  const [activeSenders, setActiveSenders] = useState<Set<string>>(new Set())
   const feedRef = useRef<HTMLDivElement>(null)
 
   const chatColorMap = useMemo(() => {
@@ -113,54 +110,13 @@ export default function MessageFeed({
     return buildChatColorMap(chats)
   }, [messages])
 
-  const filtered = useMemo(
-    () => (activeSenders.size === 0 ? messages : messages.filter((m) => activeSenders.has(m.sender_name))),
-    [messages, activeSenders]
-  )
-
-  function toggleSender(sender: string) {
-    setActiveSenders((prev) => {
-      const next = new Set(prev)
-      if (next.has(sender)) next.delete(sender)
-      else next.add(sender)
-      return next
-    })
-  }
-
   return (
     <div className="space-y-2">
-      {/* Sender filter chips */}
-      {senders.length > 1 && (
-        <div className="flex flex-wrap gap-1.5">
-          {senders.slice(0, 20).map((s) => (
-            <button
-              key={s}
-              onClick={() => toggleSender(s)}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border ${
-                activeSenders.has(s)
-                  ? 'bg-accent/15 border-accent/50 text-accent-light'
-                  : 'bg-app-surface-2 border-app-border text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-          {activeSenders.size > 0 && (
-            <button
-              onClick={() => setActiveSenders(new Set())}
-              className="px-2.5 py-1 rounded-full text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Count label */}
       <p className="text-[10px] text-slate-500">
-        {filtered.length < total
-          ? `${filtered.length.toLocaleString()} of ${total.toLocaleString()} messages`
-          : `${filtered.length.toLocaleString()} messages`}
+        {messages.length < total
+          ? `${messages.length.toLocaleString()} of ${total.toLocaleString()} messages`
+          : `${messages.length.toLocaleString()} messages`}
         {total > messages.length && (
           <span className="ml-1 text-slate-600">(showing last {messages.length.toLocaleString()})</span>
         )}
@@ -172,10 +128,10 @@ export default function MessageFeed({
         className="overflow-y-auto rounded-lg bg-app-bg border border-app-border py-1"
         style={{ height }}
       >
-        {filtered.length === 0 ? (
+        {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-slate-500 text-sm">No messages</div>
         ) : (
-          filtered.map((msg, i) => (
+          messages.map((msg, i) => (
             <MessageRow
               key={i}
               msg={msg}

@@ -1,52 +1,23 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
 import { api } from '../api/client'
 import type { DayMessage, FeedMessage } from '../api/types'
-import MessageFeed, { buildChatColorMap, CHAT_COLORS } from './MessageFeed'
+import { buildChatColorMap } from './MessageFeed'
+import ActivityCard, { buildTimelineRows } from './messages/ActivityCard'
+import ChatsFilterCard from './messages/ChatsFilterCard'
+import SenderFilterCard from './messages/SenderFilterCard'
+import MessagesCard from './messages/MessagesCard'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
 const MAX_LABELED_CHATS = 7
-const OTHER_COLOR = '#374061'
-const TOOLTIP_STYLE = { background: '#0d0f17', border: '1px solid #1a1d2e', color: '#e2e8f0', borderRadius: 8, fontSize: 12 }
-const TICK_STYLE = { fill: '#64748b', fontSize: 10 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-type TimelineRow = { bucket: string } & Record<string, number | string>
-
-function buildTimelineRows(
-  timeline: { bucket: string; chat_name: string; count: number }[],
-  topChats: string[]
-): TimelineRow[] {
-  const topSet = new Set(topChats)
-  const map = new Map<string, TimelineRow>()
-  for (const b of timeline) {
-    if (!map.has(b.bucket)) map.set(b.bucket, { bucket: b.bucket })
-    const row = map.get(b.bucket)!
-    const key = topSet.has(b.chat_name) ? b.chat_name : 'Other'
-    row[key] = ((row[key] as number | undefined) ?? 0) + b.count
-  }
-  return [...map.values()]
-}
 
 function nextDay(date: string): string {
   const d = new Date(date + 'T00:00:00')
   d.setDate(d.getDate() + 1)
   return d.toISOString().slice(0, 10)
-}
-
-function shortName(name: string, max = 22): string {
-  return name.length > max ? name.slice(0, max - 1) + '…' : name
 }
 
 function dayMessageToFeed(msg: DayMessage): FeedMessage {
@@ -55,7 +26,7 @@ function dayMessageToFeed(msg: DayMessage): FeedMessage {
   return {
     timestamp: '1970-01-01T' + msg.time + ':00',
     chat_name: msg.chat_name,
-    sender_id: msg.sender_name,  // day API doesn't expose phone; use name as fallback ID
+    sender_id: msg.sender_name,
     sender_name: msg.sender_name,
     text: msg.text,
     message_type: msg.message_type,
@@ -88,6 +59,9 @@ export default function DayDetail({ date, onClose }: Props) {
     queryFn: () => api.dayDetail(date),
   })
 
+  const [activeChats, setActiveChats] = useState<Set<string>>(new Set())
+  const [activeSenders, setActiveSenders] = useState<Set<string>>(new Set())
+
   const topChats: string[] = useMemo(() => {
     if (!data) return []
     const freq = new Map<string, number>()
@@ -99,7 +73,7 @@ export default function DayDetail({ date, onClose }: Props) {
 
   const timelineRows = useMemo(
     () => (data ? buildTimelineRows(data.timeline, topChats) : []),
-    [data, topChats]
+    [data, topChats],
   )
 
   const barKeys: string[] = useMemo(() => {
@@ -107,12 +81,6 @@ export default function DayDetail({ date, onClose }: Props) {
     return [...topChats, ...(hasOther ? ['Other'] : [])]
   }, [topChats, data])
 
-  const feedMessages: FeedMessage[] = useMemo(
-    () => (data?.messages ?? []).map(dayMessageToFeed),
-    [data]
-  )
-
-  // Chat names sorted by message count (same order as topChats + others)
   const allChatNames: string[] = useMemo(() => {
     if (!data) return []
     const freq = new Map<string, number>()
@@ -120,18 +88,32 @@ export default function DayDetail({ date, onClose }: Props) {
     return [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c)
   }, [data])
 
-  const [activeChats, setActiveChats] = useState<Set<string>>(new Set())
-
-  const visibleMessages = useMemo(
-    () => (activeChats.size === 0 ? feedMessages : feedMessages.filter((m) => activeChats.has(m.chat_name))),
-    [feedMessages, activeChats]
+  const feedMessages: FeedMessage[] = useMemo(
+    () => (data?.messages ?? []).map(dayMessageToFeed),
+    [data],
   )
+
+  const visibleMessages = useMemo(() => {
+    let msgs = feedMessages
+    if (activeChats.size > 0) msgs = msgs.filter((m) => activeChats.has(m.chat_name))
+    if (activeSenders.size > 0) msgs = msgs.filter((m) => activeSenders.has(m.sender_name))
+    return msgs
+  }, [feedMessages, activeChats, activeSenders])
 
   function toggleChat(chat: string) {
     setActiveChats((prev) => {
       const next = new Set(prev)
       if (next.has(chat)) next.delete(chat)
       else next.add(chat)
+      return next
+    })
+  }
+
+  function toggleSender(sender: string) {
+    setActiveSenders((prev) => {
+      const next = new Set(prev)
+      if (next.has(sender)) next.delete(sender)
+      else next.add(sender)
       return next
     })
   }
@@ -170,80 +152,46 @@ export default function DayDetail({ date, onClose }: Props) {
 
       {isLoading ? (
         <div className="p-5 space-y-3 animate-pulse">
-          <div className="h-32 bg-app-surface-2 rounded" />
-          <div className="h-64 bg-app-surface-2 rounded" />
+          <div className="h-40 bg-app-surface-2 rounded-xl" />
+          <div className="h-12 bg-app-surface-2 rounded-xl" />
+          <div className="h-64 bg-app-surface-2 rounded-xl" />
         </div>
       ) : !data || data.total_messages === 0 ? (
         <div className="p-8 text-center text-slate-500 text-sm">No messages on this day</div>
       ) : (
         <div className="p-5 space-y-4">
-          {/* Activity chart */}
-          <div>
-            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
-              Activity (5-min buckets)
-            </p>
-            <ResponsiveContainer width="100%" height={140}>
-              <BarChart data={timelineRows} barCategoryGap="10%">
-                <XAxis
-                  dataKey="bucket"
-                  tick={TICK_STYLE}
-                  interval={11}
-                  tickFormatter={(v: string) => v.slice(0, 2) + 'h'}
-                />
-                <YAxis tick={TICK_STYLE} width={28} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend
-                  wrapperStyle={{ fontSize: 11, color: '#94a3b8' }}
-                  formatter={(v: string) => shortName(v)}
-                />
-                {barKeys.map((key, i) => (
-                  <Bar
-                    key={key}
-                    dataKey={key}
-                    stackId="a"
-                    fill={key === 'Other' ? OTHER_COLOR : (colorMap.get(key) ?? CHAT_COLORS[i % CHAT_COLORS.length])}
-                    isAnimationActive={false}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {/* Activity graph card */}
+          <ActivityCard
+            rows={timelineRows}
+            barKeys={barKeys}
+            colorMap={colorMap}
+            label="Activity (5-min buckets)"
+            height={140}
+            tickFormatter={(v: string) => v.slice(0, 2) + 'h'}
+            tickInterval={11}
+          />
 
-          {/* Chat filter chips */}
-          {allChatNames.length > 1 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] text-slate-500 uppercase tracking-widest flex-shrink-0">Chats</span>
-              {allChatNames.map((chat) => (
-                <button
-                  key={chat}
-                  onClick={() => toggleChat(chat)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border truncate max-w-[160px] ${
-                    activeChats.has(chat)
-                      ? 'border-accent/50 text-accent-light'
-                      : 'bg-app-surface-2 border-app-border text-slate-400 hover:text-slate-200'
-                  }`}
-                  style={activeChats.has(chat) ? { backgroundColor: (colorMap.get(chat) ?? '#7c5af6') + '22' } : undefined}
-                  title={chat}
-                >
-                  {shortName(chat, 20)}
-                </button>
-              ))}
-              {activeChats.size > 0 && (
-                <button
-                  onClick={() => setActiveChats(new Set())}
-                  className="px-2 py-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          )}
+          {/* Chats filter card */}
+          <ChatsFilterCard
+            chatNames={allChatNames}
+            activeChats={activeChats}
+            colorMap={colorMap}
+            onToggle={toggleChat}
+            onClear={() => setActiveChats(new Set())}
+          />
 
-          {/* Message feed */}
-          <MessageFeed
+          {/* Sender filter card */}
+          <SenderFilterCard
+            senders={data.senders}
+            activeSenders={activeSenders}
+            onToggle={toggleSender}
+            onClear={() => setActiveSenders(new Set())}
+          />
+
+          {/* Messages card */}
+          <MessagesCard
             messages={visibleMessages}
             total={visibleMessages.length}
-            senders={data.senders}
             showChat
             dayOnly
             height="20rem"

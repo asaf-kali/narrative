@@ -48,13 +48,13 @@ def build_coactivity_graph(df: pd.DataFrame, _config: AnalysisConfig) -> Network
     if df.empty:
         return NetworkGraph(nodes=[], edges=[], communities=0, mode="coactivity")
 
-    sender_stats = _sender_stats(df)
+    sender_stats, annotated = _sender_stats(df)
     if len(sender_stats) > _MAX_PARTICIPANTS:
         sender_stats = sender_stats.nlargest(_MAX_PARTICIPANTS, "messages")
         logger.warning(f"Network: truncated to top {_MAX_PARTICIPANTS} participants by message count")
 
     active_days: dict[str, set[object]] = {
-        row["id"]: set(df[df["_sender_id"] == row["id"]]["date"]) for _, row in sender_stats.iterrows()
+        row["id"]: set(annotated[annotated["_sender_id"] == row["id"]]["date"]) for _, row in sender_stats.iterrows()
     }
 
     raw_edges: list[tuple[str, str, int]] = []
@@ -75,8 +75,10 @@ def build_reaction_graph(df: pd.DataFrame, reactions_df: pd.DataFrame, _config: 
     if df.empty or reactions_df.empty:
         return NetworkGraph(nodes=[], edges=[], communities=0, mode="reactions")
 
+    sender_stats, annotated = _sender_stats(df)
+
     msg_info = (
-        df[["message_id", "_sender_id", "sender_name"]]
+        annotated[["message_id", "_sender_id", "sender_name"]]
         .drop_duplicates("message_id")
         .rename(columns={"_sender_id": "author_id", "sender_name": "author_label"})
     )
@@ -86,13 +88,15 @@ def build_reaction_graph(df: pd.DataFrame, reactions_df: pd.DataFrame, _config: 
         return NetworkGraph(nodes=[], edges=[], communities=0, mode="reactions")
 
     id_to_label_df = (
-        df[["_sender_id", "sender_name"]].drop_duplicates("_sender_id").set_index("_sender_id")["sender_name"].to_dict()
+        annotated[["_sender_id", "sender_name"]]
+        .drop_duplicates("_sender_id")
+        .set_index("_sender_id")["sender_name"]
+        .to_dict()
     )
     merged["reactor_id"] = merged["sender_phone"].apply(lambda p: p or "me")
 
     edge_counts = merged.groupby(["reactor_id", "author_id"]).size().reset_index(name="weight")
 
-    sender_stats = _sender_stats(df)
     id_to_msgs: dict[str, int] = {str(k): int(v) for k, v in sender_stats.set_index("id")["messages"].to_dict().items()}
     id_to_label: dict[str, str] = {str(k): str(v) for k, v in sender_stats.set_index("id")["label"].to_dict().items()}
 
@@ -119,15 +123,17 @@ def _sender_id(row: pd.Series) -> str:  # type: ignore[type-arg]
     return str(row.get("sender_phone") or "") or str(row.get("sender_name", "unknown"))
 
 
-def _sender_stats(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-    df["_sender_id"] = df.apply(_sender_id, axis=1)
-    return (
-        df.groupby("_sender_id")
+def _sender_stats(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return (stats, annotated_df) where annotated_df has the _sender_id column added."""
+    annotated = df.copy()
+    annotated["_sender_id"] = annotated.apply(_sender_id, axis=1)
+    stats = (
+        annotated.groupby("_sender_id")
         .agg(label=("sender_name", "first"), messages=("message_id", "count"))
         .reset_index()
         .rename(columns={"_sender_id": "id"})
     )
+    return stats, annotated
 
 
 def _build_undirected_adj(nodes: list[str], edges: list[tuple[str, str, int]]) -> Adjacency:
