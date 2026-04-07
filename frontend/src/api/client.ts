@@ -57,4 +57,6 @@ export const api = {
   },
   network: (chatId: number, mode: 'coactivity' | 'reactions' = 'coactivity'): Promise<NetworkGraph> =>
     get(`/api/chats/${chatId}/network?mode=${mode}`),
+  globalNetwork: (mode: 'coactivity' | 'reactions' = 'coactivity', includeMe = true): Promise<NetworkGraph> =>
+    get(`/api/network?mode=${mode}&include_me=${includeMe}`),
 }

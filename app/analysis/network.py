@@ -28,6 +28,7 @@ class NetworkNode(BaseModel):
     messages: int
     cluster: int
     centrality: float
+    groups: list[str] = []  # groups this person appears in; populated by global graph
 
 
 class NetworkEdge(BaseModel):
@@ -112,6 +113,77 @@ def build_reaction_graph(df: pd.DataFrame, reactions_df: pd.DataFrame, _config: 
     merged_labels = {nid: id_to_label.get(nid, id_to_label_df.get(nid, nid)) for nid in all_ids}
 
     return _finalise(adj=adj, raw_edges=raw_edges, id_to_label=merged_labels, id_to_msgs=id_to_msgs, mode="reactions")
+
+
+def build_global_graph(df: pd.DataFrame, include_me: bool = True) -> NetworkGraph:
+    """Global contact graph across all chats.
+
+    Nodes = every contact who sent at least one message in any group.
+    Edges = shared group membership; weight = number of groups both people appear in.
+    """
+    if df.empty:
+        return NetworkGraph(nodes=[], edges=[], communities=0, mode="coactivity")
+
+    _, annotated = _sender_stats(df)
+
+    # Whole-corpus sender stats for node sizing
+    all_stats = (
+        annotated.groupby("_sender_id")
+        .agg(label=("sender_name", "first"), messages=("message_id", "count"))
+        .reset_index()
+        .rename(columns={"_sender_id": "id"})
+    )
+    id_to_label: dict[str, str] = {str(k): str(v) for k, v in all_stats.set_index("id")["label"].to_dict().items()}
+    id_to_msgs: dict[str, int] = {str(k): int(v) for k, v in all_stats.set_index("id")["messages"].to_dict().items()}
+
+    # Group membership: group_name → set of sender_ids
+    group_df = annotated[annotated["is_group"]]
+    group_members: dict[str, set[str]] = {}
+    for gname, grp in group_df.groupby("chat_name"):
+        members = {str(sid) for sid in grp["_sender_id"].unique()}
+        if not include_me:
+            members.discard("me")
+        group_members[str(gname)] = members
+
+    # Invert: sender_id → set of group names
+    person_groups: dict[str, set[str]] = {}
+    for gname, members in group_members.items():
+        for sid in members:
+            person_groups.setdefault(sid, set()).add(gname)
+
+    # Build edges: for each group, connect all pairs of members (+1 shared group)
+    edge_weights: dict[tuple[str, str], int] = {}
+    for members in group_members.values():
+        for a, b in itertools.combinations(sorted(members), 2):
+            key = (a, b)
+            edge_weights[key] = edge_weights.get(key, 0) + 1
+
+    raw_edges: list[tuple[str, str, int]] = [(a, b, w) for (a, b), w in edge_weights.items()]
+    people = list(person_groups.keys())
+    adj = _build_undirected_adj(people, raw_edges)
+
+    community_map = _label_propagation(adj) if adj else {}
+    centrality = _degree_centrality(adj)
+
+    nodes = [
+        NetworkNode(
+            id=n,
+            label=id_to_label.get(n, n),
+            messages=int(id_to_msgs.get(n, 0)),
+            cluster=community_map.get(n, 0),
+            centrality=round(centrality.get(n, 0.0), 4),
+            groups=sorted(person_groups.get(n, set())),
+        )
+        for n in adj
+    ]
+    edges = [NetworkEdge(source=a, target=b, weight=w) for a, b, w in raw_edges]
+
+    return NetworkGraph(
+        nodes=nodes,
+        edges=edges,
+        communities=len(set(community_map.values())),
+        mode="coactivity",
+    )
 
 
 # ── private helpers ───────────────────────────────────────────────────────────

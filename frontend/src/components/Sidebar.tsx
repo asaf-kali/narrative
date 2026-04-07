@@ -38,6 +38,23 @@ export default function Sidebar({ chats, isLoading }: Props) {
         </div>
       </div>
 
+      {/* Global nav */}
+      <div className="px-2 pt-2 pb-1 border-b border-app-border">
+        <NavLink
+          to="/network"
+          className={({ isActive }) =>
+            `flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+              isActive
+                ? 'bg-accent/10 text-slate-100'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+            }`
+          }
+        >
+          <span className="text-[10px] opacity-60">◎</span>
+          <span>Global Network</span>
+        </NavLink>
+      </div>
+
       {/* Chat count label + hide-empty toggle */}
       <div className="px-5 pt-3 pb-1 flex items-center justify-between">
         <span className="text-[10px] font-semibold text-app-muted uppercase tracking-widest">

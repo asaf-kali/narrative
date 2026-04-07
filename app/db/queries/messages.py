@@ -26,9 +26,9 @@ SELECT
     m.starred,
     COALESCE(pj.user, sj.user, '')   AS sender_phone,
     COALESCE(pj.server, sj.server, '') AS sender_server,
-    c.subject              AS chat_subject,
-    cj.user                AS chat_phone,
-    cj.server              AS chat_server,
+    c.subject                    AS chat_subject,
+    COALESCE(cj.user,   '')      AS chat_phone,
+    COALESCE(cj.server, '')      AS chat_server,
     cj.type                AS chat_jid_type
 FROM message m
 LEFT JOIN jid sj       ON m.sender_jid_row_id = sj._id

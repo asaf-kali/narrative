@@ -11,6 +11,7 @@ import ContentPage from './pages/ContentPage'
 import MediaPage from './pages/MediaPage'
 import MessagesPage from './pages/MessagesPage'
 import NetworkPage from './pages/NetworkPage'
+import GlobalNetworkPage from './pages/GlobalNetworkPage'
 import RangeDetailPage from './pages/RangeDetailPage'
 import ChatLayout from './components/ChatLayout'
 
@@ -26,6 +27,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<div className="h-full overflow-auto p-6"><HomePage /></div>} />
             <Route path="/messages" element={<div className="h-full overflow-auto p-6"><RangeDetailPage /></div>} />
+            <Route path="/network" element={<div className="h-full overflow-hidden p-4"><GlobalNetworkPage /></div>} />
             <Route path="/chat/:chatId" element={<ChatLayout />}>
               <Route index element={<OverviewPage />} />
               <Route path="timeline" element={<TimelinePage />} />

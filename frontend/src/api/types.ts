@@ -127,6 +127,7 @@ export interface NetworkNode {
   messages: number
   cluster: number
   centrality: number
+  groups: string[]
 }
 
 export interface NetworkEdge {
