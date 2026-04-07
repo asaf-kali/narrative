@@ -6,6 +6,7 @@ import type {
   EmojiItem,
   HeatmapPoint,
   MediaData,
+  NetworkGraph,
   OverviewData,
   Participant,
   RangeDetail,
@@ -54,4 +55,6 @@ export const api = {
     const params = new URLSearchParams({ date_from: from, date_to: to })
     return get(`/api/range?${params}`)
   },
+  network: (chatId: number, mode: 'coactivity' | 'reactions' = 'coactivity'): Promise<NetworkGraph> =>
+    get(`/api/chats/${chatId}/network?mode=${mode}`),
 }

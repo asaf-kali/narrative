@@ -121,6 +121,27 @@ export interface RangeBucket {
   count: number
 }
 
+export interface NetworkNode {
+  id: string
+  label: string
+  messages: number
+  cluster: number
+  centrality: number
+}
+
+export interface NetworkEdge {
+  source: string
+  target: string
+  weight: number
+}
+
+export interface NetworkGraph {
+  nodes: NetworkNode[]
+  edges: NetworkEdge[]
+  communities: number
+  mode: string
+}
+
 export interface RangeDetail {
   date_from: string
   date_to: string

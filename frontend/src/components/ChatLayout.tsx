@@ -10,6 +10,7 @@ const TABS = [
   { label: 'Words & Emoji', path: 'content' },
   { label: 'Media', path: 'media' },
   { label: 'Messages', path: 'messages' },
+  { label: 'Network', path: 'network' },
 ]
 
 const TYPE_LABEL: Record<string, string> = { direct: 'Direct', group: 'Group', broadcast: 'Broadcast' }

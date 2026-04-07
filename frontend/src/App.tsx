@@ -10,6 +10,7 @@ import ParticipantsPage from './pages/ParticipantsPage'
 import ContentPage from './pages/ContentPage'
 import MediaPage from './pages/MediaPage'
 import MessagesPage from './pages/MessagesPage'
+import NetworkPage from './pages/NetworkPage'
 import RangeDetailPage from './pages/RangeDetailPage'
 import ChatLayout from './components/ChatLayout'
 
@@ -32,6 +33,7 @@ export default function App() {
               <Route path="content" element={<ContentPage />} />
               <Route path="media" element={<MediaPage />} />
               <Route path="messages" element={<MessagesPage />} />
+              <Route path="network" element={<NetworkPage />} />
             </Route>
           </Routes>
         </main>

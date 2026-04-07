@@ -84,7 +84,14 @@ All processing is local. No data is sent to any external service.
             os.environ["WHATSAPP_WADB"] = str(parsed.wadb)
         if parsed.contacts:
             os.environ["WHATSAPP_CONTACTS"] = str(parsed.contacts)
-        uvicorn.run("api.asgi:app", host=parsed.host, port=parsed.port, reload=True, log_config=_UVICORN_LOG_CONFIG)
+        uvicorn.run(
+            "api.asgi:app",
+            host=parsed.host,
+            port=parsed.port,
+            reload=True,
+            reload_dirs=["app"],
+            log_config=_UVICORN_LOG_CONFIG,
+        )
     else:
         from api.server import create_api  # noqa: PLC0415
 
