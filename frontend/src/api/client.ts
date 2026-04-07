@@ -57,6 +57,13 @@ export const api = {
   },
   network: (chatId: number, mode: 'coactivity' | 'reactions' = 'coactivity'): Promise<NetworkGraph> =>
     get(`/api/chats/${chatId}/network?mode=${mode}`),
-  globalNetwork: (mode: 'coactivity' | 'reactions' = 'coactivity', includeMe = true): Promise<NetworkGraph> =>
-    get(`/api/network?mode=${mode}&include_me=${includeMe}`),
+  globalNetwork: (
+    mode: 'coactivity' | 'reactions' = 'coactivity',
+    includeMe = true,
+    dateFrom?: string,
+  ): Promise<NetworkGraph> => {
+    const params = new URLSearchParams({ mode, include_me: String(includeMe) })
+    if (dateFrom) params.set('date_from', dateFrom)
+    return get(`/api/network?${params}`)
+  },
 }

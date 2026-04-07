@@ -12,6 +12,21 @@ const CLUSTER_COLORS = [
 ]
 
 type Mode = 'coactivity' | 'reactions'
+type TimeRange = '7d' | '30d' | '90d' | 'all'
+
+const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
+  { value: '7d', label: '7 days' },
+  { value: '30d', label: '30 days' },
+  { value: '90d', label: '90 days' },
+  { value: 'all', label: 'All time' },
+]
+
+function dateFrom(range: TimeRange): string | undefined {
+  if (range === 'all') return undefined
+  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90
+  const d = new Date(Date.now() - days * 86_400_000)
+  return d.toISOString().slice(0, 10)
+}
 
 interface GraphNode extends NodeObject {
   id: string; label: string; messages: number
@@ -111,12 +126,13 @@ type Selection =
 export default function GlobalNetworkPage() {
   const [mode, setMode] = useState<Mode>('coactivity')
   const [includeMe, setIncludeMe] = useState(false)
-  const [minWeight, setMinWeight] = useState(2)
+  const [minWeight, setMinWeight] = useState(1)
+  const [timeRange, setTimeRange] = useState<TimeRange>('7d')
   const [selection, setSelection] = useState<Selection>(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['global-network', mode, includeMe],
-    queryFn: () => api.globalNetwork(mode, includeMe),
+    queryKey: ['global-network', mode, includeMe, timeRange],
+    queryFn: () => api.globalNetwork(mode, includeMe, dateFrom(timeRange)),
   })
 
   // Container sizing
@@ -183,7 +199,7 @@ export default function GlobalNetworkPage() {
         <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-app-border shrink-0">
           <div className="flex gap-1">
             {(['coactivity', 'reactions'] as Mode[]).map((m) => (
-              <button key={m} onClick={() => { setMode(m); setMinWeight(m === 'coactivity' ? 2 : 1); setSelection(null) }}
+              <button key={m} onClick={() => { setMode(m); setMinWeight(m === 'coactivity' ? 1 : 1); setSelection(null) }}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${mode === m
                   ? 'bg-accent text-white shadow-lg shadow-accent/20'
                   : 'bg-app-surface-2 text-slate-400 hover:text-slate-200 border border-app-border'}`}>
@@ -197,6 +213,17 @@ export default function GlobalNetworkPage() {
               className="w-3 h-3 accent-accent" />
             <span className="text-xs text-slate-400">Include me</span>
           </label>
+
+          <div className="flex gap-1 ml-1">
+            {TIME_RANGE_OPTIONS.map((opt) => (
+              <button key={opt.value} onClick={() => { setTimeRange(opt.value); setMinWeight(1); setSelection(null) }}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${timeRange === opt.value
+                  ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                  : 'bg-app-surface-2 text-slate-400 hover:text-slate-200 border border-app-border'}`}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-xs text-slate-500">Min. shared groups</span>

@@ -9,6 +9,7 @@ import itertools
 import logging
 import random
 
+import numpy as np
 import pandas as pd
 from models.config import AnalysisConfig
 from pydantic import BaseModel
@@ -189,16 +190,14 @@ def build_global_graph(df: pd.DataFrame, include_me: bool = True) -> NetworkGrap
 # ── private helpers ───────────────────────────────────────────────────────────
 
 
-def _sender_id(row: pd.Series) -> str:  # type: ignore[type-arg]
-    if row.get("from_me") == 1 or row.get("sender_name") == "Me":
-        return "me"
-    return str(row.get("sender_phone") or "") or str(row.get("sender_name", "unknown"))
-
-
 def _sender_stats(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Return (stats, annotated_df) where annotated_df has the _sender_id column added."""
     annotated = df.copy()
-    annotated["_sender_id"] = annotated.apply(_sender_id, axis=1)
+    is_me = (annotated["from_me"] == 1) | (annotated["sender_name"] == "Me")
+    has_phone = annotated["sender_phone"].notna() & (annotated["sender_phone"] != "")
+    annotated["_sender_id"] = np.where(
+        is_me, "me", np.where(has_phone, annotated["sender_phone"], annotated["sender_name"].fillna("unknown"))
+    )
     stats = (
         annotated.groupby("_sender_id")
         .agg(label=("sender_name", "first"), messages=("message_id", "count"))
