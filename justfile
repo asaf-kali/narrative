@@ -72,5 +72,5 @@ lint: format
 # Misc
 
 decrypt-backup key:
-    cd etc && wadecrypt {{ key }} msgstore.db.crypt15
-    cd etc && wadecrypt {{ key }} wa.db.crypt15
+    cd data && wadecrypt {{ key }} msgstore.db.crypt15
+    cd data && wadecrypt {{ key }} wa.db.crypt15

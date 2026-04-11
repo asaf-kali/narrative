@@ -56,10 +56,23 @@ Examples:
 All processing is local. No data is sent to any external service.
 """,
     )
-    parser.add_argument("--msgstore", type=Path, default=None, help="Path to decrypted msgstore.db")
-    parser.add_argument("--wadb", type=Path, default=None, help="Path to decrypted wa.db (optional, for contact names)")
     parser.add_argument(
-        "--contacts", type=Path, default=None, help="Google Contacts CSV export (optional, overrides wa.db for names)"
+        "--msgstore",
+        type=Path,
+        default="data/msgstore.db",
+        help="Path to decrypted msgstore.db",
+    )
+    parser.add_argument(
+        "--wadb",
+        type=Path,
+        default="data/wa.db",
+        help="Path to decrypted wa.db (optional, for contact names)",
+    )
+    parser.add_argument(
+        "--contacts",
+        type=Path,
+        default="data/contacts.csv",
+        help="Google Contacts CSV export (optional, overrides wa.db for names)",
     )
     parser.add_argument("--port", type=int, default=8050, help="Port to run on (default: 8050)")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")

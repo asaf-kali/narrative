@@ -1,6 +1,7 @@
 # Custom
 .idea/
 etc/
+data/
 
 # Created by https://www.toptal.com/developers/gitignore/api/pycharm,python,windows,macos,linux,node
 # Edit at https://www.toptal.com/developers/gitignore?templates=pycharm,python,windows,macos,linux,node
