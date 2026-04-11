@@ -242,7 +242,7 @@ export default function GlobalMessagesPage() {
         </div>
       ) : (
         <MessagesCard
-          messages={data.messages}
+          messages={[...data.messages].reverse()}
           total={data.total}
           showChat
           dayOnly={false}
