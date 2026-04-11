@@ -122,7 +122,7 @@ export default function GlobalMessagesPage() {
         disabled={offset + PAGE_SIZE >= (data?.total ?? 0)}
         className="px-2 py-1 rounded bg-app-surface-2 border border-app-border disabled:opacity-30 hover:text-slate-200 transition-colors"
       >
-        ← Newer
+        ← Older
       </button>
       <span className="tabular-nums">{currentPage + 1} / {totalPages}</span>
       <button
@@ -130,7 +130,7 @@ export default function GlobalMessagesPage() {
         disabled={offset === 0}
         className="px-2 py-1 rounded bg-app-surface-2 border border-app-border disabled:opacity-30 hover:text-slate-200 transition-colors"
       >
-        Older →
+        Newer →
       </button>
     </div>
   ) : null
@@ -198,11 +198,10 @@ export default function GlobalMessagesPage() {
                 <button
                   key={p.value}
                   onClick={() => applyPreset(p.value)}
-                  className={`px-2 py-1 rounded text-[11px] font-medium transition-colors border ${
-                    active
-                      ? 'bg-accent/15 border-accent/50 text-accent-light'
-                      : 'bg-app-surface-2 border-app-border text-slate-500 hover:text-slate-200'
-                  }`}
+                  className={`px-2 py-1 rounded text-[11px] font-medium transition-colors border ${active
+                    ? 'bg-accent/15 border-accent/50 text-accent-light'
+                    : 'bg-app-surface-2 border-app-border text-slate-500 hover:text-slate-200'
+                    }`}
                 >
                   {p.label}
                 </button>
