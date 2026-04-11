@@ -74,6 +74,12 @@ All processing is local. No data is sent to any external service.
         default="data/contacts.csv",
         help="Google Contacts CSV export (optional, overrides wa.db for names)",
     )
+    parser.add_argument(
+        "--local-code",
+        default="972",
+        help="Country code for local-format phone numbers in contacts CSV (e.g. 972). "
+        "When set, numbers starting with 0 are converted: '054...' → '<code>54...'",
+    )
     parser.add_argument("--port", type=int, default=8050, help="Port to run on (default: 8050)")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload (development mode)")
@@ -97,6 +103,8 @@ All processing is local. No data is sent to any external service.
             os.environ["WHATSAPP_WADB"] = str(parsed.wadb)
         if parsed.contacts:
             os.environ["WHATSAPP_CONTACTS"] = str(parsed.contacts)
+        if parsed.local_code:
+            os.environ["WHATSAPP_LOCAL_CODE"] = parsed.local_code
         uvicorn.run(
             "api.asgi:app",
             host=parsed.host,
@@ -108,7 +116,12 @@ All processing is local. No data is sent to any external service.
     else:
         from api.server import create_api  # noqa: PLC0415
 
-        api = create_api(msgstore_path=parsed.msgstore, wadb_path=parsed.wadb, contacts_path=parsed.contacts)
+        api = create_api(
+            msgstore_path=parsed.msgstore,
+            wadb_path=parsed.wadb,
+            contacts_path=parsed.contacts,
+            local_code=parsed.local_code,
+        )
         uvicorn.run(api, host=parsed.host, port=parsed.port, log_config=_UVICORN_LOG_CONFIG)
 
 

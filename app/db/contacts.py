@@ -17,37 +17,39 @@ def build_sender_registry(
     wadb: sqlite3.Connection | None,
     csv_path: Path | None,
     msgstore: sqlite3.Connection | None = None,
+    local_code: str | None = None,
 ) -> SenderRegistry:
     """Merge all contact sources into a single SenderRegistry.
 
     Priority (highest wins): CSV > wa_contacts > bare phone number.
     LID JIDs (WhatsApp privacy IDs) are resolved via jid_map in msgstore.
+    When local_code is set (e.g. '972'), local-format numbers in the
+    CSV (leading 0) are converted to international format ('054...' → '97254...').
     """
     contacts: dict[str, str] = {}
     if wadb is not None:
         contacts.update(_load_wa_contacts(wadb))
     if csv_path is not None:
-        contacts.update(load_contacts_csv(csv_path))
+        contacts.update(load_contacts_csv(csv_path, local_code=local_code))
     if msgstore is not None:
         contacts.update(_resolve_lids(msgstore, contacts))
     logger.info(f"SenderRegistry built: {len(contacts)} contacts")
     return SenderRegistry(contacts=contacts)
 
 
-def load_contacts_csv(path: Path) -> dict[str, str]:
+def load_contacts_csv(path: Path, local_code: str | None) -> dict[str, str]:
     """Parse a Google Contacts CSV export into {normalized_phone: display_name}.
 
     Scans every column in each row; values whose digit-only form falls within
     [_MIN_PHONE_DIGITS, _MAX_PHONE_DIGITS] are treated as phone numbers.
-    Numbers exported in international format (+972 50-123-4567) will match
-    reliably; local-format numbers (050-123-4567) will not unless they happen
-    to share the same digit string as the JID.
+    When local_code is provided, local-format numbers (leading 0) are
+    converted to international format by replacing the leading 0 with the code.
     """
     contacts: dict[str, str] = {}
     try:
         with path.open(encoding="utf-8-sig") as f:  # utf-8-sig strips BOM from Google export
             for row in csv.DictReader(f):
-                _add_csv_row(contacts, row)
+                _add_csv_row(contacts, row, local_code=local_code)
     except OSError:
         logger.exception(f"Could not read contacts CSV: {path}")
         return {}
@@ -55,26 +57,31 @@ def load_contacts_csv(path: Path) -> dict[str, str]:
     return contacts
 
 
-def _parse_phone(value: str) -> str | None:
-    """Return digit-only form of value if it looks like a phone number, else None.
+def _parse_phone(value: str, local_code: str | None) -> str | None:
+    """Return normalised international digits if value looks like a phone number, else None.
 
-    Strips leading '00' (European international prefix) so that '00972...' normalises
-    to '972...' the same way '+972...' does — matching WhatsApp JID format.
+    Normalisation steps:
+      1. Strip non-digit characters (+, -, spaces, etc.).
+      2. Remove '00' international dialling prefix → '00972...' becomes '972...'.
+      3. If local_code is set, replace a single leading '0' (local format)
+         → '0541234567' becomes '9721234567' when local_code='972'.
     """
     normalized = _NON_DIGIT.sub("", value.strip())
     normalized = normalized.removeprefix("00")
+    if local_code and normalized.startswith("0"):
+        normalized = local_code + normalized[1:]
     if _MIN_PHONE_DIGITS <= len(normalized) <= _MAX_PHONE_DIGITS:
         return normalized
     return None
 
 
-def _row_phones(row: dict[str, str]) -> set[str]:
+def _row_phones(row: dict[str, str], local_code: str | None) -> set[str]:
     """Extract all phone-like values from a CSV row."""
     phones = set()
     for value in row.values():
         if not value:
             continue
-        phone = _parse_phone(value)
+        phone = _parse_phone(value, local_code=local_code)
         if phone:
             phones.add(phone)
     return phones
@@ -82,9 +89,6 @@ def _row_phones(row: dict[str, str]) -> set[str]:
 
 def _add_contact(contacts: dict[str, str], phone: str, name: str) -> None:
     """Insert phone→name, warning and skipping if the phone is already mapped to a different name."""
-    if phone.startswith("0"):
-        right_part = phone.lstrip("0")
-        phone = f"972{right_part}"
     if phone not in contacts:
         contacts[phone] = name
         return
@@ -92,12 +96,12 @@ def _add_contact(contacts: dict[str, str], phone: str, name: str) -> None:
         logger.warning(f"Duplicate phone {phone}: keeping '{contacts[phone]}', skipping '{name}'")
 
 
-def _add_csv_row(contacts: dict[str, str], row: dict[str, str]) -> None:
+def _add_csv_row(contacts: dict[str, str], row: dict[str, str], local_code: str | None) -> None:
     """Resolve name and phones from one CSV row and merge into contacts."""
     name = _display_name(row)
     if not name:
         return
-    for phone in _row_phones(row):
+    for phone in _row_phones(row, local_code=local_code):
         _add_contact(contacts, phone, name)
 
 

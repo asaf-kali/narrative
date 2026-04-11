@@ -17,6 +17,7 @@ def create_api(
     msgstore_path: Path,
     wadb_path: Path | None = None,
     contacts_path: Path | None = None,
+    local_code: str | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -30,6 +31,7 @@ def create_api(
                 wadb=db.wadb,
                 csv_path=contacts_path,
                 msgstore=db.msgstore,
+                local_code=local_code,
             )
         logger.info(f"API initialized: msgstore={msgstore_path}")
         yield
