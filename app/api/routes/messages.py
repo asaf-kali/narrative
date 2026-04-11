@@ -36,6 +36,10 @@ def get_global_messages(
     chat_ids: Annotated[list[int] | None, Query()] = None,
     sender_ids: Annotated[list[str] | None, Query()] = None,
 ) -> dict[str, Any]:
+    logger.info(
+        f"Fetching messages with filters: date_from={date_from}, date_to={date_to}, "
+        f"search={search}, chat_ids={chat_ids}, sender_ids={sender_ids}"
+    )
     config = AnalysisConfig(chat_id=None, exclude_system=True)
     df = get_df(request, config)
     if df.empty:
@@ -80,6 +84,7 @@ def get_global_messages(
 
 @router.get("/senders")
 def get_senders(request: Request) -> list[dict[str, Any]]:
+    logger.info("Fetching senders with message counts")
     config = AnalysisConfig(chat_id=None, exclude_system=True)
     df = get_df(request, config)
     if df.empty:
