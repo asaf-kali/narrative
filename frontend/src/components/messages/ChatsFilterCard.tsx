@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function shortName(name: string, max = 20): string {
@@ -14,14 +16,53 @@ interface Props {
   onClear: () => void
 }
 
-/** Renders a card with toggleable chat filter chips. Returns null if ≤1 chat. */
+/** Renders a searchable chat filter card with color-coded chips. Returns null if ≤1 chat. */
 export default function ChatsFilterCard({ chatNames, activeChats, colorMap, onToggle, onClear }: Props) {
+  const [query, setQuery] = useState('')
+
   if (chatNames.length <= 1) return null
+
+  const lq = query.toLowerCase()
+  const visible = lq ? chatNames.filter((c) => c.toLowerCase().includes(lq)) : chatNames
+
   return (
-    <div className="bg-app-surface border border-app-border rounded-xl p-4">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] text-slate-500 uppercase tracking-widest flex-shrink-0 mr-1">Chats</span>
-        {chatNames.map((chat) => (
+    <div className="bg-app-surface border border-app-border rounded-xl p-4 space-y-2.5">
+      {/* Header row */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-slate-500 uppercase tracking-widest">Chats</span>
+        {activeChats.size > 0 && (
+          <button
+            onClick={onClear}
+            className="ml-auto text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Search input */}
+      <div className="relative">
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none">⌕</span>
+        <input
+          type="text"
+          placeholder="Search chats…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full bg-app-surface-2 border border-app-border rounded-lg pl-7 pr-7 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* Chips */}
+      <div className="flex flex-wrap gap-1.5">
+        {visible.map((chat) => (
           <button
             key={chat}
             onClick={() => onToggle(chat)}
@@ -36,13 +77,8 @@ export default function ChatsFilterCard({ chatNames, activeChats, colorMap, onTo
             {shortName(chat)}
           </button>
         ))}
-        {activeChats.size > 0 && (
-          <button
-            onClick={onClear}
-            className="px-2 py-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            Clear
-          </button>
+        {visible.length === 0 && (
+          <span className="text-xs text-slate-600">No matches for "{query}"</span>
         )}
       </div>
     </div>

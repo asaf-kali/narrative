@@ -22,21 +22,18 @@ Most WhatsApp analyzers work from text exports (`.txt` files). This tool reads t
 | Reactions | ❌ | ✅ |
 | Voice note duration | ❌ | ✅ |
 | Call logs | ❌ | ✅ |
-| Poll votes | ❌ | ✅ |
 | Reply chains | ❌ | ✅ |
 | Deleted messages | ❌ | ✅ |
 
-### Analyses Available
+### Pages
 
-**Overview** — Total messages, active days, media count, reactions, links shared.
+**Summary** — Global activity heatmap across all chats, key stats (total messages, active days, busiest day). Click any day for a detailed message view.
 
-**Timeline** — Daily/monthly message volume with per-sender breakdown; activity heatmap by day-of-week and hour.
+**Messages** — Browse and search all messages across all chats. Filter by message content, date range, group/chat, and sender. All filters are server-side with pagination.
 
-**Participants** — Per-sender stats table: message count, word count, avg words/message, media sent, voice notes. Percentage share chart.
+**Network** — Global cross-chat contact graph. Nodes = contacts; edges = number of shared groups. Community detection with color-coded clusters.
 
-**Words & Emoji** — Word cloud, top 20 most used words (with Hebrew + English stopword filtering), emoji frequency chart.
-
-**Media** — Media breakdown by type (image, video, voice note, document, sticker, GIF); media volume over time.
+**Per-chat pages** (Overview, Timeline, Participants, Words & Emoji, Media, Messages, Network) — Deep analysis of a single chat.
 
 ---
 
@@ -49,14 +46,20 @@ Your WhatsApp messages are stored in encrypted SQLite databases on your Android 
 3. Decrypt using a tool such as [wa-crypt-tools](https://github.com/ElDavoo/wa-crypt-tools) with your device's backup key.
 4. The decrypted `msgstore.db` and optionally `wa.db` (for contact names) are your inputs.
 
+```bash
+# Decrypt backup files into data/
+just decrypt-backup <key>
+```
+
 > Your decrypted `.db` files contain all your messages. Keep them secure and never share them.
 
 ---
 
 ## Prerequisites
 
-- [UV](https://docs.astral.sh/uv/) `>= 0.9`
+- [uv](https://docs.astral.sh/uv/) `>= 0.9`
 - [just](https://github.com/casey/just) command runner
+- Node.js 20+ (only needed for frontend development)
 
 ---
 
@@ -71,23 +74,13 @@ just install
 # 2. Place your decrypted database files in data/  (gitignored)
 mkdir -p data
 cp /path/to/msgstore.db data/
-cp /path/to/wa.db data/      # optional — needed for contact names
+cp /path/to/wa.db data/      # optional — enables contact name resolution
 
-# 3. Run the dashboard
+# 3. Build the frontend and start the server
+just frontend-build
 just run --msgstore data/msgstore.db --wadb data/wa.db
 
 # Opens at http://127.0.0.1:8050
-```
-
-### Options
-
-```
-just run --msgstore PATH [--wadb PATH] [--port PORT] [--host HOST]
-
-  --msgstore   Path to decrypted msgstore.db  (required)
-  --wadb       Path to decrypted wa.db        (optional, enables contact names)
-  --port       Port to listen on              (default: 8050)
-  --host       Host to bind to               (default: 127.0.0.1)
 ```
 
 ---
@@ -95,42 +88,22 @@ just run --msgstore PATH [--wadb PATH] [--port PORT] [--host HOST]
 ## Development
 
 ```bash
-just lint          # Format + ruff check + mypy
-just test          # Run pytest
-just cover         # Run tests with HTML coverage report
-just run-dev ...   # Hot-reload mode (set DASH_DEBUG=true)
+# Terminal 1 — backend with auto-reload
+just run-dev --msgstore data/msgstore.db
+
+# Terminal 2 — Vite dev server (proxies /api → :8050)
+just frontend-dev
+# Open http://localhost:5173
 ```
 
----
+Other useful commands:
 
-## Adding a New Analysis
-
-1. **Write the analysis function** in `app/analysis/` and decorate it:
-
-   ```python
-   # app/analysis/my_module.py
-   from analysis.base import analysis
-
-   @analysis(name="my_metric", label="My Metric", page="overview")
-   def my_metric(df: pd.DataFrame, config: AnalysisConfig) -> pd.DataFrame:
-       ...
-   ```
-
-2. **Add a chart component** to the corresponding page layout in `app/ui/layout/pages/`:
-
-   ```python
-   dcc.Graph(id="my-metric-chart")
-   ```
-
-3. **Add a callback** in `app/ui/callbacks/charts.py`:
-
-   ```python
-   @app.callback(Output("my-metric-chart", "figure"), Input("store-config", "data"))
-   def update_my_metric(config_data: dict) -> go.Figure:
-       ...
-   ```
-
-That's it — no registration step needed. The `@analysis` decorator handles discovery automatically.
+```bash
+just lint          # format + ruff fix + pre-commit
+just check-ruff    # ruff format + lint check (CI)
+just check-mypy    # mypy type check (CI)
+just frontend-build  # build React app into frontend/dist/
+```
 
 ---
 
@@ -145,28 +118,35 @@ wa.db ────────┘                                          │
                                             (timeline, participants, …)
                                                          │
                                                          ▼
-                                               Dash callbacks ──▶ Plotly figures
+                                               FastAPI routes ──▶ JSON
                                                          │
                                                          ▼
-                                               Mantine UI (browser, local)
+                                          React + TanStack Query (browser)
 ```
 
-**Layers:**
+Four strict layers. `PYTHONPATH=app` so imports are e.g. `from db.loaders import DataLoader`.
 
-| Layer | Location | Responsibility |
-|-------|----------|----------------|
-| DB | `app/db/` | Read-only SQLite access, contact name resolution, DataFrame construction |
-| Models | `app/models/` | Pydantic types for config, message metadata, chat summaries |
-| Analysis | `app/analysis/` | Pure functions: `(pd.DataFrame, AnalysisConfig) → pd.DataFrame` |
-| Cache | `app/cache.py` | LRU-20 in-memory cache keyed by `(chat_id, date_range)` |
-| UI | `app/ui/` | Dash + dash-mantine-components; callbacks call analysis functions |
+| Layer | Path | Responsibility |
+|-------|------|----------------|
+| DB | `app/db/` | Read-only SQLite access; `DataLoader` resolves contacts, normalises timestamps to local TZ |
+| Models | `app/models/` | Pydantic types for config, message metadata, chat summaries; `AnalysisConfig.cache_key()` drives LRU cache |
+| Analysis | `app/analysis/` | Pure functions: `(pd.DataFrame, AnalysisConfig) → pd.DataFrame`, registered with `@analysis(...)` |
+| API | `app/api/` | FastAPI routes; `deps.get_df()` loads and caches DataFrames |
+
+### Key API endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/messages` | Global messages — search, date range, `chat_ids[]`, `sender_ids[]`, pagination |
+| `GET /api/senders` | All unique senders (for filter UI population) |
+| `GET /api/chats/{id}/messages` | Per-chat messages — search, date range, sender filter, pagination |
+| `GET /api/network` | Global cross-chat contact network |
+| `GET /api/search` | Full-text message search (quick, no pagination) |
 
 ---
 
 ## Privacy
 
-- **No network calls to external services.** The Dash server runs on `localhost` only (`127.0.0.1` by default). Change to `0.0.0.0` to expose on your LAN — but never expose it to the internet.
-- **All assets are served locally.** `serve_locally=True` prevents Dash from loading React/Plotly assets from CDN.
-- **`langdetect`** (used for stopword selection) uses bundled language profiles — no network requests.
+- **No network calls.** The server binds to `127.0.0.1` by default and never makes outbound requests.
 - **No telemetry, no analytics, no cloud.** This tool reads files from your disk and renders charts in your browser. Nothing leaves your machine.
 - The `data/` directory (where your `.db` files live) is in `.gitignore` and will never be committed.

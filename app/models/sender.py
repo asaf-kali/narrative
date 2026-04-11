@@ -48,6 +48,10 @@ class SenderRegistry:
             return f"Group ({chat_phone})"
         return self._contacts.get(chat_phone) or chat_phone or "Unknown"
 
+    @property
+    def me_name(self) -> str:
+        return self._me.display_name
+
     def as_dict(self) -> dict[str, str]:
         """Back-compat for DataFrame pipeline: return {phone: display_name}."""
         return dict(self._contacts)

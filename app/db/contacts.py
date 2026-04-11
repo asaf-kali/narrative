@@ -56,8 +56,13 @@ def load_contacts_csv(path: Path) -> dict[str, str]:
 
 
 def _parse_phone(value: str) -> str | None:
-    """Return digit-only form of value if it looks like a phone number, else None."""
+    """Return digit-only form of value if it looks like a phone number, else None.
+
+    Strips leading '00' (European international prefix) so that '00972...' normalises
+    to '972...' the same way '+972...' does — matching WhatsApp JID format.
+    """
     normalized = _NON_DIGIT.sub("", value.strip())
+    normalized = normalized.removeprefix("00")
     if _MIN_PHONE_DIGITS <= len(normalized) <= _MAX_PHONE_DIGITS:
         return normalized
     return None
@@ -77,6 +82,9 @@ def _row_phones(row: dict[str, str]) -> set[str]:
 
 def _add_contact(contacts: dict[str, str], phone: str, name: str) -> None:
     """Insert phone→name, warning and skipping if the phone is already mapped to a different name."""
+    if phone.startswith("0"):
+        right_part = phone.lstrip("0")
+        phone = f"972{right_part}"
     if phone not in contacts:
         contacts[phone] = name
         return

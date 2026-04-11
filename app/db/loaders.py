@@ -106,18 +106,17 @@ def _rows_to_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) ->
         _LOCAL_TZ
     )
 
-    # Resolve sender display name
-    df["sender_name"] = df.apply(
-        lambda r: (
-            registry.resolve_sender(
-                phone=str(r.get("sender_phone") or ""),
-                from_me=r.get("from_me") == 1,
-                chat_phone=str(r.get("chat_phone") or ""),
-                is_group=str(r.get("chat_server") or "") == GROUP_SERVER,
-            ).display_name
-        ),
-        axis=1,
-    )
+    # Resolve sender display name — vectorized for performance
+    contacts = registry.as_dict()
+    is_grp = df["chat_server"].str.endswith(GROUP_SERVER, na=False)
+    from_me_mask = df["from_me"] == 1
+    phone_col = df["sender_phone"].fillna("").astype(str)
+    chat_phone_col = df["chat_phone"].fillna("").astype(str)
+
+    # For 1-on-1 chats, sender_phone is "" in the DB — fall back to chat_phone
+    effective_phone = phone_col.where((phone_col != "") | is_grp, chat_phone_col)
+    resolved = effective_phone.map(contacts).fillna(effective_phone).replace("", "Unknown")
+    df["sender_name"] = resolved.where(~from_me_mask, registry.me_name)
 
     # Derive time components used by analysis
     df["date"] = df["timestamp"].dt.date
@@ -126,16 +125,16 @@ def _rows_to_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) ->
     df["day_of_week"] = df["timestamp"].dt.day_name()
     df["hour"] = df["timestamp"].dt.hour
 
-    # Chat display name
-    df["chat_name"] = df.apply(
-        lambda r: registry.resolve_chat_name(
-            chat_subject=r.get("chat_subject"),
-            chat_server=str(r.get("chat_server") or ""),
-            chat_phone=str(r.get("chat_phone") or ""),
-        ),
-        axis=1,
-    )
-    df["is_group"] = df["chat_server"].str.endswith(GROUP_SERVER, na=False)
+    # Chat display name — vectorized
+    chat_subject = df["chat_subject"].fillna("")
+    is_broadcast = df["chat_server"] == BROADCAST_SERVER
+
+    group_fallback = "Group (" + chat_phone_col + ")"
+    chat_name = chat_phone_col.map(contacts).fillna(chat_phone_col)  # direct default
+    chat_name = chat_name.where(~is_grp, chat_subject.where(chat_subject != "", group_fallback))
+    chat_name = chat_name.where(~is_broadcast, chat_subject.where(chat_subject != "", "Broadcast"))
+    df["chat_name"] = chat_name.where(chat_subject == "", chat_subject)  # subject beats everything
+    df["is_group"] = is_grp
 
     return df
 

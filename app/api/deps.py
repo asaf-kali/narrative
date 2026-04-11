@@ -21,7 +21,7 @@ def get_df(request: Request, config: AnalysisConfig) -> pd.DataFrame:
     msgstore: Path = request.app.state.msgstore_path
     wadb: Path | None = request.app.state.wadb_path
     registry: SenderRegistry = request.app.state.sender_registry
-    logger.info(f"Loading messages for chat_id={config.chat_id}")
+    logger.info(f"Loading messages for chat_id [{config.chat_id}]")
     with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
         df = DataLoader(db, registry=registry).load_messages(config)
     logger.info(f"Loaded {len(df)} messages")

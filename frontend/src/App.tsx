@@ -12,8 +12,9 @@ import MediaPage from './pages/MediaPage'
 import MessagesPage from './pages/MessagesPage'
 import NetworkPage from './pages/NetworkPage'
 import GlobalNetworkPage from './pages/GlobalNetworkPage'
-import RangeDetailPage from './pages/RangeDetailPage'
+import GlobalMessagesPage from './pages/GlobalMessagesPage'
 import ChatLayout from './components/ChatLayout'
+import NavBar from './components/NavBar'
 
 export default function App() {
   const { data: chats = [], isLoading } = useQuery({ queryKey: ['chats'], queryFn: api.chats })
@@ -23,10 +24,11 @@ export default function App() {
       <Sidebar chats={chats} isLoading={isLoading} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
+        <NavBar />
         <main className="flex-1 overflow-hidden">
           <Routes>
             <Route path="/" element={<div className="h-full overflow-auto p-6"><HomePage /></div>} />
-            <Route path="/messages" element={<div className="h-full overflow-auto p-6"><RangeDetailPage /></div>} />
+            <Route path="/messages" element={<div className="h-full overflow-auto p-6"><GlobalMessagesPage /></div>} />
             <Route path="/network" element={<div className="h-full overflow-hidden p-4"><GlobalNetworkPage /></div>} />
             <Route path="/chat/:chatId" element={<ChatLayout />}>
               <Route index element={<OverviewPage />} />

@@ -11,6 +11,7 @@ import type {
   Participant,
   RangeDetail,
   SearchResult,
+  SenderInfo,
   TimelinePoint,
   WordData,
 } from './types'
@@ -48,6 +49,24 @@ export const api = {
     if (senderId) params.set('sender_id', senderId)
     return get(`/api/chats/${chatId}/messages?${params}`)
   },
+  globalMessages: (
+    limit = 100,
+    offset = 0,
+    dateFrom?: string,
+    dateTo?: string,
+    search?: string,
+    chatIds?: number[],
+    senderIds?: string[],
+  ): Promise<ChatMessagesResponse> => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+    if (dateFrom) params.set('date_from', dateFrom)
+    if (dateTo) params.set('date_to', dateTo)
+    if (search) params.set('search', search)
+    chatIds?.forEach((id) => params.append('chat_ids', String(id)))
+    senderIds?.forEach((id) => params.append('sender_ids', id))
+    return get(`/api/messages?${params}`)
+  },
+  senders: (): Promise<SenderInfo[]> => get('/api/senders'),
   search: (q: string, limit = 50): Promise<SearchResult[]> =>
     get(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   dayDetail: (date: string): Promise<DayDetail> => get(`/api/day/${date}`),

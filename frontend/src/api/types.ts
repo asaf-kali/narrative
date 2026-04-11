@@ -143,6 +143,13 @@ export interface NetworkGraph {
   mode: string
 }
 
+export interface SenderInfo {
+  sender_id: string   // "me" | phone digits | name fallback
+  sender_name: string
+  phone: string
+  message_count: number
+}
+
 export interface RangeDetail {
   date_from: string
   date_to: string

@@ -24,9 +24,9 @@ mypy runs via `uv run dmypy run .` (daemon).
 
 **`app/analysis/`** — Pure functions `(pd.DataFrame, AnalysisConfig) → pd.DataFrame`. Register with `@analysis(...)` decorator.
 
-**`app/api/`** — FastAPI backend. `server.py` creates the app with lifespan (stores db paths in `app.state`). Routes in `routes/chats.py` and `routes/analysis.py`. `deps.py` provides `get_df()` with LRU cache. In production, serves the built frontend from `frontend/dist/`. CORS allows `localhost:5173` for development.
+**`app/api/`** — FastAPI backend. `server.py` creates the app with lifespan (stores db paths in `app.state`). Routes in `routes/chats.py`, `routes/analysis.py`, and `routes/messages.py`. `deps.py` provides `get_df()` with LRU cache. In production, serves the built frontend from `frontend/dist/`. CORS allows `localhost:5173` for development.
 
-**`frontend/`** — React 18 + TypeScript + Vite + Tailwind CSS + Recharts + TanStack Query + React Router v6. API client in `src/api/client.ts`. Pages: Overview, Timeline, Participants, Content (words/emoji), Media.
+**`frontend/`** — React 18 + TypeScript + Vite + Tailwind CSS + Recharts + TanStack Query + React Router v6. API client in `src/api/client.ts`. Top-level pages: Summary (`/`), Messages (`/messages`), Network (`/network`). Chat pages under `/chat/:chatId`: Overview, Timeline, Participants, Content (words/emoji), Media, Messages, Network.
 
 ## Dev workflow
 
