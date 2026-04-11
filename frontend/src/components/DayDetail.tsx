@@ -25,6 +25,7 @@ function dayMessageToFeed(msg: DayMessage): FeedMessage {
   // so MessageFeed's dayOnly=true mode can slice the time back out
   return {
     timestamp: '1970-01-01T' + msg.time + ':00',
+    chat_id: 0,
     chat_name: msg.chat_name,
     sender_id: msg.sender_name,
     sender_name: msg.sender_name,

@@ -13,6 +13,8 @@ interface Props {
   highlight?: string
   /** Optional content rendered in a header bar above the feed (e.g. pagination). */
   header?: ReactNode
+  onChatClick?: (chatId: string) => void
+  onSenderClick?: (senderId: string) => void
 }
 
 export default function MessagesCard({
@@ -23,6 +25,8 @@ export default function MessagesCard({
   height,
   highlight,
   header,
+  onChatClick,
+  onSenderClick,
 }: Props) {
   return (
     <div className="bg-app-surface border border-app-border rounded-xl overflow-hidden">
@@ -39,6 +43,8 @@ export default function MessagesCard({
           dayOnly={dayOnly}
           height={height}
           highlight={highlight}
+          onChatClick={onChatClick}
+          onSenderClick={onSenderClick}
         />
       </div>
     </div>

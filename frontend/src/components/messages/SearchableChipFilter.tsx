@@ -26,7 +26,11 @@ export default function SearchableChipFilter({ title, items, activeIds, onToggle
   if (items.length <= 1) return null
 
   const lq = query.toLowerCase()
-  const visible = lq ? items.filter((item) => item.searchText.toLowerCase().includes(lq)) : items
+  const filtered = lq ? items.filter((item) => item.searchText.toLowerCase().includes(lq)) : items
+  const visible = [
+    ...filtered.filter((item) => activeIds.has(item.id)),
+    ...filtered.filter((item) => !activeIds.has(item.id)),
+  ]
 
   return (
     <div className="bg-app-surface border border-app-border rounded-xl p-4 space-y-2.5">

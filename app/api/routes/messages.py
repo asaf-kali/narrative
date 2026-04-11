@@ -49,6 +49,10 @@ def get_global_messages(
         df = df[df["timestamp"] >= _to_ts(date_from)]
     if date_to is not None:
         df = df[df["timestamp"] <= _to_ts(date_to)]
+
+    # Snapshot after date filtering only — used to derive available filter options.
+    df_date = df
+
     if chat_ids:
         df = df[df["chat_row_id"].isin(chat_ids)]
     if sender_ids:
@@ -71,6 +75,7 @@ def get_global_messages(
         messages.append(
             {
                 "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "chat_id": int(row["chat_row_id"]),
                 "chat_name": str(row.get("chat_name", "")),
                 "sender_name": str(row["sender_name"]),
                 "sender_id": s_id,
@@ -79,7 +84,15 @@ def get_global_messages(
             }
         )
 
-    return {"total": total, "messages": messages}
+    available_chat_ids = sorted(df_date["chat_row_id"].dropna().astype(int).unique().tolist())
+    available_sender_ids = sorted(_build_sender_id_series(df_date).unique().tolist())
+
+    return {
+        "total": total,
+        "messages": messages,
+        "available_chat_ids": available_chat_ids,
+        "available_sender_ids": available_sender_ids,
+    }
 
 
 @router.get("/senders")

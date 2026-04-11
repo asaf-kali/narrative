@@ -65,17 +65,30 @@ export default function GlobalMessagesPage() {
     enabled: !rangeInvalid && fromValid && toValid,
   })
 
+  const availableChatIds = useMemo(
+    () => data?.available_chat_ids ? new Set(data.available_chat_ids) : null,
+    [data],
+  )
+  const availableSenderIds = useMemo(
+    () => data?.available_sender_ids ? new Set(data.available_sender_ids) : null,
+    [data],
+  )
+
   const chatItems = useMemo(
     () =>
       chats
+        .filter((c) => !availableChatIds || availableChatIds.has(c.chat_id))
         .sort((a, b) => b.message_count - a.message_count)
         .map((c) => ({ id: String(c.chat_id), label: c.display_name, searchText: c.display_name })),
-    [chats],
+    [chats, availableChatIds],
   )
 
   const senderItems = useMemo(
-    () => senders.map((s) => ({ id: s.sender_id, label: s.sender_name, searchText: `${s.sender_name} ${s.phone}` })),
-    [senders],
+    () =>
+      senders
+        .filter((s) => !availableSenderIds || availableSenderIds.has(s.sender_id))
+        .map((s) => ({ id: s.sender_id, label: s.sender_name, searchText: `${s.sender_name} ${s.phone}` })),
+    [senders, availableSenderIds],
   )
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
@@ -218,7 +231,7 @@ export default function GlobalMessagesPage() {
       <div className="flex gap-4 items-start">
         <div className="flex-1 min-w-0">
           <SearchableChipFilter
-            title="Chats"
+            title={`Chats (${chatItems.length})`}
             items={chatItems}
             activeIds={activeChatIds}
             onToggle={toggleChat}
@@ -227,7 +240,7 @@ export default function GlobalMessagesPage() {
         </div>
         <div className="flex-1 min-w-0">
           <SearchableChipFilter
-            title="Senders"
+            title={`Senders (${senderItems.length})`}
             items={senderItems}
             activeIds={activeSenders}
             onToggle={toggleSender}
@@ -252,6 +265,8 @@ export default function GlobalMessagesPage() {
           height="calc(100vh - 420px)"
           highlight={searchTerm}
           header={pagination}
+          onChatClick={toggleChat}
+          onSenderClick={toggleSender}
         />
       )}
     </div>

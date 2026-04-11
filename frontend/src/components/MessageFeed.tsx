@@ -54,9 +54,11 @@ interface RowProps {
   dayOnly: boolean
   showChat: boolean
   highlight: string
+  onChatClick?: (chatId: string) => void
+  onSenderClick?: (senderId: string) => void
 }
 
-function MessageRow({ msg, chatColor, dayOnly, showChat, highlight }: RowProps) {
+function MessageRow({ msg, chatColor, dayOnly, showChat, highlight, onChatClick, onSenderClick }: RowProps) {
   const isMedia = msg.text?.startsWith('[') ?? false
   return (
     <div className="flex items-baseline gap-3 px-3 py-1.5 hover:bg-white/[0.025] rounded transition-colors min-w-0">
@@ -65,14 +67,19 @@ function MessageRow({ msg, chatColor, dayOnly, showChat, highlight }: RowProps) 
       </span>
       {showChat && (
         <span
-          className="text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0 max-w-[140px] truncate"
+          className={`text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0 max-w-[140px] truncate ${onChatClick ? 'cursor-pointer hover:brightness-125' : ''}`}
           style={{ backgroundColor: chatColor + '22', color: chatColor }}
           title={msg.chat_name}
+          onClick={onChatClick ? () => onChatClick(String(msg.chat_id)) : undefined}
         >
           {shortName(msg.chat_name, 18)}
         </span>
       )}
-      <span className="text-xs font-medium text-slate-300 flex-shrink-0 w-28 truncate" title={msg.sender_name}>
+      <span
+        className={`text-xs font-medium text-slate-300 flex-shrink-0 w-28 truncate ${onSenderClick ? 'cursor-pointer hover:text-slate-100' : ''}`}
+        title={msg.sender_name}
+        onClick={onSenderClick ? () => onSenderClick(msg.sender_id) : undefined}
+      >
         {msg.sender_name}
       </span>
       <span className={`text-xs min-w-0 truncate ${isMedia ? 'text-slate-500 italic' : 'text-slate-400'}`}>
@@ -93,6 +100,8 @@ interface Props {
   dayOnly?: boolean
   height?: string
   highlight?: string
+  onChatClick?: (chatId: string) => void
+  onSenderClick?: (senderId: string) => void
 }
 
 export default function MessageFeed({
@@ -102,6 +111,8 @@ export default function MessageFeed({
   dayOnly = false,
   height = '18rem',
   highlight = '',
+  onChatClick,
+  onSenderClick,
 }: Props) {
   const feedRef = useRef<HTMLDivElement>(null)
 
@@ -139,6 +150,8 @@ export default function MessageFeed({
               dayOnly={dayOnly}
               showChat={showChat}
               highlight={highlight}
+              onChatClick={onChatClick}
+              onSenderClick={onSenderClick}
             />
           ))
         )}

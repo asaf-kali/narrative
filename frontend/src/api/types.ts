@@ -72,6 +72,7 @@ export interface DayCount {
 
 export interface FeedMessage {
   timestamp: string    // "YYYY-MM-DDTHH:MM:SS"
+  chat_id: number
   chat_name: string
   sender_id: string    // "me" | phone number
   sender_name: string
@@ -82,6 +83,8 @@ export interface FeedMessage {
 export interface ChatMessagesResponse {
   total: number
   messages: FeedMessage[]
+  available_chat_ids?: number[]
+  available_sender_ids?: string[]
 }
 
 export interface DayMessage {
