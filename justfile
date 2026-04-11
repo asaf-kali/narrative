@@ -6,15 +6,19 @@ NPM := "npm --prefix frontend"
 
 # Install
 
+install: install-dev lint
+
 install-run:
     uv sync --no-default-groups
 
-install-dev:
-    uv sync --group lint --group dev
-    {{ RUN }} pre-commit install
-    {{ NPM }} install
+install-lint:
+    uv sync --group lint
 
-install: install-dev lint
+install-all:
+    uv sync --all-groups
+
+install-dev: install-all frontend-install
+    {{ RUN }} pre-commit install
 
 # UV
 
