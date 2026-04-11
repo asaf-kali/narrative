@@ -293,7 +293,6 @@ export default function GlobalNetworkPage() {
           selection.type === 'node'
             ? <NodePanel node={selection.node} onClose={() => setSelection(null)} />
             : <EdgePanel
-                nodeA={selection.nodeA} nodeB={selection.nodeB}
                 labelA={selection.nodeA.label} labelB={selection.nodeB.label}
                 weight={selection.weight}
                 shared={sharedGroups(selection.nodeA, selection.nodeB)}
