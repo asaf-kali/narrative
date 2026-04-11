@@ -115,23 +115,26 @@ export default function GlobalMessagesPage() {
 
   const activeChatIds = useMemo(() => new Set([...activeChats].map(String)), [activeChats])
 
+  const lastOffset = (totalPages - 1) * PAGE_SIZE
+  const btnClass = "px-2 py-1 rounded bg-app-surface-2 border border-app-border disabled:opacity-30 hover:text-slate-200 transition-colors"
+
   const pagination = totalPages > 1 ? (
-    <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
-      <button
-        onClick={() => setOffset(offset + PAGE_SIZE)}
-        disabled={offset + PAGE_SIZE >= (data?.total ?? 0)}
-        className="px-2 py-1 rounded bg-app-surface-2 border border-app-border disabled:opacity-30 hover:text-slate-200 transition-colors"
-      >
-        ← Older
-      </button>
-      <span className="tabular-nums">{currentPage + 1} / {totalPages}</span>
-      <button
-        onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-        disabled={offset === 0}
-        className="px-2 py-1 rounded bg-app-surface-2 border border-app-border disabled:opacity-30 hover:text-slate-200 transition-colors"
-      >
-        Newer →
-      </button>
+    <div className="flex items-center gap-1 text-xs text-slate-400">
+      {/* jump to oldest */}
+      <button onClick={() => setOffset(lastOffset)} disabled={offset >= lastOffset} className={btnClass} title="Oldest">«</button>
+      {/* +10 pages (older) */}
+      <button onClick={() => setOffset(Math.min(lastOffset, offset + 10 * PAGE_SIZE))} disabled={offset >= lastOffset} className={btnClass} title="+10 pages">‹‹</button>
+      {/* +1 page (older) */}
+      <button onClick={() => setOffset(Math.min(lastOffset, offset + PAGE_SIZE))} disabled={offset >= lastOffset} className={btnClass}>‹ Older</button>
+
+      <span className="tabular-nums px-1">{totalPages - currentPage} / {totalPages}</span>
+
+      {/* −1 page (newer) */}
+      <button onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} disabled={offset === 0} className={btnClass}>Newer ›</button>
+      {/* −10 pages (newer) */}
+      <button onClick={() => setOffset(Math.max(0, offset - 10 * PAGE_SIZE))} disabled={offset === 0} className={btnClass} title="−10 pages">››</button>
+      {/* jump to newest */}
+      <button onClick={() => setOffset(0)} disabled={offset === 0} className={btnClass} title="Newest">»</button>
     </div>
   ) : null
 

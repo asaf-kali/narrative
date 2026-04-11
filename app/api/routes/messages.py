@@ -90,7 +90,16 @@ def get_senders(request: Request) -> list[dict[str, Any]]:
     if df.empty:
         return []
 
-    df = df.assign(_sender_id=_build_sender_id_series(df))
+    # For 1-on-1 received messages, sender_phone is "" — the peer's phone is in
+    # chat_phone. Use that as the effective phone so name+phone search both work.
+    phone_col = df["sender_phone"].fillna("").astype(str)
+    chat_phone_col = df["chat_phone"].fillna("").astype(str)
+    from_me_mask = df["from_me"] == 1
+    effective_phone = phone_col.where(
+        (phone_col != "") | df["is_group"] | from_me_mask,
+        chat_phone_col,
+    )
+    df = df.assign(_sender_id=_build_sender_id_series(df), _effective_phone=effective_phone)
     counts = df.groupby("_sender_id").size().rename("message_count")
     df_unique = df.drop_duplicates(subset="_sender_id").join(counts, on="_sender_id")
     df_unique = df_unique.sort_values("message_count", ascending=False)
@@ -99,7 +108,7 @@ def get_senders(request: Request) -> list[dict[str, Any]]:
         {
             "sender_id": str(row["_sender_id"]),
             "sender_name": str(row["sender_name"]),
-            "phone": str(row.get("sender_phone", "") or ""),
+            "phone": str(row["_effective_phone"]),
             "message_count": int(row["message_count"]),
         }
         for _, row in df_unique.iterrows()
