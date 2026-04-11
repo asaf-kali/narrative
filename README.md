@@ -68,13 +68,13 @@ git clone https://github.com/asaf-kali/whatsapp-analyzer
 cd whatsapp-analyzer
 just install
 
-# 2. Place your decrypted database files in etc/  (gitignored)
-mkdir -p etc
-cp /path/to/msgstore.db etc/
-cp /path/to/wa.db etc/      # optional — needed for contact names
+# 2. Place your decrypted database files in data/  (gitignored)
+mkdir -p data
+cp /path/to/msgstore.db data/
+cp /path/to/wa.db data/      # optional — needed for contact names
 
 # 3. Run the dashboard
-just run --msgstore etc/msgstore.db --wadb etc/wa.db
+just run --msgstore data/msgstore.db --wadb data/wa.db
 
 # Opens at http://127.0.0.1:8050
 ```
@@ -169,4 +169,4 @@ wa.db ────────┘                                          │
 - **All assets are served locally.** `serve_locally=True` prevents Dash from loading React/Plotly assets from CDN.
 - **`langdetect`** (used for stopword selection) uses bundled language profiles — no network requests.
 - **No telemetry, no analytics, no cloud.** This tool reads files from your disk and renders charts in your browser. Nothing leaves your machine.
-- The `etc/` directory (where your `.db` files live) is in `.gitignore` and will never be committed.
+- The `data/` directory (where your `.db` files live) is in `.gitignore` and will never be committed.

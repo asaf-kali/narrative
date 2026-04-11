@@ -50,8 +50,8 @@ def main(args: list[str] | None = None) -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py --msgstore ../etc/msgstore.db --wadb ../etc/wa.db
-  python main.py --msgstore ../etc/msgstore.db --port 8050
+  python main.py --msgstore ../data/msgstore.db --wadb ../data/wa.db
+  python main.py --msgstore ../data/msgstore.db --port 8050
 
 All processing is local. No data is sent to any external service.
 """,

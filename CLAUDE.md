@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 just lint                 # format + ruff fix + pre-commit
-just run --msgstore etc/msgstore.db --wadb etc/wa.db   # start backend (serves built frontend)
+just run --msgstore data/msgstore.db --wadb data/wa.db   # start backend (serves built frontend)
 just run-dev ...          # start backend with --reload
 just frontend-dev         # start Vite dev server (localhost:5173, proxies /api to :8050)
 just frontend-build       # build React app into frontend/dist/
@@ -30,10 +30,10 @@ mypy runs via `uv run dmypy run .` (daemon).
 
 ## Dev workflow
 
-1. `just run-dev --msgstore etc/msgstore.db` — backend on :8050
+1. `just run-dev --msgstore data/msgstore.db` — backend on :8050
 2. In another terminal: `just frontend-dev` — Vite on :5173 (proxies /api to :8050)
 
-For production: `just frontend-build` then `just run --msgstore etc/msgstore.db`
+For production: `just frontend-build` then `just run --msgstore data/msgstore.db`
 
 ## WhatsApp DB Schema Notes
 
