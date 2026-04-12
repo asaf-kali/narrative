@@ -1,4 +1,6 @@
-# Narrative
+<p align="center">
+  <img src="frontend/src/assets/large.png" alt="Narrative logo" width="250px" />
+</p>
 
 [![CI](https://github.com/asaf-kali/narrative/actions/workflows/ci.yml/badge.svg)](https://github.com/asaf-kali/narrative/actions/workflows/ci.yml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
