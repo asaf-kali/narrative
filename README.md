@@ -14,18 +14,9 @@ A local analytics dashboard for exploring the narrative hidden in your WhatsApp 
 
 ## What It Does
 
-Most WhatsApp analyzers work from text exports (`.txt` files). This tool reads the actual encrypted-then-decrypted SQLite databases (`msgstore.db` + `wa.db`) that WhatsApp stores on your Android device — giving access to far richer data:
+Most WhatsApp analyzers work from text exports (`.txt` files). This tool reads the actual encrypted-then-decrypted SQLite databases (`msgstore.db` + `wa.db`) that WhatsApp stores on your Android device — giving access to far richer data. Visualize activity heatmaps, explore your contact network, analyze messaging patterns, and browse conversations with full metadata and reaction history.
 
-| Feature | Text export | This tool |
-|---------|------------|-----------|
-| Message text | ✅ | ✅ |
-| Timestamps | Approximate | Exact (millisecond) |
-| Media metadata | ❌ | ✅ |
-| Reactions | ❌ | ✅ |
-| Voice note duration | ❌ | ✅ |
-| Call logs | ❌ | ✅ |
-| Reply chains | ❌ | ✅ |
-| Deleted messages | ❌ | ✅ |
+**Data you can access** (unavailable in text exports):
 
 ---
 
@@ -34,7 +25,7 @@ Most WhatsApp analyzers work from text exports (`.txt` files). This tool reads t
 Your WhatsApp messages are stored in encrypted SQLite databases on your Android device. To use this tool:
 
 1. Back up your WhatsApp data from your Android device (via WhatsApp Settings → Chats → Chat backup).
-2. Locate `msgstore.db.crypt15` (or similar) on your device storage at `Internal Storage/WhatsApp/Databases/`.
+2. Locate `msgstore.db.crypt15` (or similar) on your device storage at `Internal Storage/AWhatsApp/Databases/`.
 3. Decrypt using a tool such as [wa-crypt-tools](https://github.com/ElDavoo/wa-crypt-tools) with your device's backup key.
 4. The decrypted `msgstore.db` and optionally `wa.db` (for contact names) are your inputs.
 
@@ -65,8 +56,6 @@ just install
 
 # 2. Place your decrypted database files in data/  (gitignored)
 mkdir -p data
-cp /path/to/msgstore.db data/
-cp /path/to/wa.db data/      # optional — enables contact name resolution
 
 # 3. Start the server (builds frontend automatically)
 just run
