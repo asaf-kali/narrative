@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import type { DayMessage, FeedMessage } from '../api/types'
 import { buildChatColorMap } from './MessageFeed'
 import ActivityCard, { buildTimelineRows } from './messages/ActivityCard'
+import { CardSpinner } from './Spinner'
 import ChatsFilterCard from './messages/ChatsFilterCard'
 import SenderFilterCard from './messages/SenderFilterCard'
 import MessagesCard from './messages/MessagesCard'
@@ -152,11 +153,7 @@ export default function DayDetail({ date, onClose }: Props) {
       </div>
 
       {isLoading ? (
-        <div className="p-5 space-y-3 animate-pulse">
-          <div className="h-40 bg-app-surface-2 rounded-xl" />
-          <div className="h-12 bg-app-surface-2 rounded-xl" />
-          <div className="h-64 bg-app-surface-2 rounded-xl" />
-        </div>
+        <CardSpinner className="h-64" />
       ) : !data || data.total_messages === 0 ? (
         <div className="p-8 text-center text-slate-500 text-sm">No messages on this day</div>
       ) : (

@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { api } from '../api/client'
+import { CardSpinner } from '../components/Spinner'
 
 const COLORS = ['#7c5af6', '#0891b2', '#0d9488', '#db2777', '#f59e0b', '#84cc16', '#6366f1', '#94a3b8']
 const TOOLTIP_STYLE = { background: '#0d0f17', border: '1px solid #1a1d2e', color: '#e2e8f0', borderRadius: 8, fontSize: 12 }
@@ -26,7 +27,7 @@ export default function ContentPage() {
         <div className="bg-app-surface border border-app-border rounded-xl p-4">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Word Cloud</h3>
           {isLoading ? (
-            <div className="h-48 bg-app-surface-2 rounded animate-pulse" />
+            <CardSpinner className="h-48" />
           ) : data?.wordcloud_png ? (
             <img src={data.wordcloud_png} alt="Word cloud" className="w-full rounded" />
           ) : (
@@ -36,7 +37,7 @@ export default function ContentPage() {
         <div className="bg-app-surface border border-app-border rounded-xl p-4">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Top 20 Words</h3>
           {isLoading ? (
-            <div className="h-48 bg-app-surface-2 rounded animate-pulse" />
+            <CardSpinner className="h-48" />
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data?.frequencies.slice(0, 20)} layout="vertical">
@@ -57,7 +58,7 @@ export default function ContentPage() {
       <div className="bg-app-surface border border-app-border rounded-xl p-4">
         <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Emoji Usage</h3>
         {eLoading ? (
-          <div className="h-48 bg-app-surface-2 rounded animate-pulse" />
+          <CardSpinner className="h-48" />
         ) : (
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={emojiData.slice(0, 20)} layout="vertical">

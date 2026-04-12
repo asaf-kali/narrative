@@ -7,10 +7,11 @@ interface Props {
   activeSenders: Set<string>
   onToggle: (sender: string) => void
   onClear: () => void
+  isLoading?: boolean
 }
 
 /** Renders a searchable sender filter card. Returns null if ≤1 sender. */
-export default function SenderFilterCard({ senders, activeSenders, onToggle, onClear }: Props) {
+export default function SenderFilterCard({ senders, activeSenders, onToggle, onClear, isLoading }: Props) {
   const items = senders.map((s) => ({ id: s, label: s, searchText: s }))
   return (
     <SearchableChipFilter
@@ -19,6 +20,7 @@ export default function SenderFilterCard({ senders, activeSenders, onToggle, onC
       activeIds={activeSenders}
       onToggle={onToggle}
       onClear={onClear}
+      isLoading={isLoading}
     />
   )
 }

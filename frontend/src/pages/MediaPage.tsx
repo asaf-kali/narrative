@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 import { api } from '../api/client'
+import { CardSpinner } from '../components/Spinner'
 
 const COLORS = ['#7c5af6', '#0891b2', '#0d9488', '#db2777', '#f59e0b', '#84cc16', '#6366f1', '#94a3b8']
 const TOOLTIP_STYLE = { background: '#0d0f17', border: '1px solid #1a1d2e', color: '#e2e8f0', borderRadius: 8, fontSize: 12 }
@@ -17,9 +18,13 @@ export default function MediaPage() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-app-surface border border-app-border rounded-xl h-80 animate-pulse" />
-        <div className="bg-app-surface border border-app-border rounded-xl h-80 animate-pulse" />
+      <div className="grid grid-cols-5 gap-4">
+        <div className="col-span-2 bg-app-surface border border-app-border rounded-xl">
+          <CardSpinner className="h-80" />
+        </div>
+        <div className="col-span-3 bg-app-surface border border-app-border rounded-xl">
+          <CardSpinner className="h-80" />
+        </div>
       </div>
     )
   }

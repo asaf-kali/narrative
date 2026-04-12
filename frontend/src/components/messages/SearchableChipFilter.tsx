@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CardSpinner } from '../Spinner'
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -15,13 +16,23 @@ interface Props {
   activeIds: Set<string>
   onToggle: (id: string) => void
   onClear: () => void
+  isLoading?: boolean
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
 
-/** Chip filter card with a built-in search input. Returns null if ≤1 item. */
-export default function SearchableChipFilter({ title, items, activeIds, onToggle, onClear }: Props) {
+/** Chip filter card with a built-in search input. Returns null if ≤1 item and not loading. */
+export default function SearchableChipFilter({ title, items, activeIds, onToggle, onClear, isLoading }: Props) {
   const [query, setQuery] = useState('')
+
+  if (isLoading) {
+    return (
+      <div className="bg-app-surface border border-app-border rounded-xl p-4">
+        <span className="text-[10px] text-slate-500 uppercase tracking-widest">{title}</span>
+        <CardSpinner className="h-12" />
+      </div>
+    )
+  }
 
   if (items.length <= 1) return null
 

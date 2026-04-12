@@ -14,7 +14,7 @@ A local analytics dashboard for exploring the narrative hidden in your WhatsApp 
 
 ## What It Does
 
-Most WhatsApp analyzers work from text exports (`.txt` files). This tool reads the actual encrypted-then-decrypted SQLite databases (`msgstore.db` + `wa.db`) that WhatsApp stores on your Android device — giving access to far richer data. Visualize activity heatmaps, explore your contact network, analyze messaging patterns, and browse conversations with full metadata and reaction history.
+Reads the encrypted-then-decrypted SQLite databases (`msgstore.db` + `wa.db`) that WhatsApp stores on your Android device. Visualize activity heatmaps, explore your contact network, analyze messaging patterns, and browse conversations with full metadata and reaction history.
 
 ---
 

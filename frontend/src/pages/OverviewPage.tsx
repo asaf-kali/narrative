@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { api } from '../api/client'
+import { CardSpinner } from '../components/Spinner'
 
 const DONUT_COLORS = ['#7c5af6', '#0891b2', '#db2777', '#f59e0b', '#84cc16', '#6366f1', '#0d9488', '#94a3b8']
 const TOOLTIP_STYLE = { background: '#0d0f17', border: '1px solid #1a1d2e', color: '#e2e8f0', borderRadius: 8, fontSize: 12 }
@@ -89,15 +90,21 @@ export default function OverviewPage() {
 
 function LoadingState() {
   return (
-    <div className="space-y-4 animate-pulse">
+    <div className="space-y-4">
       <div className="grid grid-cols-6 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-app-surface border border-app-border rounded-xl h-20" />
+          <div key={i} className="bg-app-surface border border-app-border rounded-xl p-4">
+            <CardSpinner className="h-12" />
+          </div>
         ))}
       </div>
       <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-2 bg-app-surface border border-app-border rounded-xl h-56" />
-        <div className="bg-app-surface border border-app-border rounded-xl h-56" />
+        <div className="col-span-2 bg-app-surface border border-app-border rounded-xl p-4">
+          <CardSpinner className="h-48" />
+        </div>
+        <div className="bg-app-surface border border-app-border rounded-xl p-4">
+          <CardSpinner className="h-48" />
+        </div>
       </div>
     </div>
   )

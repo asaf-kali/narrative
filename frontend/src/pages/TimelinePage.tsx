@@ -5,6 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } f
 import { api } from '../api/client'
 import Heatmap from '../components/Heatmap'
 import type { TimelinePoint } from '../api/types'
+import { CardSpinner } from '../components/Spinner'
 
 const COLORS = ['#7c5af6', '#0891b2', '#0d9488', '#db2777', '#f59e0b', '#84cc16', '#6366f1', '#94a3b8']
 const TOOLTIP_STYLE = { background: '#0d0f17', border: '1px solid #1a1d2e', color: '#e2e8f0', borderRadius: 8, fontSize: 12 }
@@ -59,7 +60,7 @@ export default function TimelinePage() {
           </div>
         </div>
         {tLoading ? (
-          <div className="h-64 bg-app-surface-2 rounded animate-pulse" />
+          <CardSpinner className="h-64" />
         ) : (
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={rows}>
@@ -85,7 +86,7 @@ export default function TimelinePage() {
 
       <div className="bg-app-surface border border-app-border rounded-xl p-4">
         <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Activity Heatmap (Day × Hour)</h3>
-        {hLoading ? <div className="h-40 bg-app-surface-2 rounded animate-pulse" /> : <Heatmap data={heatmapData} />}
+        {hLoading ? <CardSpinner className="h-40" /> : <Heatmap data={heatmapData} />}
       </div>
     </div>
   )

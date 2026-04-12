@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject, type LinkObject } from 'react-force-graph-2d'
 import { api } from '../api/client'
 import type { NetworkNode } from '../api/types'
+import { CardSpinner } from '../components/Spinner'
 
 // Distinct palette for community clusters
 const CLUSTER_COLORS = [
@@ -161,7 +162,7 @@ export default function NetworkPage() {
         {/* Canvas */}
         <div ref={containerRef} className="flex-1 min-h-0">
           {isLoading ? (
-            <div className="h-full bg-app-surface-2 animate-pulse" />
+            <CardSpinner className="h-full" />
           ) : graphData.nodes.length === 0 ? (
             <div className="h-full flex items-center justify-center text-slate-500 text-sm">
               No data — try a different mode or lower the min. interactions slider.

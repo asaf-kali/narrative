@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { api } from '../api/client'
+import { CardSpinner } from '../components/Spinner'
 
 const COLORS = ['#7c5af6', '#0891b2', '#0d9488', '#db2777', '#f59e0b', '#84cc16', '#6366f1', '#94a3b8']
 const TOOLTIP_STYLE = { background: '#0d0f17', border: '1px solid #1a1d2e', color: '#e2e8f0', borderRadius: 8, fontSize: 12 }
@@ -15,7 +16,11 @@ export default function ParticipantsPage() {
     enabled: !!chatId,
   })
 
-  if (isLoading) return <div className="h-64 bg-app-surface border border-app-border rounded-xl animate-pulse" />
+  if (isLoading) return (
+    <div className="bg-app-surface border border-app-border rounded-xl">
+      <CardSpinner className="h-64" />
+    </div>
+  )
 
   return (
     <div className="space-y-4">

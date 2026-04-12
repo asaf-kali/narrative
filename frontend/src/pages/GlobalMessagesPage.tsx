@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { CardSpinner } from '../components/Spinner'
 import DatetimeInput, { DATETIME_RE, formatDatetime, toApiDatetime } from '../components/DatetimeInput'
 import SearchableChipFilter from '../components/messages/SearchableChipFilter'
 import MessagesCard from '../components/messages/MessagesCard'
@@ -47,8 +48,8 @@ export default function GlobalMessagesPage() {
   const toValid = !dateTo || DATETIME_RE.test(dateTo)
   const rangeInvalid = !!(dateFrom && dateTo && fromValid && toValid && dateTo < dateFrom)
 
-  const { data: chats = [] } = useQuery({ queryKey: ['chats'], queryFn: api.chats })
-  const { data: senders = [] } = useQuery({ queryKey: ['senders'], queryFn: api.senders })
+  const { data: chats = [], isLoading: isChatsLoading } = useQuery({ queryKey: ['chats'], queryFn: api.chats })
+  const { data: senders = [], isLoading: isSendersLoading } = useQuery({ queryKey: ['senders'], queryFn: api.senders })
 
   const { data, isLoading } = useQuery({
     queryKey: ['global-messages', offset, dateFrom, dateTo, searchTerm, [...activeChats].sort(), [...activeSenders].sort()],
@@ -236,6 +237,7 @@ export default function GlobalMessagesPage() {
             activeIds={activeChatIds}
             onToggle={toggleChat}
             onClear={() => { setActiveChats(new Set()); reset() }}
+            isLoading={isChatsLoading}
           />
         </div>
         <div className="flex-1 min-w-0">
@@ -245,13 +247,16 @@ export default function GlobalMessagesPage() {
             activeIds={activeSenders}
             onToggle={toggleSender}
             onClear={() => { setActiveSenders(new Set()); reset() }}
+            isLoading={isSendersLoading}
           />
         </div>
       </div>
 
       {/* Messages feed */}
       {isLoading ? (
-        <div className="bg-app-surface border border-app-border rounded-xl h-64 animate-pulse" />
+        <div className="bg-app-surface border border-app-border rounded-xl">
+          <CardSpinner className="h-64" />
+        </div>
       ) : !data || data.total === 0 ? (
         <div className="bg-app-surface border border-app-border rounded-xl p-8 text-center text-slate-500 text-sm">
           {searchTerm ? `No messages matching "${searchTerm}"` : 'No messages in this range'}

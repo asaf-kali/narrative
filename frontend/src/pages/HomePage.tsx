@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { DayCount } from '../api/types'
+import { CardSpinner } from '../components/Spinner'
 import CalendarHeatmap from '../components/CalendarHeatmap'
 import DayDetail from '../components/DayDetail'
 import DatetimeInput, { DATETIME_RE, formatDatetime } from '../components/DatetimeInput'
@@ -140,7 +141,7 @@ export default function HomePage() {
         </div>
 
         {isLoading ? (
-          <div className="h-36 bg-app-surface-2 rounded animate-pulse" />
+          <CardSpinner className="h-36" />
         ) : (
           <CalendarHeatmap data={data} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
         )}

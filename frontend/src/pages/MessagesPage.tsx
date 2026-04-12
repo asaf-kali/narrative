@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { CardSpinner } from '../components/Spinner'
 import DatetimeInput, { DATETIME_RE, formatDatetime, toApiDatetime } from '../components/DatetimeInput'
 import SenderFilterCard from '../components/messages/SenderFilterCard'
 import MessagesCard from '../components/messages/MessagesCard'
@@ -49,7 +50,7 @@ export default function MessagesPage() {
   const toValid = !dateTo || DATETIME_RE.test(dateTo)
   const rangeInvalid = !!(dateFrom && dateTo && fromValid && toValid && dateTo < dateFrom)
 
-  const { data: participants = [] } = useQuery({
+  const { data: participants = [], isLoading: isParticipantsLoading } = useQuery({
     queryKey: ['participants', chatId],
     queryFn: () => api.participants(Number(chatId)),
     enabled: !!chatId,
@@ -201,11 +202,14 @@ export default function MessagesPage() {
         activeSenders={activeSenders}
         onToggle={toggleSender}
         onClear={() => { setActiveSenders(new Set()); reset() }}
+        isLoading={isParticipantsLoading}
       />
 
       {/* Messages card */}
       {isLoading ? (
-        <div className="bg-app-surface border border-app-border rounded-xl h-64 animate-pulse" />
+        <div className="bg-app-surface border border-app-border rounded-xl">
+          <CardSpinner className="h-64" />
+        </div>
       ) : !data || data.total === 0 ? (
         <div className="bg-app-surface border border-app-border rounded-xl p-8 text-center text-slate-500 text-sm">
           {searchTerm ? `No messages matching "${searchTerm}"` : 'No messages in this range'}
