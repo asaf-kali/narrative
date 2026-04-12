@@ -46,7 +46,7 @@ _UVICORN_LOG_CONFIG: dict[str, object] = {
 
 def main(args: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="WhatsApp Analyzer — local dashboard for decrypted WhatsApp databases.",
+        description="Narrative — local analytics dashboard for WhatsApp chat history from decrypted SQLite databases.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -94,7 +94,7 @@ All processing is local. No data is sent to any external service.
         logger.error(f"msgstore.db not found: {parsed.msgstore}")
         sys.exit(1)
 
-    logger.info(f"Starting WhatsApp Analyzer on http://{parsed.host}:{parsed.port}")
+    logger.info(f"Starting Narrative on http://{parsed.host}:{parsed.port}")
 
     if parsed.reload:
         # uvicorn requires an import string to enable --reload; pass paths via env vars

@@ -2,9 +2,9 @@
 
 [project]
 
-name = "whatsapp-analyzer"
-version = "0.1.0"
-description = "A tool for analyzing WhatsApp chat exports."
+name = "narrative"
+version = "0.2.0"
+description = "A local analytics dashboard for WhatsApp chat history from decrypted SQLite databases."
 authors = [
     { name = "Asaf Kali", email = "asaf.kali@mail.huji.ac.il" },
 ]

@@ -1,12 +1,14 @@
-# WhatsApp Analyzer
+# Narrative
 
-[![CI](https://github.com/asaf-kali/whatsapp-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/asaf-kali/whatsapp-analyzer/actions/workflows/ci.yml)
+[![CI](https://github.com/asaf-kali/narrative/actions/workflows/ci.yml/badge.svg)](https://github.com/asaf-kali/narrative/actions/workflows/ci.yml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Type checked: mypy](https://img.shields.io/badge/type%20check-mypy-22aa11)](http://mypy-lang.org/)
 
-A local web dashboard for analyzing WhatsApp chat history, built directly on decrypted SQLite database files.
+A local analytics dashboard for exploring the narrative hidden in your WhatsApp chat history. Reads decrypted SQLite databases directly, unlocking insights text exports cannot provide.
 
-**All processing is local. No message data is sent to any external service.**
+- **All processing is local** — No network calls, no telemetry, no cloud
+- **No message data is sent anywhere** — Server binds to `127.0.0.1` only
+- **Database files never committed** — `data/` directory is gitignored
 
 ---
 
@@ -67,8 +69,8 @@ just decrypt-backup <key>
 
 ```bash
 # 1. Clone and install dependencies
-git clone https://github.com/asaf-kali/whatsapp-analyzer
-cd whatsapp-analyzer
+git clone https://github.com/asaf-kali/narrative
+cd narrative
 just install
 
 # 2. Place your decrypted database files in data/  (gitignored)
@@ -104,49 +106,3 @@ just check-ruff    # ruff format + lint check (CI)
 just check-mypy    # mypy type check (CI)
 just frontend-build  # build React app into frontend/dist/
 ```
-
----
-
-## Architecture
-
-```
-msgstore.db ──┐
-              ├──▶ DBConnection ──▶ DataLoader ──▶ pd.DataFrame (cached)
-wa.db ────────┘                                          │
-                                                         ▼
-                                               Analysis functions
-                                            (timeline, participants, …)
-                                                         │
-                                                         ▼
-                                               FastAPI routes ──▶ JSON
-                                                         │
-                                                         ▼
-                                          React + TanStack Query (browser)
-```
-
-Four strict layers. `PYTHONPATH=app` so imports are e.g. `from db.loaders import DataLoader`.
-
-| Layer | Path | Responsibility |
-|-------|------|----------------|
-| DB | `app/db/` | Read-only SQLite access; `DataLoader` resolves contacts, normalises timestamps to local TZ |
-| Models | `app/models/` | Pydantic types for config, message metadata, chat summaries; `AnalysisConfig.cache_key()` drives LRU cache |
-| Analysis | `app/analysis/` | Pure functions: `(pd.DataFrame, AnalysisConfig) → pd.DataFrame`, registered with `@analysis(...)` |
-| API | `app/api/` | FastAPI routes; `deps.get_df()` loads and caches DataFrames |
-
-### Key API endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/messages` | Global messages — search, date range, `chat_ids[]`, `sender_ids[]`, pagination |
-| `GET /api/senders` | All unique senders (for filter UI population) |
-| `GET /api/chats/{id}/messages` | Per-chat messages — search, date range, sender filter, pagination |
-| `GET /api/network` | Global cross-chat contact network |
-| `GET /api/search` | Full-text message search (quick, no pagination) |
-
----
-
-## Privacy
-
-- **No network calls.** The server binds to `127.0.0.1` by default and never makes outbound requests.
-- **No telemetry, no analytics, no cloud.** This tool reads files from your disk and renders charts in your browser. Nothing leaves your machine.
-- The `data/` directory (where your `.db` files live) is in `.gitignore` and will never be committed.

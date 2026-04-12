@@ -36,7 +36,7 @@ def create_api(
         logger.info(f"API initialized: msgstore={msgstore_path}")
         yield
 
-    app = FastAPI(title="WhatsApp Analyzer API", lifespan=_lifespan)
+    app = FastAPI(title="Narrative API", lifespan=_lifespan)
 
     app.add_middleware(
         CORSMiddleware,
