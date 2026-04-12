@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import logo from '../assets/logo.png'
 import GlobalSearch from './GlobalSearch'
 
 export default function Header() {
@@ -18,7 +19,7 @@ export default function Header() {
   return (
     <>
       <header className="bg-app-surface border-b border-app-border px-6 py-3 flex items-center justify-between flex-shrink-0">
-        <h1 className="text-sm font-semibold text-slate-200 tracking-tight">Narrative</h1>
+        <img src={logo} alt="Narrative" className="h-6" />
         <button
           onClick={() => setSearchOpen(true)}
           className="flex items-center gap-2 bg-app-surface-2 border border-app-border rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:text-slate-300 hover:border-accent/30 transition-colors"
