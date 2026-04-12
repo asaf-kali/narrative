@@ -14,46 +14,39 @@ A local analytics dashboard for exploring the narrative hidden in your WhatsApp 
 
 ## What It Does
 
-Most WhatsApp analyzers work from text exports (`.txt` files). This tool reads the actual encrypted-then-decrypted SQLite databases (`msgstore.db` + `wa.db`) that WhatsApp stores on your Android device — giving access to far richer data:
-
-| Feature | Text export | This tool |
-|---------|------------|-----------|
-| Message text | ✅ | ✅ |
-| Timestamps | Approximate | Exact (millisecond) |
-| Media metadata | ❌ | ✅ |
-| Reactions | ❌ | ✅ |
-| Voice note duration | ❌ | ✅ |
-| Call logs | ❌ | ✅ |
-| Reply chains | ❌ | ✅ |
-| Deleted messages | ❌ | ✅ |
-
-### Pages
-
-**Summary** — Global activity heatmap across all chats, key stats (total messages, active days, busiest day). Click any day for a detailed message view.
-
-**Messages** — Browse and search all messages across all chats. Filter by message content, date range, group/chat, and sender. All filters are server-side with pagination.
-
-**Network** — Global cross-chat contact graph. Nodes = contacts; edges = number of shared groups. Community detection with color-coded clusters.
-
-**Per-chat pages** (Overview, Timeline, Participants, Words & Emoji, Media, Messages, Network) — Deep analysis of a single chat.
+Most WhatsApp analyzers work from text exports (`.txt` files). This tool reads the actual encrypted-then-decrypted SQLite databases (`msgstore.db` + `wa.db`) that WhatsApp stores on your Android device — giving access to far richer data. Visualize activity heatmaps, explore your contact network, analyze messaging patterns, and browse conversations with full metadata and reaction history.
 
 ---
 
 ## Getting the Database Files
 
-Your WhatsApp messages are stored in encrypted SQLite databases on your Android device. To use this tool:
+> **Android only.** iOS stores WhatsApp data in a proprietary format not currently supported by this tool.
 
-1. Back up your WhatsApp data from your Android device (via WhatsApp Settings → Chats → Chat backup).
-2. Locate `msgstore.db.crypt15` (or similar) on your device storage at `Internal Storage/WhatsApp/Databases/`.
-3. Decrypt using a tool such as [wa-crypt-tools](https://github.com/ElDavoo/wa-crypt-tools) with your device's backup key.
-4. The decrypted `msgstore.db` and optionally `wa.db` (for contact names) are your inputs.
+WhatsApp encrypts its local backup as `.crypt15` files. To decrypt them, you need a **64-digit encryption key** that you generate once in WhatsApp settings and must keep safe forever.
+
+### 1. Generate your encryption key
+
+1. In WhatsApp: **Settings → Chats → Chat Backup → End-to-end Encrypted Backup**
+2. Tap **Turn On**, then choose **Use 64-digit encryption key** (not a password)
+3. WhatsApp displays your 64-digit key — **copy it and store it in a safe place immediately**
+4. Tap **Create** to enable encrypted backups
+
+> ⚠️ **Do not lose your key.** It cannot be recovered from WhatsApp. Without it, your backup files are permanently unreadable. Store it in a password manager and never share it.
+
+### 2. Back up and copy the files
+
+1. Trigger a backup: **Settings → Chats → Chat Backup → Back Up Now**
+2. Copy these files from your device to the `data/` directory (via USB cable, ADB, or a file manager app):
+   - `Android/media/com.whatsapp/WhatsApp/Databases/msgstore.db.crypt15` — all messages
+   - `Android/media/com.whatsapp/WhatsApp/Backups/wa.db.crypt15` *(optional — for contact names)*
+
+### 3. Decrypt
 
 ```bash
-# Decrypt backup files into data/
-just decrypt-backup <key>
+just decrypt <your-64-digit-key>
 ```
 
-> Your decrypted `.db` files contain all your messages. Keep them secure and never share them.
+> Your decrypted `.db` files contain all your messages in plain text. Keep them secure and never share them.
 
 ---
 
@@ -73,14 +66,11 @@ git clone https://github.com/asaf-kali/narrative
 cd narrative
 just install
 
-# 2. Place your decrypted database files in data/  (gitignored)
-mkdir -p data
-cp /path/to/msgstore.db data/
-cp /path/to/wa.db data/      # optional — enables contact name resolution
+# 2. Copy encrypted backup files into data/ and decrypt (see "Getting the Database Files" above)
+just decrypt <key>
 
-# 3. Build the frontend and start the server
-just frontend-build
-just run --msgstore data/msgstore.db --wadb data/wa.db
+# 3. Start the server (builds frontend automatically)
+just run
 
 # Opens at http://127.0.0.1:8050
 ```

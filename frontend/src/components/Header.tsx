@@ -17,8 +17,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="bg-app-surface border-b border-app-border px-6 py-3 flex items-center justify-between flex-shrink-0">
-        <h1 className="text-sm font-semibold text-slate-200 tracking-tight">Narrative</h1>
+      <header className="bg-app-surface border-b border-app-border px-6 py-3 flex items-center justify-end flex-shrink-0">
         <button
           onClick={() => setSearchOpen(true)}
           className="flex items-center gap-2 bg-app-surface-2 border border-app-border rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:text-slate-300 hover:border-accent/30 transition-colors"
@@ -27,7 +26,6 @@ export default function Header() {
           <span>Search all messages</span>
           <kbd className="text-[10px] border border-app-border rounded px-1 py-0.5 ml-1">⌘K</kbd>
         </button>
-        <span className="text-[11px] text-app-muted">All processing is local — no data leaves your device</span>
       </header>
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>

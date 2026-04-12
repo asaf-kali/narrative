@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
+import logo from '../assets/logo.png'
 import type { Chat } from '../api/types'
 
 interface Props { chats: Chat[]; isLoading: boolean }
@@ -19,10 +20,8 @@ export default function Sidebar({ chats, isLoading }: Props) {
       {/* Brand */}
       <div className="px-5 py-5 border-b border-app-border">
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-accent/30">
-            W
-          </div>
-          <span className="font-semibold text-sm text-slate-100 tracking-tight">WA Analyzer</span>
+          <img src={logo} alt="Narrative" className="h-7" />
+          <span className="font-semibold text-sm text-slate-100 tracking-tight">Narrative</span>
         </Link>
         <div className="mt-3.5 relative">
           <svg className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

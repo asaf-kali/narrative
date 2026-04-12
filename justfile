@@ -47,7 +47,7 @@ frontend-dev:
 backend-dev *args:
     PYTHONPATH=app {{ RUN }} python app/main.py --reload {{ args }}
 
-run *args:
+run *args: frontend-build
     PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
 
 run-dev *args:
@@ -71,6 +71,6 @@ lint: format
 
 # Misc
 
-decrypt-backup key:
-    cd data && wadecrypt {{ key }}
-    cd data && wadecrypt {{ key }}
+decrypt key:
+    cd data && wadecrypt {{ key }} msgstore.db.crypt15 msgstore.db
+    -cd data && wadecrypt {{ key }} wa.db.crypt15 wa.db
