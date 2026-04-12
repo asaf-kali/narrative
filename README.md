@@ -27,16 +27,6 @@ Most WhatsApp analyzers work from text exports (`.txt` files). This tool reads t
 | Reply chains | ❌ | ✅ |
 | Deleted messages | ❌ | ✅ |
 
-### Pages
-
-**Summary** — Global activity heatmap across all chats, key stats (total messages, active days, busiest day). Click any day for a detailed message view.
-
-**Messages** — Browse and search all messages across all chats. Filter by message content, date range, group/chat, and sender. All filters are server-side with pagination.
-
-**Network** — Global cross-chat contact graph. Nodes = contacts; edges = number of shared groups. Community detection with color-coded clusters.
-
-**Per-chat pages** (Overview, Timeline, Participants, Words & Emoji, Media, Messages, Network) — Deep analysis of a single chat.
-
 ---
 
 ## Getting the Database Files
@@ -78,9 +68,8 @@ mkdir -p data
 cp /path/to/msgstore.db data/
 cp /path/to/wa.db data/      # optional — enables contact name resolution
 
-# 3. Build the frontend and start the server
-just frontend-build
-just run --msgstore data/msgstore.db --wadb data/wa.db
+# 3. Start the server (builds frontend automatically)
+just run
 
 # Opens at http://127.0.0.1:8050
 ```

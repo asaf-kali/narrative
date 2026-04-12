@@ -47,7 +47,7 @@ frontend-dev:
 backend-dev *args:
     PYTHONPATH=app {{ RUN }} python app/main.py --reload {{ args }}
 
-run *args:
+run *args: frontend-build
     PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
 
 run-dev *args:
