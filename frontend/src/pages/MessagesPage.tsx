@@ -106,11 +106,11 @@ export default function MessagesPage() {
   }
 
   const pagination = totalPages > 1 ? (
-    <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+    <div className="ml-auto flex items-center gap-2 text-xs text-tx-secondary">
       <button
         onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
         disabled={offset === 0}
-        className="px-2 py-1 rounded bg-app-surface-2 border border-app-border disabled:opacity-30 hover:text-slate-200 transition-colors"
+        className="px-2 py-1 rounded bg-app-surface-2 border border-app-border disabled:opacity-30 hover:text-tx-primary transition-colors"
       >
         ← Older
       </button>
@@ -118,7 +118,7 @@ export default function MessagesPage() {
       <button
         onClick={() => setOffset(offset + PAGE_SIZE)}
         disabled={offset + PAGE_SIZE >= (data?.total ?? 0)}
-        className="px-2 py-1 rounded bg-app-surface-2 border border-app-border disabled:opacity-30 hover:text-slate-200 transition-colors"
+        className="px-2 py-1 rounded bg-app-surface-2 border border-app-border disabled:opacity-30 hover:text-tx-primary transition-colors"
       >
         Newer →
       </button>
@@ -131,22 +131,22 @@ export default function MessagesPage() {
       {/* Range card */}
       <div className="bg-app-surface border border-app-border rounded-xl p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex-shrink-0">Range</span>
+          <span className="text-xs font-semibold text-tx-secondary uppercase tracking-widest flex-shrink-0">Range</span>
 
           {/* Search */}
           <div className="relative flex-shrink-0">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none">⌕</span>
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-tx-muted text-xs pointer-events-none">⌕</span>
             <input
               type="text"
               placeholder="Search…"
               value={searchInput}
               onChange={(e) => { setSearchInput(e.target.value); reset() }}
-              className="bg-app-surface-2 border border-app-border rounded-lg pl-7 pr-7 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 w-40"
+              className="bg-app-surface-2 border border-app-border rounded-lg pl-7 pr-7 py-1.5 text-xs text-tx-secondary placeholder-tx-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 w-40"
             />
             {searchInput && (
               <button
                 onClick={() => setSearchInput('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-tx-muted hover:text-tx-secondary text-xs"
               >
                 ✕
               </button>
@@ -160,7 +160,7 @@ export default function MessagesPage() {
               onChange={(v) => { setDateFrom(v); reset() }}
               isInvalid={(!!dateFrom && !fromValid) || rangeInvalid}
             />
-            <span className={rangeInvalid ? 'text-red-400' : 'text-slate-500'}>→</span>
+            <span className={rangeInvalid ? 'text-red-400' : 'text-tx-muted'}>→</span>
             <DatetimeInput
               value={dateTo}
               onChange={(v) => { setDateTo(v); reset() }}
@@ -185,7 +185,7 @@ export default function MessagesPage() {
                   className={`px-2 py-1 rounded text-[11px] font-medium transition-colors border ${
                     active
                       ? 'bg-accent/15 border-accent/50 text-accent-light'
-                      : 'bg-app-surface-2 border-app-border text-slate-500 hover:text-slate-200'
+                      : 'bg-app-surface-2 border-app-border text-tx-muted hover:text-tx-primary'
                   }`}
                 >
                   {p.label}
@@ -211,7 +211,7 @@ export default function MessagesPage() {
           <CardSpinner className="h-64" />
         </div>
       ) : !data || data.total === 0 ? (
-        <div className="bg-app-surface border border-app-border rounded-xl p-8 text-center text-slate-500 text-sm">
+        <div className="bg-app-surface border border-app-border rounded-xl p-8 text-center text-tx-muted text-sm">
           {searchTerm ? `No messages matching "${searchTerm}"` : 'No messages in this range'}
         </div>
       ) : (

@@ -24,12 +24,16 @@ class DataLoader:
         self._db = db
         self._registry = registry or SenderRegistry(contacts={})
 
-    def load_chats(self) -> list[ChatSummary]:
-        return [
+    def load_chats(self, search: str | None = None, limit: int = 100) -> list[ChatSummary]:
+        summaries = [
             _row_to_chat_summary(row, self._registry)
             for row in fetch_chats(self._db.msgstore)
             if row.chat_id is not None
         ]
+        if search:
+            needle = search.lower()
+            return [s for s in summaries if needle in s.display_name.lower()]
+        return summaries[:limit]
 
     def load_messages(self, config: AnalysisConfig) -> pd.DataFrame:
         rows = list(

@@ -1,8 +1,8 @@
 import { NavLink, useMatch } from 'react-router-dom'
 
 const BASE = 'flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors'
-const ACTIVE = 'border-accent text-slate-100'
-const INACTIVE = 'border-transparent text-slate-500 hover:text-slate-200'
+const ACTIVE = 'border-accent text-tx-primary'
+const INACTIVE = 'border-transparent text-tx-muted hover:text-tx-primary'
 
 export default function NavBar() {
   const inChat = useMatch('/chat/*')

@@ -42,7 +42,7 @@ export default function TimelinePage() {
     <div className="space-y-4">
       <div className="bg-app-surface border border-app-border rounded-xl p-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Message Timeline</h3>
+          <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest">Message Timeline</h3>
           <div className="flex gap-1.5">
             {(['daily', 'monthly'] as const).map((p) => (
               <button
@@ -51,7 +51,7 @@ export default function TimelinePage() {
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   period === p
                     ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                    : 'bg-app-surface-2 text-slate-400 hover:text-slate-200 border border-app-border'
+                    : 'bg-app-surface-2 text-tx-secondary hover:text-tx-primary border border-app-border'
                 }`}
               >
                 {p.charAt(0).toUpperCase() + p.slice(1)}
@@ -85,7 +85,7 @@ export default function TimelinePage() {
       </div>
 
       <div className="bg-app-surface border border-app-border rounded-xl p-4">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Activity Heatmap (Day × Hour)</h3>
+        <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Activity Heatmap (Day × Hour)</h3>
         {hLoading ? <CardSpinner className="h-40" /> : <Heatmap data={heatmapData} />}
       </div>
     </div>

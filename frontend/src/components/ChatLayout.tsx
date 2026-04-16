@@ -28,8 +28,8 @@ function formatDate(iso: string | null): string {
 function Chip({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[9px] font-semibold uppercase tracking-widest text-slate-500">{label}</span>
-      <span className={`text-xs text-slate-300 ${mono ? 'font-mono' : ''}`}>{value}</span>
+      <span className="text-[9px] font-semibold uppercase tracking-widest text-tx-muted">{label}</span>
+      <span className={`text-xs text-tx-secondary ${mono ? 'font-mono' : ''}`}>{value}</span>
     </div>
   )
 }
@@ -43,7 +43,7 @@ function ChatHeader({ chat }: { chat: Chat }) {
       <div className="flex items-start justify-between gap-4 mb-3">
         {/* Name + type badge */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <h1 className="text-base font-bold text-slate-100 truncate">{chat.display_name}</h1>
+          <h1 className="text-base font-bold text-tx-primary truncate">{chat.display_name}</h1>
           <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${TYPE_COLOR[chat.chat_type]}`}>
             {TYPE_LABEL[chat.chat_type]}
           </span>
@@ -68,8 +68,8 @@ function ChatHeader({ chat }: { chat: Chat }) {
             className={({ isActive }) =>
               `px-3.5 py-2 text-xs font-medium rounded-t-md border-b-2 -mb-px transition-colors ${
                 isActive
-                  ? 'border-accent text-slate-100 bg-app-surface-2'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'
+                  ? 'border-accent text-tx-primary bg-app-surface-2'
+                  : 'border-transparent text-tx-secondary hover:text-tx-primary hover:bg-app-hover'
               }`
             }
           >
@@ -83,7 +83,7 @@ function ChatHeader({ chat }: { chat: Chat }) {
 
 export default function ChatLayout() {
   const { chatId } = useParams<{ chatId: string }>()
-  const { data: chats = [] } = useQuery({ queryKey: ['chats'], queryFn: api.chats })
+  const { data: chats = [] } = useQuery({ queryKey: ['chats'], queryFn: () => api.chats() })
   const chat = chats.find((c) => c.chat_id === Number(chatId))
 
   return (

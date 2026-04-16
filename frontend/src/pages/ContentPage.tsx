@@ -25,17 +25,17 @@ export default function ContentPage() {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-app-surface border border-app-border rounded-xl p-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Word Cloud</h3>
+          <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Word Cloud</h3>
           {isLoading ? (
             <CardSpinner className="h-48" />
           ) : data?.wordcloud_png ? (
             <img src={data.wordcloud_png} alt="Word cloud" className="w-full rounded" />
           ) : (
-            <div className="h-48 flex items-center justify-center text-slate-500 text-sm">No text content</div>
+            <div className="h-48 flex items-center justify-center text-tx-muted text-sm">No text content</div>
           )}
         </div>
         <div className="bg-app-surface border border-app-border rounded-xl p-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Top 20 Words</h3>
+          <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Top 20 Words</h3>
           {isLoading ? (
             <CardSpinner className="h-48" />
           ) : (
@@ -56,7 +56,7 @@ export default function ContentPage() {
       </div>
 
       <div className="bg-app-surface border border-app-border rounded-xl p-4">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Emoji Usage</h3>
+        <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Emoji Usage</h3>
         {eLoading ? (
           <CardSpinner className="h-48" />
         ) : (

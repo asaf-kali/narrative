@@ -61,8 +61,8 @@ interface RowProps {
 function MessageRow({ msg, chatColor, dayOnly, showChat, highlight, onChatClick, onSenderClick }: RowProps) {
   const isMedia = msg.text?.startsWith('[') ?? false
   return (
-    <div className="flex items-baseline gap-3 px-3 py-1.5 hover:bg-white/[0.025] rounded transition-colors min-w-0">
-      <span className="text-[11px] text-slate-500 tabular-nums flex-shrink-0 w-28">
+    <div className="flex items-baseline gap-3 px-3 py-1.5 hover:bg-app-hover rounded transition-colors min-w-0">
+      <span className="text-[11px] text-tx-muted tabular-nums flex-shrink-0 w-28">
         {formatTime(msg.timestamp, dayOnly)}
       </span>
       {showChat && (
@@ -76,13 +76,13 @@ function MessageRow({ msg, chatColor, dayOnly, showChat, highlight, onChatClick,
         </span>
       )}
       <span
-        className={`text-xs font-medium text-slate-300 flex-shrink-0 w-28 truncate ${onSenderClick ? 'cursor-pointer hover:text-slate-100' : ''}`}
+        className={`text-xs font-medium text-tx-secondary flex-shrink-0 w-28 truncate ${onSenderClick ? 'cursor-pointer hover:text-tx-primary' : ''}`}
         title={msg.sender_name}
         onClick={onSenderClick ? () => onSenderClick(msg.sender_id) : undefined}
       >
         {msg.sender_name}
       </span>
-      <span className={`text-xs min-w-0 truncate ${isMedia ? 'text-slate-500 italic' : 'text-slate-400'}`}>
+      <span className={`text-xs min-w-0 truncate ${isMedia ? 'text-tx-muted italic' : 'text-tx-secondary'}`}>
         {highlight && !isMedia
           ? <Highlighted text={msg.text ?? ''} term={highlight} />
           : (msg.text ?? '')}
@@ -124,12 +124,12 @@ export default function MessageFeed({
   return (
     <div className="space-y-2">
       {/* Count label */}
-      <p className="text-[10px] text-slate-500">
+      <p className="text-[10px] text-tx-muted">
         {messages.length < total
           ? `${messages.length.toLocaleString()} of ${total.toLocaleString()} messages`
           : `${messages.length.toLocaleString()} messages`}
         {total > messages.length && (
-          <span className="ml-1 text-slate-600">(showing last {messages.length.toLocaleString()})</span>
+          <span className="ml-1 text-tx-muted">(showing last {messages.length.toLocaleString()})</span>
         )}
       </p>
 
@@ -140,7 +140,7 @@ export default function MessageFeed({
         style={{ height }}
       >
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-500 text-sm">No messages</div>
+          <div className="flex items-center justify-center h-full text-tx-muted text-sm">No messages</div>
         ) : (
           messages.map((msg, i) => (
             <MessageRow

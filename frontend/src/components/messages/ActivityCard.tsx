@@ -58,7 +58,7 @@ export default function ActivityCard({
 }: Props) {
   return (
     <div className="bg-app-surface border border-app-border rounded-xl p-4">
-      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">{label}</p>
+      <p className="text-[10px] font-semibold text-tx-muted uppercase tracking-widest mb-2">{label}</p>
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={rows} barCategoryGap="10%">
           <XAxis

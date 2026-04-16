@@ -23,7 +23,12 @@ async function get<T>(url: string): Promise<T> {
 }
 
 export const api = {
-  chats: (): Promise<Chat[]> => get('/api/chats'),
+  chats: (search?: string): Promise<Chat[]> => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    const qs = params.toString()
+    return get(`/api/chats${qs ? `?${qs}` : ''}`)
+  },
   dailyCounts: (): Promise<DayCount[]> => get('/api/stats/daily'),
   overview: (chatId: number): Promise<OverviewData> => get(`/api/chats/${chatId}/overview`),
   timeline: (chatId: number, period: 'daily' | 'monthly'): Promise<TimelinePoint[]> =>

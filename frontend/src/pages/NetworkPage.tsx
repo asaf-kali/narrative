@@ -36,8 +36,8 @@ function nodeColor(node: GraphNode): string {
 function StatRow({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className="text-xs font-semibold text-slate-300 tabular-nums">{value}</span>
+      <span className="text-xs text-tx-muted">{label}</span>
+      <span className="text-xs font-semibold text-tx-secondary tabular-nums">{value}</span>
     </div>
   )
 }
@@ -45,17 +45,17 @@ function StatRow({ label, value }: { label: string; value: number | string }) {
 function TopNode({ rank, node }: { rank: number; node: NetworkNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-slate-600 w-3 shrink-0">{rank}</span>
+      <span className="text-[10px] text-tx-muted w-3 shrink-0">{rank}</span>
       <div className="w-2 h-2 rounded-full shrink-0" style={{ background: CLUSTER_COLORS[node.cluster % CLUSTER_COLORS.length] }} />
-      <span className="text-xs text-slate-300 truncate">{node.label}</span>
-      <span className="text-[10px] text-slate-500 ml-auto shrink-0 tabular-nums">{(node.centrality * 100).toFixed(0)}%</span>
+      <span className="text-xs text-tx-secondary truncate">{node.label}</span>
+      <span className="text-[10px] text-tx-muted ml-auto shrink-0 tabular-nums">{(node.centrality * 100).toFixed(0)}%</span>
     </div>
   )
 }
 
 export default function NetworkPage() {
   const { chatId } = useParams<{ chatId: string }>()
-  const { data: chats = [] } = useQuery({ queryKey: ['chats'], queryFn: api.chats })
+  const { data: chats = [] } = useQuery({ queryKey: ['chats'], queryFn: () => api.chats() })
   const chat = chats.find((c) => c.chat_id === Number(chatId))
 
   const [mode, setMode] = useState<Mode>('coactivity')
@@ -109,8 +109,8 @@ export default function NetworkPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center space-y-1">
-          <p className="text-slate-400 text-sm font-medium">Network analysis is only available for group chats</p>
-          <p className="text-slate-600 text-xs">Direct and broadcast chats don't have enough participants to form a network.</p>
+          <p className="text-tx-secondary text-sm font-medium">Network analysis is only available for group chats</p>
+          <p className="text-tx-muted text-xs">Direct and broadcast chats don't have enough participants to form a network.</p>
         </div>
       </div>
     )
@@ -130,7 +130,7 @@ export default function NetworkPage() {
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   mode === m
                     ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                    : 'bg-app-surface-2 text-slate-400 hover:text-slate-200 border border-app-border'
+                    : 'bg-app-surface-2 text-tx-secondary hover:text-tx-primary border border-app-border'
                 }`}
               >
                 {m === 'coactivity' ? 'Co-activity' : 'Reactions'}
@@ -139,7 +139,7 @@ export default function NetworkPage() {
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs text-slate-500">Min. interactions</span>
+            <span className="text-xs text-tx-muted">Min. interactions</span>
             <input
               type="range"
               min={1}
@@ -148,12 +148,12 @@ export default function NetworkPage() {
               onChange={(e) => setMinWeight(Number(e.target.value))}
               className="w-28 accent-accent"
             />
-            <span className="text-xs text-slate-300 tabular-nums w-5 text-right">{minWeight}</span>
+            <span className="text-xs text-tx-secondary tabular-nums w-5 text-right">{minWeight}</span>
           </div>
 
           <button
             onClick={() => fgRef.current?.zoomToFit(400, 20)}
-            className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+            className="text-[10px] text-tx-muted hover:text-tx-secondary transition-colors"
           >
             Fit
           </button>
@@ -164,7 +164,7 @@ export default function NetworkPage() {
           {isLoading ? (
             <CardSpinner className="h-full" />
           ) : graphData.nodes.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+            <div className="h-full flex items-center justify-center text-tx-muted text-sm">
               No data — try a different mode or lower the min. interactions slider.
             </div>
           ) : (
@@ -202,14 +202,14 @@ export default function NetworkPage() {
       {/* Sidebar */}
       <div className="w-48 shrink-0 flex flex-col gap-3">
         <div className="bg-app-surface border border-app-border rounded-xl p-4 space-y-2">
-          <h3 className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Stats</h3>
+          <h3 className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-3">Stats</h3>
           <StatRow label="Participants" value={data?.nodes.length ?? 0} />
           <StatRow label="Connections" value={graphData.links.length} />
           <StatRow label="Communities" value={data?.communities ?? 0} />
         </div>
 
         <div className="bg-app-surface border border-app-border rounded-xl p-4 flex-1">
-          <h3 className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Most Connected</h3>
+          <h3 className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-3">Most Connected</h3>
           <div className="space-y-2.5">
             {topNodes.map((node, i) => (
               <TopNode key={node.id} rank={i + 1} node={node} />

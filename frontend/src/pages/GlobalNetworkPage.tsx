@@ -52,8 +52,8 @@ function sharedGroups(a: NetworkNode | undefined, b: NetworkNode | undefined): s
 function StatRow({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-xs text-slate-500 shrink-0">{label}</span>
-      <span className="text-xs font-semibold text-slate-300 tabular-nums text-right">{value}</span>
+      <span className="text-xs text-tx-muted shrink-0">{label}</span>
+      <span className="text-xs font-semibold text-tx-secondary tabular-nums text-right">{value}</span>
     </div>
   )
 }
@@ -63,10 +63,10 @@ function NodePanel({ node, onClose }: { node: NetworkNode; onClose: () => void }
     <div className="bg-app-surface border border-app-border rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="text-sm font-semibold text-slate-100 leading-tight">{node.label}</div>
-          <div className="text-[10px] text-slate-500 font-mono mt-0.5">{node.id}</div>
+          <div className="text-sm font-semibold text-tx-primary leading-tight">{node.label}</div>
+          <div className="text-[10px] text-tx-muted font-mono mt-0.5">{node.id}</div>
         </div>
-        <button onClick={onClose} className="text-slate-600 hover:text-slate-400 text-lg leading-none mt-0.5">×</button>
+        <button onClick={onClose} className="text-tx-muted hover:text-tx-secondary text-lg leading-none mt-0.5">×</button>
       </div>
 
       <div className="space-y-1.5">
@@ -77,12 +77,12 @@ function NodePanel({ node, onClose }: { node: NetworkNode; onClose: () => void }
 
       {node.groups.length > 0 && (
         <div>
-          <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
+          <div className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-2">
             Groups ({node.groups.length})
           </div>
           <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
             {node.groups.map((g) => (
-              <div key={g} className="text-[11px] text-slate-400 bg-app-surface-2 rounded px-2 py-0.5 truncate">{g}</div>
+              <div key={g} className="text-[11px] text-tx-secondary bg-app-surface-2 rounded px-2 py-0.5 truncate">{g}</div>
             ))}
           </div>
         </div>
@@ -97,19 +97,19 @@ function EdgePanel({ shared, labelA, labelB, weight, onClose }: {
   return (
     <div className="bg-app-surface border border-app-border rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-xs text-slate-300 leading-snug">
-          <span className="font-semibold text-slate-100">{labelA}</span>
-          <span className="text-slate-500"> & </span>
-          <span className="font-semibold text-slate-100">{labelB}</span>
+        <div className="text-xs text-tx-secondary leading-snug">
+          <span className="font-semibold text-tx-primary">{labelA}</span>
+          <span className="text-tx-muted"> & </span>
+          <span className="font-semibold text-tx-primary">{labelB}</span>
         </div>
-        <button onClick={onClose} className="text-slate-600 hover:text-slate-400 text-lg leading-none shrink-0">×</button>
+        <button onClick={onClose} className="text-tx-muted hover:text-tx-secondary text-lg leading-none shrink-0">×</button>
       </div>
       <StatRow label="Shared groups" value={weight} />
       <div>
-        <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Common groups</div>
+        <div className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-2">Common groups</div>
         <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
           {shared.map((g) => (
-            <div key={g} className="text-[11px] text-slate-400 bg-app-surface-2 rounded px-2 py-0.5 truncate">{g}</div>
+            <div key={g} className="text-[11px] text-tx-secondary bg-app-surface-2 rounded px-2 py-0.5 truncate">{g}</div>
           ))}
         </div>
       </div>
@@ -203,7 +203,7 @@ export default function GlobalNetworkPage() {
               <button key={m} onClick={() => { setMode(m); setMinWeight(m === 'coactivity' ? 1 : 1); setSelection(null) }}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${mode === m
                   ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                  : 'bg-app-surface-2 text-slate-400 hover:text-slate-200 border border-app-border'}`}>
+                  : 'bg-app-surface-2 text-tx-secondary hover:text-tx-primary border border-app-border'}`}>
                 {m === 'coactivity' ? 'Shared groups' : 'Reactions'}
               </button>
             ))}
@@ -212,7 +212,7 @@ export default function GlobalNetworkPage() {
           <label className="flex items-center gap-1.5 cursor-pointer select-none ml-1">
             <input type="checkbox" checked={includeMe} onChange={(e) => { setIncludeMe(e.target.checked); setSelection(null) }}
               className="w-3 h-3 accent-accent" />
-            <span className="text-xs text-slate-400">Include me</span>
+            <span className="text-xs text-tx-secondary">Include me</span>
           </label>
 
           <div className="flex gap-1 ml-1">
@@ -220,21 +220,21 @@ export default function GlobalNetworkPage() {
               <button key={opt.value} onClick={() => { setTimeRange(opt.value); setMinWeight(1); setSelection(null) }}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${timeRange === opt.value
                   ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                  : 'bg-app-surface-2 text-slate-400 hover:text-slate-200 border border-app-border'}`}>
+                  : 'bg-app-surface-2 text-tx-secondary hover:text-tx-primary border border-app-border'}`}>
                 {opt.label}
               </button>
             ))}
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs text-slate-500">Min. shared groups</span>
+            <span className="text-xs text-tx-muted">Min. shared groups</span>
             <input type="range" min={1} max={Math.min(maxWeight, 20)} value={minWeight}
               onChange={(e) => setMinWeight(Number(e.target.value))} className="w-28 accent-accent" />
-            <span className="text-xs text-slate-300 tabular-nums w-4 text-right">{minWeight}</span>
+            <span className="text-xs text-tx-secondary tabular-nums w-4 text-right">{minWeight}</span>
           </div>
 
           <button onClick={() => fgRef.current?.zoomToFit(400, 20)}
-            className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors">
+            className="text-[10px] text-tx-muted hover:text-tx-secondary transition-colors">
             Fit
           </button>
         </div>
@@ -244,7 +244,7 @@ export default function GlobalNetworkPage() {
           {isLoading ? (
             <CardSpinner className="h-full" />
           ) : graphData.nodes.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+            <div className="h-full flex items-center justify-center text-tx-muted text-sm">
               No data — lower the min. shared groups slider.
             </div>
           ) : (
@@ -283,7 +283,7 @@ export default function GlobalNetworkPage() {
       {/* Sidebar */}
       <div className="w-52 shrink-0 flex flex-col gap-3 overflow-y-auto">
         <div className="bg-app-surface border border-app-border rounded-xl p-4 space-y-1.5 shrink-0">
-          <h3 className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Stats</h3>
+          <h3 className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-3">Stats</h3>
           <StatRow label="Contacts" value={data?.nodes.length.toLocaleString() ?? '—'} />
           <StatRow label="Visible" value={graphData.nodes.length.toLocaleString()} />
           <StatRow label="Connections" value={graphData.links.length.toLocaleString()} />
@@ -303,20 +303,20 @@ export default function GlobalNetworkPage() {
 
         {!selection && (
           <div className="bg-app-surface border border-app-border rounded-xl p-4 flex-1">
-            <h3 className="text-[9px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Most Connected</h3>
+            <h3 className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-3">Most Connected</h3>
             <div className="space-y-2.5">
               {topNodes.map((node, i) => (
                 <div key={node.id} className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-600 w-3 shrink-0">{i + 1}</span>
+                  <span className="text-[10px] text-tx-muted w-3 shrink-0">{i + 1}</span>
                   <div className="w-2 h-2 rounded-full shrink-0" style={{ background: clusterColor(node.cluster) }} />
-                  <span className="text-xs text-slate-300 truncate">{node.label}</span>
-                  <span className="text-[10px] text-slate-500 ml-auto shrink-0 tabular-nums">
+                  <span className="text-xs text-tx-secondary truncate">{node.label}</span>
+                  <span className="text-[10px] text-tx-muted ml-auto shrink-0 tabular-nums">
                     {node.groups.length}g
                   </span>
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-slate-600 mt-4">Click a node or edge for details.</p>
+            <p className="text-[10px] text-tx-muted mt-4">Click a node or edge for details.</p>
           </div>
         )}
       </div>

@@ -1,27 +1,32 @@
 import { useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import logo from '../assets/logo.png'
-import type { Chat } from '../api/types'
-
-interface Props { chats: Chat[]; isLoading: boolean }
+import { api } from '../api/client'
+import { useDebounce } from '../hooks/useDebounce'
 
 const TYPE_ICONS: Record<string, string> = { group: '⬡', direct: '◎', broadcast: '◈' }
 
-export default function Sidebar({ chats, isLoading }: Props) {
+export default function Sidebar() {
   const [search, setSearch] = useState('')
   const [hideEmpty, setHideEmpty] = useState(true)
-  const filtered = chats.filter((c) => {
-    if (hideEmpty && c.message_count === 0) return false
-    return c.display_name.toLowerCase().includes(search.toLowerCase())
+  const debouncedSearch = useDebounce(search, 300)
+
+  const { data: chats = [], isLoading } = useQuery({
+    queryKey: ['chats', debouncedSearch],
+    queryFn: () => api.chats(debouncedSearch || undefined),
+    staleTime: 30_000,
   })
 
+  const filtered = hideEmpty ? chats.filter((c) => c.message_count > 0) : chats
+
   return (
-    <aside className="w-64 bg-[#06070c] border-r border-app-border flex flex-col flex-shrink-0 h-full">
+    <aside className="w-64 bg-app-sidebar border-r border-app-border flex flex-col flex-shrink-0 h-full">
       {/* Brand */}
       <div className="px-5 py-5 border-b border-app-border">
         <Link to="/" className="flex items-center gap-2.5 group">
           <img src={logo} alt="Narrative" className="h-7" />
-          <span className="font-semibold text-sm text-slate-100 tracking-tight">Narrative</span>
+          <span className="font-semibold text-sm text-tx-primary tracking-tight">Narrative</span>
         </Link>
         <div className="mt-3.5 relative">
           <svg className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-app-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -32,7 +37,7 @@ export default function Sidebar({ chats, isLoading }: Props) {
             placeholder="Search chats…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-app-surface border border-app-border rounded-lg pl-8 pr-3 py-2 text-xs text-slate-300 placeholder-app-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all"
+            className="w-full bg-app-surface border border-app-border rounded-lg pl-8 pr-3 py-2 text-xs text-tx-secondary placeholder-app-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all"
           />
         </div>
       </div>
@@ -69,8 +74,8 @@ export default function Sidebar({ chats, isLoading }: Props) {
             className={({ isActive }) =>
               `flex items-center gap-2.5 px-3 py-2 rounded-md mb-0.5 text-xs transition-all group relative ${
                 isActive
-                  ? 'bg-accent/10 text-slate-100 border-l-2 border-accent pl-[10px]'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border-l-2 border-transparent pl-[10px]'
+                  ? 'bg-accent/10 text-tx-primary border-l-2 border-accent pl-[10px]'
+                  : 'text-tx-secondary hover:text-tx-primary hover:bg-app-hover border-l-2 border-transparent pl-[10px]'
               }`
             }
           >

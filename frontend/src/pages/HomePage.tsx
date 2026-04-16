@@ -90,8 +90,8 @@ export default function HomePage() {
   return (
     <div className="max-w-5xl space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-100">All Chats</h2>
-        <p className="text-xs text-slate-500 mt-1">Activity across all conversations</p>
+        <h2 className="text-xl font-bold text-tx-primary">All Chats</h2>
+        <p className="text-xs text-tx-muted mt-1">Activity across all conversations</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -102,7 +102,7 @@ export default function HomePage() {
 
       <div className="bg-app-surface border border-app-border rounded-xl p-5">
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex-shrink-0">Message Activity</h3>
+          <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest flex-shrink-0">Message Activity</h3>
 
           {/* Preset chips */}
           <div className="flex gap-1.5">
@@ -113,7 +113,7 @@ export default function HomePage() {
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   range === r.value
                     ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                    : 'bg-app-surface-2 text-slate-400 hover:text-slate-200 border border-app-border'
+                    : 'bg-app-surface-2 text-tx-secondary hover:text-tx-primary border border-app-border'
                 }`}
               >
                 {r.label}
@@ -128,7 +128,7 @@ export default function HomePage() {
               onChange={(v) => handleCustomChange(v, customTo)}
               isInvalid={(!!customFrom && !DATETIME_RE.test(customFrom)) || rangeInvalid}
             />
-            <span className={rangeInvalid ? 'text-red-400' : 'text-slate-500'}>→</span>
+            <span className={rangeInvalid ? 'text-red-400' : 'text-tx-muted'}>→</span>
             <DatetimeInput
               value={customTo}
               onChange={(v) => handleCustomChange(customFrom, v)}
@@ -157,11 +157,11 @@ export default function HomePage() {
 function StatCard({ label, value, sub, icon }: { label: string; value: string; sub?: string; icon: string }) {
   return (
     <div className="bg-app-surface border border-app-border rounded-xl p-4">
-      <div className="text-[11px] text-slate-400 mb-1.5">
+      <div className="text-[11px] text-tx-secondary mb-1.5">
         {icon} {label}
       </div>
-      <div className="text-2xl font-bold text-slate-100 tabular-nums">{value}</div>
-      {sub && <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>}
+      <div className="text-2xl font-bold text-tx-primary tabular-nums">{value}</div>
+      {sub && <div className="text-[11px] text-tx-muted mt-0.5">{sub}</div>}
     </div>
   )
 }

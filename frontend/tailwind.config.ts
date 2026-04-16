@@ -6,11 +6,19 @@ export default {
     extend: {
       colors: {
         app: {
-          bg: '#07080d',
-          surface: '#0d0f17',
-          'surface-2': '#12151f',
-          border: '#1a1d2e',
-          muted: '#374061',
+          bg: 'var(--app-bg)',
+          surface: 'var(--app-surface)',
+          'surface-2': 'var(--app-surface-2)',
+          sidebar: 'var(--app-sidebar)',
+          border: 'var(--app-border)',
+          muted: 'var(--app-muted)',
+          hover: 'var(--app-hover)',
+        },
+        tx: {
+          primary: 'var(--tx-primary)',
+          secondary: 'var(--tx-secondary)',
+          muted: 'var(--tx-muted)',
+          faint: 'var(--tx-faint)',
         },
         accent: {
           DEFAULT: '#7c5af6',

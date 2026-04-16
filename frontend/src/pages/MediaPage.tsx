@@ -41,7 +41,7 @@ export default function MediaPage() {
   return (
     <div className="grid grid-cols-5 gap-4">
       <div className="col-span-2 bg-app-surface border border-app-border rounded-xl p-4">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Media Breakdown</h3>
+        <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Media Breakdown</h3>
         <ResponsiveContainer width="100%" height={280}>
           <PieChart>
             <Pie
@@ -63,7 +63,7 @@ export default function MediaPage() {
         </ResponsiveContainer>
       </div>
       <div className="col-span-3 bg-app-surface border border-app-border rounded-xl p-4">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Media Over Time</h3>
+        <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Media Over Time</h3>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={timelineRows}>
             <XAxis dataKey="month" tick={TICK_STYLE} />

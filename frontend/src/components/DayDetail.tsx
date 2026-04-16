@@ -40,8 +40,8 @@ function dayMessageToFeed(msg: DayMessage): FeedMessage {
 function StatPill({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex items-center gap-2 bg-app-surface-2 border border-app-border rounded-lg px-3 py-2">
-      <span className="text-slate-500 text-xs">{label}</span>
-      <span className="text-slate-200 text-sm font-semibold tabular-nums">
+      <span className="text-tx-muted text-xs">{label}</span>
+      <span className="text-tx-primary text-sm font-semibold tabular-nums">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </span>
     </div>
@@ -125,7 +125,7 @@ export default function DayDetail({ date, onClose }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-app-border">
         <div className="flex items-center gap-4">
-          <span className="text-sm font-semibold text-slate-200">{date}</span>
+          <span className="text-sm font-semibold text-tx-primary">{date}</span>
           {data && (
             <>
               <StatPill label="messages" value={data.total_messages} />
@@ -138,14 +138,14 @@ export default function DayDetail({ date, onClose }: Props) {
             href={`/messages?from=${encodeURIComponent(date + ' 00:00')}&to=${encodeURIComponent(nextDay(date) + ' 00:00')}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-slate-500 hover:text-accent-light transition-colors"
+            className="text-xs text-tx-muted hover:text-accent-light transition-colors"
             title="Open in new window"
           >
             ↗ Open
           </a>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-300 transition-colors text-lg leading-none"
+            className="text-tx-muted hover:text-tx-secondary transition-colors text-lg leading-none"
           >
             ✕
           </button>
@@ -155,7 +155,7 @@ export default function DayDetail({ date, onClose }: Props) {
       {isLoading ? (
         <CardSpinner className="h-64" />
       ) : !data || data.total_messages === 0 ? (
-        <div className="p-8 text-center text-slate-500 text-sm">No messages on this day</div>
+        <div className="p-8 text-center text-tx-muted text-sm">No messages on this day</div>
       ) : (
         <div className="p-5 space-y-4">
           {/* Activity graph card */}

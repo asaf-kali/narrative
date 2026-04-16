@@ -14,15 +14,15 @@ function formatTs(ts: string): string {
 
 function HighlightedSnippet({ text, term }: { text: string; term: string }) {
   const idx = text.toLowerCase().indexOf(term.toLowerCase())
-  if (idx === -1) return <span className="text-slate-400 text-xs truncate">{text}</span>
+  if (idx === -1) return <span className="text-tx-secondary text-xs truncate">{text}</span>
   // Show ~40 chars around the match
   const start = Math.max(0, idx - 30)
   const end = Math.min(text.length, idx + term.length + 30)
   const snippet = (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '')
   const snipIdx = snippet.indexOf(term.toLowerCase() === text.slice(idx, idx + term.length).toLowerCase() ? text.slice(idx, idx + term.length) : term)
-  if (snipIdx === -1) return <span className="text-slate-400 text-xs">{snippet}</span>
+  if (snipIdx === -1) return <span className="text-tx-secondary text-xs">{snippet}</span>
   return (
-    <span className="text-slate-400 text-xs">
+    <span className="text-tx-secondary text-xs">
       {snippet.slice(0, snipIdx)}
       <mark className="bg-accent/30 text-accent-light rounded-sm px-0.5 not-italic">
         {snippet.slice(snipIdx, snipIdx + term.length)}
@@ -36,17 +36,17 @@ function ResultRow({ result, term, onSelect }: { result: SearchResult; term: str
   return (
     <button
       onClick={onSelect}
-      className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-white/[0.04] transition-colors text-left"
+      className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-app-hover transition-colors text-left"
     >
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-medium text-slate-200 truncate">{result.chat_name}</span>
-          <span className="text-[10px] text-slate-500 flex-shrink-0">·</span>
-          <span className="text-[11px] text-slate-400 flex-shrink-0">{result.sender_name}</span>
+          <span className="text-xs font-medium text-tx-primary truncate">{result.chat_name}</span>
+          <span className="text-[10px] text-tx-muted flex-shrink-0">·</span>
+          <span className="text-[11px] text-tx-secondary flex-shrink-0">{result.sender_name}</span>
         </div>
         <HighlightedSnippet text={result.text} term={term} />
       </div>
-      <span className="text-[10px] text-slate-600 flex-shrink-0 mt-0.5">{formatTs(result.timestamp)}</span>
+      <span className="text-[10px] text-tx-muted flex-shrink-0 mt-0.5">{formatTs(result.timestamp)}</span>
     </button>
   )
 }
@@ -108,19 +108,19 @@ export default function GlobalSearch({ open, onClose }: Props) {
         <div className="bg-app-surface border border-app-border rounded-xl shadow-2xl overflow-hidden">
           {/* Input */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-app-border">
-            <span className="text-slate-400 text-base flex-shrink-0">⌕</span>
+            <span className="text-tx-secondary text-base flex-shrink-0">⌕</span>
             <input
               ref={inputRef}
               type="text"
               placeholder="Search all messages…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-slate-200 placeholder-slate-600 focus:outline-none"
+              className="flex-1 bg-transparent text-sm text-tx-primary placeholder-tx-muted focus:outline-none"
             />
             {isFetching && (
-              <span className="text-[10px] text-slate-500 flex-shrink-0">searching…</span>
+              <span className="text-[10px] text-tx-muted flex-shrink-0">searching…</span>
             )}
-            <kbd className="text-[10px] text-slate-600 border border-app-border rounded px-1.5 py-0.5 flex-shrink-0">
+            <kbd className="text-[10px] text-tx-muted border border-app-border rounded px-1.5 py-0.5 flex-shrink-0">
               Esc
             </kbd>
           </div>
@@ -128,16 +128,16 @@ export default function GlobalSearch({ open, onClose }: Props) {
           {/* Results */}
           <div className="max-h-96 overflow-y-auto">
             {!showResults ? (
-              <p className="px-4 py-6 text-center text-slate-600 text-xs">
+              <p className="px-4 py-6 text-center text-tx-muted text-xs">
                 Type at least {MIN_LEN} characters to search
               </p>
             ) : noResults ? (
-              <p className="px-4 py-6 text-center text-slate-500 text-sm">
+              <p className="px-4 py-6 text-center text-tx-muted text-sm">
                 No results for "{query}"
               </p>
             ) : (
               <>
-                <p className="px-4 pt-2 pb-1 text-[10px] text-slate-600">
+                <p className="px-4 pt-2 pb-1 text-[10px] text-tx-muted">
                   {results.length} result{results.length !== 1 ? 's' : ''}
                   {results.length === 50 ? ' (showing first 50)' : ''}
                 </p>

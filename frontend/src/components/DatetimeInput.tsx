@@ -48,7 +48,7 @@ export default function DatetimeInput({ value, onChange, isInvalid = false, plac
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onClick={() => pickerRef.current?.showPicker()}
-        className={`bg-app-surface-2 border rounded px-2 py-1.5 text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-1 w-40 cursor-pointer ${borderClass}`}
+        className={`bg-app-surface-2 border rounded px-2 py-1.5 text-tx-secondary placeholder-tx-muted focus:outline-none focus:ring-1 w-40 cursor-pointer ${borderClass}`}
       />
       <input
         ref={pickerRef}

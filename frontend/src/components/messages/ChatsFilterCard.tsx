@@ -29,11 +29,11 @@ export default function ChatsFilterCard({ chatNames, activeChats, colorMap, onTo
     <div className="bg-app-surface border border-app-border rounded-xl p-4 space-y-2.5">
       {/* Header row */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-slate-500 uppercase tracking-widest">Chats</span>
+        <span className="text-[10px] text-tx-muted uppercase tracking-widest">Chats</span>
         {activeChats.size > 0 && (
           <button
             onClick={onClear}
-            className="ml-auto text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+            className="ml-auto text-[11px] text-tx-muted hover:text-tx-secondary transition-colors"
           >
             Clear
           </button>
@@ -42,18 +42,18 @@ export default function ChatsFilterCard({ chatNames, activeChats, colorMap, onTo
 
       {/* Search input */}
       <div className="relative">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none">⌕</span>
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-tx-muted text-xs pointer-events-none">⌕</span>
         <input
           type="text"
           placeholder="Search chats…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full bg-app-surface-2 border border-app-border rounded-lg pl-7 pr-7 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+          className="w-full bg-app-surface-2 border border-app-border rounded-lg pl-7 pr-7 py-1.5 text-xs text-tx-secondary placeholder-tx-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
         />
         {query && (
           <button
             onClick={() => setQuery('')}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-tx-muted hover:text-tx-secondary text-xs"
           >
             ✕
           </button>
@@ -69,7 +69,7 @@ export default function ChatsFilterCard({ chatNames, activeChats, colorMap, onTo
             className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border truncate max-w-[160px] ${
               activeChats.has(chat)
                 ? 'border-accent/50 text-accent-light'
-                : 'bg-app-surface-2 border-app-border text-slate-400 hover:text-slate-200'
+                : 'bg-app-surface-2 border-app-border text-tx-secondary hover:text-tx-primary'
             }`}
             style={activeChats.has(chat) ? { backgroundColor: (colorMap.get(chat) ?? '#7c5af6') + '22' } : undefined}
             title={chat}
@@ -78,7 +78,7 @@ export default function ChatsFilterCard({ chatNames, activeChats, colorMap, onTo
           </button>
         ))}
         {visible.length === 0 && (
-          <span className="text-xs text-slate-600">No matches for "{query}"</span>
+          <span className="text-xs text-tx-muted">No matches for "{query}"</span>
         )}
       </div>
     </div>

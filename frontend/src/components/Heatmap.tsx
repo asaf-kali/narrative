@@ -24,7 +24,7 @@ export default function Heatmap({ data }: Props) {
           <tr>
             <th className="w-24" />
             {HOURS.map((h) => (
-              <th key={h} className="text-center text-slate-500 font-normal pb-1 w-8">
+              <th key={h} className="text-center text-tx-muted font-normal pb-1 w-8">
                 {h % 4 === 0 ? `${h}h` : ''}
               </th>
             ))}
@@ -33,7 +33,7 @@ export default function Heatmap({ data }: Props) {
         <tbody>
           {DAYS.map((day) => (
             <tr key={day}>
-              <td className="text-slate-500 pr-2 text-right whitespace-nowrap">{day.slice(0, 3)}</td>
+              <td className="text-tx-muted pr-2 text-right whitespace-nowrap">{day.slice(0, 3)}</td>
               {HOURS.map((hour) => {
                 const count = lookup.get(`${day}-${hour}`) ?? 0
                 return (

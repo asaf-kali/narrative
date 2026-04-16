@@ -25,7 +25,7 @@ export default function ParticipantsPage() {
   return (
     <div className="space-y-4">
       <div className="bg-app-surface border border-app-border rounded-xl p-4">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Message Distribution</h3>
+        <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Message Distribution</h3>
         <ResponsiveContainer width="100%" height={Math.max(200, data.length * 36)}>
           <BarChart data={data} layout="vertical">
             <XAxis type="number" tick={TICK_STYLE} />
@@ -41,12 +41,12 @@ export default function ParticipantsPage() {
       </div>
 
       <div className="bg-app-surface border border-app-border rounded-xl p-4 overflow-x-auto">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Detailed Stats</h3>
+        <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Detailed Stats</h3>
         <table className="w-full text-xs">
           <thead>
             <tr className="text-left border-b border-app-border">
               {['Name', 'Messages', '%', 'Words', 'Avg words', 'Media', 'Audio'].map((h) => (
-                <th key={h} className="py-2 pr-4 text-slate-500 font-medium">
+                <th key={h} className="py-2 pr-4 text-tx-muted font-medium">
                   {h}
                 </th>
               ))}
@@ -54,14 +54,14 @@ export default function ParticipantsPage() {
           </thead>
           <tbody>
             {data.map((p, i) => (
-              <tr key={i} className="border-b border-app-border/50 hover:bg-white/[0.02] transition-colors">
-                <td className="py-2.5 pr-4 font-medium text-slate-200">{p.sender_name}</td>
-                <td className="py-2.5 pr-4 tabular-nums text-slate-300">{p.messages.toLocaleString()}</td>
-                <td className="py-2.5 pr-4 tabular-nums text-slate-400">{p.pct}%</td>
-                <td className="py-2.5 pr-4 tabular-nums text-slate-400">{Number(p.words).toLocaleString()}</td>
-                <td className="py-2.5 pr-4 tabular-nums text-slate-400">{p.avg_words}</td>
-                <td className="py-2.5 pr-4 tabular-nums text-slate-400">{p.media}</td>
-                <td className="py-2.5 pr-4 tabular-nums text-slate-400">{p.audio}</td>
+              <tr key={i} className="border-b border-app-border/50 hover:bg-app-hover transition-colors">
+                <td className="py-2.5 pr-4 font-medium text-tx-primary">{p.sender_name}</td>
+                <td className="py-2.5 pr-4 tabular-nums text-tx-secondary">{p.messages.toLocaleString()}</td>
+                <td className="py-2.5 pr-4 tabular-nums text-tx-secondary">{p.pct}%</td>
+                <td className="py-2.5 pr-4 tabular-nums text-tx-secondary">{Number(p.words).toLocaleString()}</td>
+                <td className="py-2.5 pr-4 tabular-nums text-tx-secondary">{p.avg_words}</td>
+                <td className="py-2.5 pr-4 tabular-nums text-tx-secondary">{p.media}</td>
+                <td className="py-2.5 pr-4 tabular-nums text-tx-secondary">{p.audio}</td>
               </tr>
             ))}
           </tbody>

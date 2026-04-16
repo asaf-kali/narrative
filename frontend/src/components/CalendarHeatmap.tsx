@@ -1,4 +1,5 @@
 import type { DayCount } from '../api/types'
+import { useTheme } from '../context/ThemeContext'
 
 interface Props {
   data: DayCount[]
@@ -71,20 +72,22 @@ function buildGrid(data: DayCount[]): { weeks: Cell[][]; monthLabels: { label: s
   return { weeks, monthLabels }
 }
 
-function cellColor(count: number, max: number, isSelected: boolean): string {
+function cellColor(count: number, max: number, isSelected: boolean, emptyColor: string): string {
   if (isSelected) return '#7c5af6'
-  if (count === 0) return '#12151f'
+  if (count === 0) return emptyColor
   const t = Math.sqrt(count / max)
   const alpha = 0.15 + t * 0.85
   return `rgba(124, 90, 246, ${alpha.toFixed(2)})`
 }
 
 export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Props) {
+  const { theme } = useTheme()
+  const emptyColor = theme === 'light' ? '#e8edf5' : '#181c2a'
   const { weeks, monthLabels } = buildGrid(data)
   const max = Math.max(...data.map((d) => d.count), 1)
 
   if (weeks.length === 0) {
-    return <div className="text-slate-500 text-sm text-center py-8">No data</div>
+    return <div className="text-tx-muted text-sm text-center py-8">No data</div>
   }
 
   return (
@@ -94,7 +97,7 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
         {weeks.map((_, wi) => {
           const label = monthLabels.find((m) => m.colIndex === wi)
           return (
-            <div key={wi} className="text-xs text-slate-500 flex-shrink-0" style={{ width: '14px', marginRight: '2px' }}>
+            <div key={wi} className="text-xs text-tx-muted flex-shrink-0" style={{ width: '14px', marginRight: '2px' }}>
               {label ? label.label : ''}
             </div>
           )
@@ -108,7 +111,7 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
           {DAYS.map((d, i) => (
             <div
               key={d}
-              className="text-xs text-slate-500 flex items-center justify-end pr-1"
+              className="text-xs text-tx-muted flex items-center justify-end pr-1"
               style={{ height: '14px', marginBottom: '2px', width: '2rem', visibility: i % 2 === 0 ? 'visible' : 'hidden' }}
             >
               {d}
@@ -129,7 +132,7 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
                   width: '14px',
                   height: '14px',
                   marginBottom: '2px',
-                  backgroundColor: cell.date ? cellColor(cell.count, max, cell.date === selectedDate) : 'transparent',
+                  backgroundColor: cell.date ? cellColor(cell.count, max, cell.date === selectedDate, emptyColor) : 'transparent',
                 }}
               />
             ))}
@@ -138,13 +141,13 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-1 mt-3 justify-end text-xs text-slate-500">
+      <div className="flex items-center gap-1 mt-3 justify-end text-xs text-tx-muted">
         <span>Less</span>
         {[0, 0.2, 0.4, 0.7, 1].map((t) => (
           <div
             key={t}
             className="w-3 h-3 rounded-sm"
-            style={{ backgroundColor: t === 0 ? '#12151f' : cellColor(Math.ceil(t * max), max, false) }}
+            style={{ backgroundColor: t === 0 ? emptyColor : cellColor(Math.ceil(t * max), max, false, emptyColor) }}
           />
         ))}
         <span>More</span>

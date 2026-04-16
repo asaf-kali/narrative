@@ -11,10 +11,10 @@ const TICK_STYLE = { fill: '#64748b', fontSize: 11 }
 function StatCard({ icon, label, value }: { icon: string; label: string; value: string | number }) {
   return (
     <div className="bg-app-surface border border-app-border rounded-xl p-4">
-      <div className="text-[11px] text-slate-400 mb-1.5">
+      <div className="text-[11px] text-tx-secondary mb-1.5">
         {icon} {label}
       </div>
-      <div className="text-2xl font-bold text-slate-100 tabular-nums">
+      <div className="text-2xl font-bold text-tx-primary tabular-nums">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </div>
     </div>
@@ -44,7 +44,7 @@ export default function OverviewPage() {
       </div>
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2 bg-app-surface border border-app-border rounded-xl p-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Activity</h3>
+          <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Activity</h3>
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={data.sparkline}>
               <XAxis dataKey="date" tick={TICK_STYLE} tickFormatter={(v: string) => v.slice(0, 7)} interval="preserveStartEnd" />
@@ -63,7 +63,7 @@ export default function OverviewPage() {
           </ResponsiveContainer>
         </div>
         <div className="bg-app-surface border border-app-border rounded-xl p-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Message Types</h3>
+          <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Message Types</h3>
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie
