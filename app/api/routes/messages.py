@@ -129,11 +129,20 @@ def get_senders(request: Request) -> list[dict[str, Any]]:
 
 
 def _build_sender_id_series(df: pd.DataFrame) -> pd.Series:
-    """Derive sender_id per row: 'me' if from_me, else phone or sender_name as fallback."""
+    """Derive sender_id per row: 'me' if from_me, else phone or sender_name as fallback.
+
+    For 1-on-1 received messages sender_phone is empty — use chat_phone so the same
+    person gets the same sender_id whether they appear in a 1-on-1 or group chat.
+    """
     phone_col = df["sender_phone"].fillna("").astype(str)
+    chat_phone_col = df["chat_phone"].fillna("").astype(str)
     name_col = df["sender_name"].astype(str)
-    fallback = phone_col.where(phone_col != "", name_col)
-    return fallback.mask(df["from_me"] == 1, "me")
+    effective_phone = phone_col.where(
+        (phone_col != "") | df["is_group"] | (df["from_me"] == 1),
+        chat_phone_col,
+    )
+    sender_id = effective_phone.where(effective_phone != "", name_col)
+    return sender_id.mask(df["from_me"] == 1, "me")
 
 
 def _to_ts(dt: datetime) -> pd.Timestamp:

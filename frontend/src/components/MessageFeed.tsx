@@ -18,9 +18,6 @@ export function buildChatColorMap(chats: string[]): Map<string, string> {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function shortName(name: string, max = 20): string {
-  return name.length > max ? name.slice(0, max - 1) + '…' : name
-}
 
 function formatTime(ts: string, dayOnly: boolean): string {
   if (dayOnly) return ts.slice(11, 16)
@@ -67,12 +64,12 @@ function MessageRow({ msg, chatColor, dayOnly, showChat, highlight, onChatClick,
       </span>
       {showChat && (
         <span
-          className={`text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0 max-w-[140px] truncate ${onChatClick ? 'cursor-pointer hover:brightness-125' : ''}`}
+          className={`text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0 w-[140px] truncate ${onChatClick ? 'cursor-pointer hover:brightness-125' : ''}`}
           style={{ backgroundColor: chatColor + '22', color: chatColor }}
           title={msg.chat_name}
           onClick={onChatClick ? () => onChatClick(String(msg.chat_id)) : undefined}
         >
-          {shortName(msg.chat_name, 18)}
+          {msg.chat_name}
         </span>
       )}
       <span
