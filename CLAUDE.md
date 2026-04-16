@@ -35,6 +35,13 @@ mypy runs via `uv run dmypy run .` (daemon).
 
 For production: `just frontend-build` then `just run --msgstore data/msgstore.db`
 
+## UI Testing with Playwright
+
+The Playwright plugin is available for browser-based UI verification. Use it to screenshot pages and confirm visual correctness after frontend changes.
+
+- Requires `/opt/google/chrome/chrome` — symlinked to the Chromium binary at `~/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome`
+- Dev server must be running on `localhost:5173` before navigating
+
 ## WhatsApp DB Schema Notes
 
 The real schema varies by WhatsApp version. Queries in `app/db/queries/` are written defensively. Key `message_type` values:

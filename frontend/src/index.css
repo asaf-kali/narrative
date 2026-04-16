@@ -11,12 +11,12 @@
   --app-surface-2: #181c2a;
   --app-sidebar: #0a0c14;
   --app-border: #252b40;
-  --app-muted: #6b7db3;
+  --app-muted: #8a9bc8;
   --app-hover: rgba(255,255,255,0.05);
-  --tx-primary: #e2e8f0;
-  --tx-secondary: #94a3b8;
-  --tx-muted: #64748b;
-  --tx-faint: #475569;
+  --tx-primary: #edf2f7;
+  --tx-secondary: #adb9cc;
+  --tx-muted: #8294ab;
+  --tx-faint: #647a96;
   --scrollbar-thumb: #252b40;
   --scrollbar-thumb-hover: #323a58;
 }
