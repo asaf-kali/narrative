@@ -44,11 +44,16 @@ frontend-dev:
 
 # Backend
 
+backend *args:
+    PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
+
 backend-dev *args:
-    PYTHONPATH=app {{ RUN }} python app/main.py --reload {{ args }}
+    just backend {{ args }} --reload
+
+# Run
 
 run *args: frontend-build
-    PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
+    just backend {{ args }}
 
 run-dev *args:
     just backend-dev {{ args }} & just frontend-dev
