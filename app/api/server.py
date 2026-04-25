@@ -21,8 +21,8 @@ def create_api(
 ) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
-        from db.connection import DBConnection  # noqa: PLC0415
-        from db.contacts import build_sender_registry  # noqa: PLC0415
+        from db.connection import DBConnection  # noqa: PLC0415  # ty: ignore[unresolved-import]
+        from db.contacts import build_sender_registry  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
         app.state.msgstore_path = msgstore_path
         app.state.wadb_path = wadb_path
@@ -45,7 +45,7 @@ def create_api(
         allow_headers=["*"],
     )
 
-    from api.routes import analysis, chats, day, messages, range_detail, search, stats  # noqa: PLC0415
+    from api.routes import analysis, chats, day, messages, range_detail, search, stats  # ty: ignore[unresolved-import]  # noqa: I001, PLC0415
 
     app.include_router(chats.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")

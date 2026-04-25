@@ -1,8 +1,8 @@
 import logging
 from pathlib import Path
 
-from db.loaders import open_connection
-from db.queries.stats import fetch_daily_counts
+from db.loaders import open_connection  # ty: ignore[unresolved-import]
+from db.queries.stats import fetch_daily_counts  # ty: ignore[unresolved-import]
 from fastapi import APIRouter, Request
 
 logger = logging.getLogger(__name__)

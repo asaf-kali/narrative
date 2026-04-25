@@ -7,7 +7,7 @@ import logging
 import os
 from pathlib import Path
 
-from api.server import create_api
+from api.server import create_api  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 

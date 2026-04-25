@@ -114,7 +114,7 @@ All processing is local. No data is sent to any external service.
             log_config=_UVICORN_LOG_CONFIG,
         )
     else:
-        from api.server import create_api  # noqa: PLC0415
+        from api.server import create_api  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
         api = create_api(
             msgstore_path=parsed.msgstore,

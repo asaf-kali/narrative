@@ -3,7 +3,7 @@ import sqlite3
 from collections.abc import Generator
 from datetime import datetime
 
-from db.row_types import RawRangeMessageRow
+from db.row_types import RawRangeMessageRow  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 

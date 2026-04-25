@@ -11,7 +11,7 @@ import random
 
 import numpy as np
 import pandas as pd
-from models.config import AnalysisConfig
+from models.config import AnalysisConfig  # ty: ignore[unresolved-import]
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)

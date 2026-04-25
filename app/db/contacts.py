@@ -4,7 +4,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from models.sender import SenderRegistry
+from models.sender import SenderRegistry  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 

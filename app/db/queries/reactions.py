@@ -2,7 +2,7 @@ import logging
 import sqlite3
 from collections.abc import Generator
 
-from db.row_types import RawReactionRow
+from db.row_types import RawReactionRow  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 

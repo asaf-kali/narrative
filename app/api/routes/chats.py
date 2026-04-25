@@ -2,10 +2,10 @@ import logging
 from pathlib import Path
 from typing import Annotated
 
-from db.loaders import DataLoader, open_connection
+from db.loaders import DataLoader, open_connection  # ty: ignore[unresolved-import]
 from fastapi import APIRouter, Query, Request
-from models.chat import ChatSummary
-from models.sender import SenderRegistry
+from models.chat import ChatSummary  # ty: ignore[unresolved-import]
+from models.sender import SenderRegistry  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

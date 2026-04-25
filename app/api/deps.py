@@ -3,12 +3,12 @@ import threading
 from pathlib import Path
 from typing import cast
 
-import cache
+import cache  # ty: ignore[unresolved-import]
 import pandas as pd
-from db.loaders import DataLoader, open_connection
+from db.loaders import DataLoader, open_connection  # ty: ignore[unresolved-import]
 from fastapi import Request
-from models.config import AnalysisConfig
-from models.sender import SenderRegistry
+from models.config import AnalysisConfig  # ty: ignore[unresolved-import]
+from models.sender import SenderRegistry  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 

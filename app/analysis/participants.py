@@ -1,9 +1,9 @@
 import logging
 
 import pandas as pd
-from analysis.base import analysis
-from models.config import AnalysisConfig
-from models.message import AUDIO_TYPES, MEDIA_TYPES
+from analysis.base import analysis  # ty: ignore[unresolved-import]
+from models.config import AnalysisConfig  # ty: ignore[unresolved-import]
+from models.message import AUDIO_TYPES, MEDIA_TYPES  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ def per_sender_stats(df: pd.DataFrame, config: AnalysisConfig) -> pd.DataFrame:
     text_mask = df["text_data"].notna()
 
     stats: pd.DataFrame = (
-        df.groupby("sender_name")  # type: ignore[call-overload]
+        df.groupby("sender_name")  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]
         .apply(
             lambda g: pd.Series(
                 {

@@ -1,11 +1,11 @@
 import logging
 from pathlib import Path
 
-from db.loaders import open_connection
-from db.queries.day import fetch_day_messages
+from db.loaders import open_connection  # ty: ignore[unresolved-import]
+from db.queries.day import fetch_day_messages  # ty: ignore[unresolved-import]
 from fastapi import APIRouter, HTTPException, Request
-from models.message import MessageType
-from models.sender import GROUP_SERVER, SenderRegistry
+from models.message import MessageType  # ty: ignore[unresolved-import]
+from models.sender import GROUP_SERVER, SenderRegistry  # ty: ignore[unresolved-import]
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)

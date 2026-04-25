@@ -1,4 +1,4 @@
-import logging
+import logging  # noqa: I001
 import subprocess
 from base64 import b64encode
 from datetime import datetime
@@ -7,16 +7,16 @@ from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
-from analysis.content import build_word_cloud_text, emoji_counts, word_frequencies
-from analysis.media import media_breakdown, media_over_time
-from analysis.network import NetworkGraph, build_coactivity_graph, build_global_graph, build_reaction_graph
-from analysis.participants import per_sender_stats
-from analysis.timeline import active_days_count, daily_timeline, hourly_heatmap, monthly_timeline
-from api.deps import get_df
-from db.loaders import DataLoader, open_connection
+from analysis.content import build_word_cloud_text, emoji_counts, word_frequencies  # ty: ignore[unresolved-import]
+from analysis.media import media_breakdown, media_over_time  # ty: ignore[unresolved-import]
+from analysis.network import NetworkGraph, build_coactivity_graph, build_global_graph, build_reaction_graph  # ty: ignore[unresolved-import]
+from analysis.participants import per_sender_stats  # ty: ignore[unresolved-import]
+from analysis.timeline import active_days_count, daily_timeline, hourly_heatmap, monthly_timeline  # ty: ignore[unresolved-import]
+from api.deps import get_df  # ty: ignore[unresolved-import]
+from db.loaders import DataLoader, open_connection  # ty: ignore[unresolved-import]
 from fastapi import APIRouter, Request
-from models.config import AnalysisConfig
-from models.message import AUDIO_TYPES, MEDIA_TYPES, MessageType
+from models.config import AnalysisConfig  # ty: ignore[unresolved-import]
+from models.message import AUDIO_TYPES, MEDIA_TYPES, MessageType  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

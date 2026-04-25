@@ -2,11 +2,11 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
-from db.loaders import open_connection
-from db.queries.range import fetch_range_messages
+from db.loaders import open_connection  # ty: ignore[unresolved-import]
+from db.queries.range import fetch_range_messages  # ty: ignore[unresolved-import]
 from fastapi import APIRouter, Request
-from models.message import MessageType
-from models.sender import GROUP_SERVER, SenderRegistry
+from models.message import MessageType  # ty: ignore[unresolved-import]
+from models.sender import GROUP_SERVER, SenderRegistry  # ty: ignore[unresolved-import]
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)

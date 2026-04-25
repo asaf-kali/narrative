@@ -3,15 +3,15 @@ import logging
 from pathlib import Path
 
 import pandas as pd
-from db.connection import DBConnection
-from db.queries.calls import fetch_calls
-from db.queries.chats import fetch_chats
-from db.queries.messages import fetch_all_messages, fetch_messages_for_chat
-from db.queries.reactions import fetch_reactions
-from db.row_types import RawChatRow, RawMessageRow
-from models.chat import ChatSummary, ChatType
-from models.config import AnalysisConfig
-from models.sender import BROADCAST_SERVER, GROUP_SERVER, SenderRegistry
+from db.connection import DBConnection  # ty: ignore[unresolved-import]
+from db.queries.calls import fetch_calls  # ty: ignore[unresolved-import]
+from db.queries.chats import fetch_chats  # ty: ignore[unresolved-import]
+from db.queries.messages import fetch_all_messages, fetch_messages_for_chat  # ty: ignore[unresolved-import]
+from db.queries.reactions import fetch_reactions  # ty: ignore[unresolved-import]
+from db.row_types import RawChatRow, RawMessageRow  # ty: ignore[unresolved-import]
+from models.chat import ChatSummary, ChatType  # ty: ignore[unresolved-import]
+from models.config import AnalysisConfig  # ty: ignore[unresolved-import]
+from models.sender import BROADCAST_SERVER, GROUP_SERVER, SenderRegistry  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,7 @@ def _rows_to_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) ->
     chat_subject = df["chat_subject"].fillna("")
     is_broadcast = df["chat_server"] == BROADCAST_SERVER
 
-    group_fallback = "Group (" + chat_phone_col + ")"
+    group_fallback = "Group (" + chat_phone_col + ")"  # ty: ignore[unsupported-operator]
     chat_name = chat_phone_col.map(contacts).fillna(chat_phone_col)  # direct default
     chat_name = chat_name.where(~is_grp, chat_subject.where(chat_subject != "", group_fallback))
     chat_name = chat_name.where(~is_broadcast, chat_subject.where(chat_subject != "", "Broadcast"))
@@ -145,7 +145,7 @@ def _rows_to_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) ->
 
 def _apply_config_filters(df: pd.DataFrame, config: AnalysisConfig) -> pd.DataFrame:
     if config.exclude_system:
-        from models.message import MessageType  # noqa: PLC0415
+        from models.message import MessageType  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
         df = df[df["message_type"] != MessageType.SYSTEM]
 

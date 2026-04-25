@@ -3,10 +3,10 @@ from datetime import UTC, datetime, tzinfo
 from typing import Annotated, Any
 
 import pandas as pd
-from api.deps import get_df
+from api.deps import get_df  # ty: ignore[unresolved-import]
 from fastapi import APIRouter, Query, Request
-from models.config import AnalysisConfig
-from models.message import MessageType
+from models.config import AnalysisConfig  # ty: ignore[unresolved-import]
+from models.message import MessageType  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

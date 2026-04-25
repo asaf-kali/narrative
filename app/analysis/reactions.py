@@ -1,8 +1,8 @@
 import logging
 
 import pandas as pd
-from analysis.base import analysis
-from models.config import AnalysisConfig
+from analysis.base import analysis  # ty: ignore[unresolved-import]
+from models.config import AnalysisConfig  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 

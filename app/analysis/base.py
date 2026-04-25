@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 import pandas as pd
-from models.config import AnalysisConfig
+from models.config import AnalysisConfig  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 
