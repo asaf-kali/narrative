@@ -18,6 +18,7 @@ def create_api(
     wadb_path: Path | None = None,
     contacts_path: Path | None = None,
     local_code: str | None = None,
+    search_dir: Path | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -33,6 +34,15 @@ def create_api(
                 msgstore=db.msgstore,
                 local_code=local_code,
             )
+
+        if search_dir is not None and (search_dir / "lance").exists():
+            from search.embedder import Embedder  # noqa: PLC0415
+            from search.vector_store import VectorStore  # noqa: PLC0415
+
+            app.state.embedder = Embedder()
+            app.state.vector_store = VectorStore.open(search_dir)
+            logger.info(f"Semantic search index loaded from {search_dir}")
+
         logger.info(f"API initialized: msgstore={msgstore_path}")
         yield
 
@@ -45,7 +55,7 @@ def create_api(
         allow_headers=["*"],
     )
 
-    from api.routes import analysis, chats, day, messages, range_detail, search, stats  # noqa: PLC0415
+    from api.routes import analysis, chats, day, messages, range_detail, search, semantic_search, stats  # noqa: PLC0415
 
     app.include_router(chats.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")
@@ -54,6 +64,7 @@ def create_api(
     app.include_router(day.router, prefix="/api")
     app.include_router(range_detail.router, prefix="/api")
     app.include_router(search.router, prefix="/api")
+    app.include_router(semantic_search.router, prefix="/api")
 
     if _DIST.exists():
         logger.info(f"Serving frontend from {_DIST}")

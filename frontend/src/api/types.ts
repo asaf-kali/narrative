@@ -153,6 +153,14 @@ export interface SenderInfo {
   message_count: number
 }
 
+export interface SemanticSearchHit {
+  chat_id: number
+  chat_name: string
+  timestamp_start: string  // ISO 8601 datetime
+  timestamp_end: string    // ISO 8601 datetime
+  score: number
+}
+
 export interface RangeDetail {
   date_from: string
   date_to: string

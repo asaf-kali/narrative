@@ -80,6 +80,12 @@ All processing is local. No data is sent to any external service.
         help="Country code for local-format phone numbers in contacts CSV (e.g. 972). "
         "When set, numbers starting with 0 are converted: '054...' → '<code>54...'",
     )
+    parser.add_argument(
+        "--search-dir",
+        type=Path,
+        default=None,
+        help="Directory containing the semantic search index (optional)",
+    )
     parser.add_argument("--port", type=int, default=8050, help="Port to run on (default: 8050)")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload (development mode)")
@@ -121,6 +127,7 @@ All processing is local. No data is sent to any external service.
             wadb_path=parsed.wadb,
             contacts_path=parsed.contacts,
             local_code=parsed.local_code,
+            search_dir=parsed.search_dir,
         )
         uvicorn.run(api, host=parsed.host, port=parsed.port, log_config=_UVICORN_LOG_CONFIG)
 
