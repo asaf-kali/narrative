@@ -44,9 +44,6 @@ function isoToLocal(iso: string): string {
 function SemanticHitCard({ hit }: { hit: SemanticSearchHit }) {
   const [expanded, setExpanded] = useState(false)
 
-  const dateFrom = hit.timestamp_start.replace('Z', '').replace('T', ' ').slice(0, 16)
-  const dateTo = hit.timestamp_end.replace('Z', '').replace('T', ' ').slice(0, 16)
-
   const { data, isLoading } = useQuery({
     queryKey: ['semantic-hit', hit.chat_id, hit.timestamp_start, hit.timestamp_end],
     queryFn: () =>

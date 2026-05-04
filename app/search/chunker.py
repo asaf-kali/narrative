@@ -42,7 +42,7 @@ def chunk_messages(df: pd.DataFrame, gap_ms: int = _GAP_MS) -> list[Session]:
     sessions: list[Session] = []
 
     for chat_id_val, group in work.groupby("chat_row_id", sort=False):
-        chat_id = int(chat_id_val)
+        chat_id = int(chat_id_val)  # type: ignore[arg-type]
         chat_name: str = str(group["chat_name"].iloc[0])
         timestamps = group["timestamp_ms"].to_numpy()
         msg_ids = group["message_id"].to_numpy()
