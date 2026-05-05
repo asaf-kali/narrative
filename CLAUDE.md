@@ -67,6 +67,8 @@ Contact name resolution order: `wa_contacts.display_name` → `jid.user` (phone 
 
 Ruff runs `select = ["ALL"]` with a targeted ignore list. Notable active rules: `ANN` (type annotations required everywhere), `S` (security), `PERF`, `UP` (pyupgrade). `disallow_untyped_decorators = false` is set globally because the `@analysis` TypeVar decorator pattern is correct but mypy can't verify it.
 
+Never use `# noqa: PLC0415` (imports not at top of file). If you think a deferred import is needed, ask the user first.
+
 ## Privacy
 
 All processing is local. Default host is `127.0.0.1`.

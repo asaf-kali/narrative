@@ -11,6 +11,7 @@ import type {
   Participant,
   RangeDetail,
   SearchResult,
+  SemanticSearchHit,
   SenderInfo,
   TimelinePoint,
   WordData,
@@ -20,6 +21,12 @@ async function get<T>(url: string): Promise<T> {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json() as Promise<T>
+}
+
+export class SemanticUnavailableError extends Error {
+  constructor() {
+    super('Semantic search index not available')
+  }
 }
 
 export const api = {
@@ -74,6 +81,14 @@ export const api = {
   senders: (): Promise<SenderInfo[]> => get('/api/senders'),
   search: (q: string, limit = 50): Promise<SearchResult[]> =>
     get(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  semanticSearch: async (q: string, limit = 10, chatId?: number): Promise<SemanticSearchHit[]> => {
+    const params = new URLSearchParams({ q, limit: String(limit) })
+    if (chatId !== undefined) params.set('chat_id', String(chatId))
+    const res = await fetch(`/api/semantic-search?${params}`)
+    if (res.status === 503) throw new SemanticUnavailableError()
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+    return res.json() as Promise<SemanticSearchHit[]>
+  },
   dayDetail: (date: string): Promise<DayDetail> => get(`/api/day/${date}`),
   rangeDetail: (from: string, to: string): Promise<RangeDetail> => {
     const params = new URLSearchParams({ date_from: from, date_to: to })

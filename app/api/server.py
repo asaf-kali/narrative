@@ -3,6 +3,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from api.routes import analysis, chats, day, messages, range_detail, search, stats
+from db.connection import DBConnection
+from db.contacts import build_sender_registry
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -12,18 +15,24 @@ logger = logging.getLogger(__name__)
 
 _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
+# Semantic search route and store are only wired up when lancedb/pyarrow are installed.
+try:
+    from api.routes.semantic_search import router as _semantic_router
+    from semantic_search.embedder import Embedder
+    from semantic_search.vector_store import VectorStore
+except ImportError:
+    _semantic_router = None
+
 
 def create_api(
     msgstore_path: Path,
     wadb_path: Path | None = None,
     contacts_path: Path | None = None,
     local_code: str | None = None,
+    search_dir: Path | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
-        from db.connection import DBConnection  # noqa: PLC0415
-        from db.contacts import build_sender_registry  # noqa: PLC0415
-
         app.state.msgstore_path = msgstore_path
         app.state.wadb_path = wadb_path
         with DBConnection(msgstore_path=msgstore_path, wadb_path=wadb_path) as db:
@@ -33,6 +42,12 @@ def create_api(
                 msgstore=db.msgstore,
                 local_code=local_code,
             )
+
+        if _semantic_router is not None and search_dir is not None and (search_dir / "lance").exists():
+            app.state.embedder = Embedder()
+            app.state.vector_store = VectorStore.open(search_dir)
+            logger.info(f"Semantic search index loaded from {search_dir}")
+
         logger.info(f"API initialized: msgstore={msgstore_path}")
         yield
 
@@ -45,8 +60,6 @@ def create_api(
         allow_headers=["*"],
     )
 
-    from api.routes import analysis, chats, day, messages, range_detail, search, stats  # noqa: PLC0415
-
     app.include_router(chats.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")
     app.include_router(analysis.router, prefix="/api")
@@ -54,6 +67,8 @@ def create_api(
     app.include_router(day.router, prefix="/api")
     app.include_router(range_detail.router, prefix="/api")
     app.include_router(search.router, prefix="/api")
+    if _semantic_router is not None:
+        app.include_router(_semantic_router, prefix="/api")
 
     if _DIST.exists():
         logger.info(f"Serving frontend from {_DIST}")
