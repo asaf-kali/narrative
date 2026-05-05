@@ -6,10 +6,11 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from db.loaders import COL_CHAT_NAME, COL_CHAT_ROW_ID, COL_MESSAGE_ID, COL_MESSAGE_TYPE, COL_TEXT_DATA, COL_TIMESTAMP
 from models.message import MessageType
 from numpy.typing import NDArray
 
-_GAP_SECONDS = 15 * 60
+_COL_TIMESTAMP_MS = "timestamp_ms"
 
 
 @dataclass
@@ -24,26 +25,30 @@ class Session:
     embed_text: str  # joined text for embedding only — not stored persistently
 
 
-def chunk_messages(df: pd.DataFrame, gap_seconds: int = _GAP_SECONDS) -> Iterator[Session]:
+def chunk_messages(df: pd.DataFrame, gap_seconds: int) -> Iterator[Session]:
     work = _prepare(df)
     text_mask = _text_mask(work)
     gap_ms = gap_seconds * 1000
-    for chat_id_val, group in work.groupby("chat_row_id", sort=False):
+    for chat_id_val, group in work.groupby(COL_CHAT_ROW_ID, sort=False):
         chat_mask = text_mask.reindex(group.index, fill_value=False)
-        yield from _chunk_chat(group, chat_mask, int(chat_id_val), gap_ms)  # type: ignore[arg-type]
+        yield from _chunk_chat(group, chat_mask, int(chat_id_val), gap_ms)
 
 
 def _prepare(df: pd.DataFrame) -> pd.DataFrame:
     work = df.copy()
-    if pd.api.types.is_datetime64_any_dtype(work["timestamp"]):
-        work["timestamp_ms"] = work["timestamp"].astype("int64") // 1_000_000
+    if pd.api.types.is_datetime64_any_dtype(work[COL_TIMESTAMP]):
+        work[_COL_TIMESTAMP_MS] = work[COL_TIMESTAMP].astype("int64") // 1_000_000
     else:
-        work["timestamp_ms"] = work["timestamp"].astype("int64")
-    return work.sort_values(["chat_row_id", "timestamp_ms"]).reset_index(drop=True)
+        work[_COL_TIMESTAMP_MS] = work[COL_TIMESTAMP].astype("int64")
+    return work.sort_values([COL_CHAT_ROW_ID, _COL_TIMESTAMP_MS]).reset_index(drop=True)
 
 
 def _text_mask(df: pd.DataFrame) -> pd.Series[bool]:
-    return (df["message_type"] == int(MessageType.TEXT)) & df["text_data"].notna() & (df["text_data"].str.strip() != "")
+    return (  # type: ignore[no-any-return]
+        (df[COL_MESSAGE_TYPE] == int(MessageType.TEXT))
+        & df[COL_TEXT_DATA].notna()
+        & (df[COL_TEXT_DATA].str.strip() != "")
+    )
 
 
 def _chunk_chat(
@@ -52,10 +57,10 @@ def _chunk_chat(
     chat_id: int,
     gap_ms: int,
 ) -> Iterator[Session]:
-    chat_name = str(group["chat_name"].iloc[0])
-    timestamps: NDArray[np.int64] = group["timestamp_ms"].to_numpy()
-    msg_ids: NDArray[np.int64] = group["message_id"].to_numpy()
-    texts = group["text_data"].where(text_mask).fillna("")
+    chat_name = str(group[COL_CHAT_NAME].iloc[0])
+    timestamps: NDArray[np.int64] = group[_COL_TIMESTAMP_MS].to_numpy()
+    msg_ids: NDArray[np.int64] = group[COL_MESSAGE_ID].to_numpy()
+    texts = group[COL_TEXT_DATA].where(text_mask).fillna("")
 
     session_start = 0
     for i in range(1, len(group) + 1):

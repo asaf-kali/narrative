@@ -11,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 from db.connection import DBConnection
 from db.contacts import build_sender_registry
-from db.loaders import DataLoader
+from db.loaders import COL_CHAT_ROW_ID, COL_MESSAGE_ID, COL_TIMESTAMP, DataLoader
 from models.config import AnalysisConfig
 from semantic_search.chunker import Session, chunk_messages
 from semantic_search.embedder import Embedder
@@ -22,17 +22,17 @@ logger = logging.getLogger(__name__)
 
 
 def _ts_ms(df: pd.DataFrame) -> pd.Series[int]:
-    ts = df["timestamp"]
+    ts = df[COL_TIMESTAMP]
     if pd.api.types.is_datetime64_any_dtype(ts):
-        return ts.astype("int64") // 1_000_000
-    return ts.astype("int64")
+        return ts.astype("int64") // 1_000_000  # type: ignore[no-any-return]
+    return ts.astype("int64")  # type: ignore[no-any-return]
 
 
 def _sessions_for_new_chats(full_df: pd.DataFrame, new_chats: set[int], gap_seconds: int) -> Iterator[Session]:
     if not new_chats:
         return
     logger.info(f"New chats: {len(new_chats)}")
-    yield from chunk_messages(full_df[full_df["chat_row_id"].isin(new_chats)], gap_seconds=gap_seconds)
+    yield from chunk_messages(full_df[full_df[COL_CHAT_ROW_ID].isin(new_chats)], gap_seconds=gap_seconds)
 
 
 def _sessions_for_updated_chat(
@@ -43,8 +43,8 @@ def _sessions_for_updated_chat(
     gap_seconds: int,
     state: StateDB,
 ) -> tuple[Iterator[Session], list[str]]:
-    chat_mask = full_df["chat_row_id"] == chat_id
-    new_df = full_df[chat_mask & (full_df["message_id"] > max_indexed)]
+    chat_mask = full_df[COL_CHAT_ROW_ID] == chat_id
+    new_df = full_df[chat_mask & (full_df[COL_MESSAGE_ID] > max_indexed)]
     if new_df.empty:
         return iter([]), []
 
@@ -52,8 +52,8 @@ def _sessions_for_updated_chat(
     to_delete: list[str] = []
     last = state.get_last_session(chat_id)
     if last is not None:
-        boundary_mask = chat_mask & (full_ts_ms >= last.timestamp_start) & (full_df["message_id"] <= max_indexed)
-        combined = pd.concat([full_df[boundary_mask], new_df]).drop_duplicates("message_id")
+        boundary_mask = chat_mask & (full_ts_ms >= last.timestamp_start) & (full_df[COL_MESSAGE_ID] <= max_indexed)
+        combined = pd.concat([full_df[boundary_mask], new_df]).drop_duplicates(COL_MESSAGE_ID)
         to_delete.append(last.session_id)
     else:
         combined = new_df
@@ -108,7 +108,7 @@ def _embed_and_write(
     )
 
     for chat_id in all_chats:
-        chat_max_id = int(full_df[full_df["chat_row_id"] == chat_id]["message_id"].max())
+        chat_max_id = int(full_df[full_df[COL_CHAT_ROW_ID] == chat_id][COL_MESSAGE_ID].max())
         state.upsert_state(chat_id, chat_max_id)
 
     if is_first_run:
@@ -139,7 +139,7 @@ def _run(
 
     full_ts_ms = _ts_ms(full_df)
     known_chats = set(state.all_chat_ids())
-    all_chats = {int(c) for c in full_df["chat_row_id"].unique()}
+    all_chats = {int(c) for c in full_df[COL_CHAT_ROW_ID].unique()}
 
     to_delete: list[str] = []
     session_iters: list[Iterator[Session]] = [_sessions_for_new_chats(full_df, all_chats - known_chats, gap_seconds)]
