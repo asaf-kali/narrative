@@ -45,7 +45,7 @@ frontend-dev:
 # Backend
 
 backend *args:
-    PYTHONPATH=app {{ RUN }} python app/main.py {{ args }}
+    PYTHONPATH=app {{ RUN }} python app/main.py serve {{ args }}
 
 backend-dev *args:
     just backend {{ args }} --reload
@@ -77,7 +77,7 @@ lint: format
 # Misc
 
 index *args:
-    PYTHONPATH=app {{ RUN }} python app/semantic_search/indexer.py {{ args }}
+    PYTHONPATH=app {{ RUN }} python app/main.py index {{ args }}
 
 decrypt key:
     cd data && wadecrypt {{ key }} msgstore.db.crypt15 msgstore.db

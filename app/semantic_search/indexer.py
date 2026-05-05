@@ -1,10 +1,8 @@
-"""CLI tool to build or incrementally update the semantic search index."""
+"""Build or incrementally update the semantic search index."""
 
 from __future__ import annotations
 
-import argparse
 import logging
-import sys
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -121,7 +119,7 @@ def _embed_and_write(
     logger.info(f"Done — indexed {len(sessions)} sessions across {len(all_chats)} chats")
 
 
-def _run(
+def run(
     msgstore_path: Path,
     wadb_path: Path | None,
     search_dir: Path,
@@ -173,32 +171,3 @@ def _run(
         is_first_run=not known_chats,
     )
     state.close()
-
-
-def main(args: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Build or update the semantic search index.")
-    parser.add_argument("--msgstore", type=Path, default=Path("data/msgstore.db"))
-    parser.add_argument("--wadb", type=Path, default=None)
-    parser.add_argument("--search-dir", type=Path, default=Path("data/search"), dest="search_dir")
-    parser.add_argument("--gap-seconds", type=int, default=15 * 60, dest="gap_seconds")
-    parser.add_argument("--batch-size", type=int, default=32, dest="batch_size")
-    parsed = parser.parse_args(args)
-
-    if not parsed.msgstore.exists():
-        logger.error(f"msgstore.db not found: {parsed.msgstore}")
-        sys.exit(1)
-
-    wadb = parsed.wadb if parsed.wadb and parsed.wadb.exists() else None
-    _run(
-        msgstore_path=parsed.msgstore,
-        wadb_path=wadb,
-        search_dir=parsed.search_dir,
-        gap_seconds=parsed.gap_seconds,
-        batch_size=parsed.batch_size,
-    )
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
-    logging.captureWarnings(True)  # noqa: FBT003
-    main()
