@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from db.loaders import open_connection
@@ -10,6 +11,13 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@dataclass(frozen=True, order=True)
+class _BucketKey:
+    bucket: str
+    chat_name: str
+
 
 _TYPE_LABELS: dict[int, str] = {
     MessageType.IMAGE: "[Image]",
@@ -64,7 +72,7 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
         return DayDetail(date=date, total_messages=0, active_chats=0, senders=[], timeline=[], messages=[])
 
     messages: list[DayMessage] = []
-    bucket_counts: dict[tuple[str, str], int] = {}
+    bucket_counts: dict[_BucketKey, int] = {}
     chat_name_set: set[str] = set()
     sender_freq: dict[str, int] = {}
 
@@ -84,7 +92,8 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
 
         hh, mm = r.time.split(":")
         bucket = f"{hh}:{int(mm) // 5 * 5:02d}"
-        bucket_counts[(bucket, chat_name)] = bucket_counts.get((bucket, chat_name), 0) + 1
+        key = _BucketKey(bucket=bucket, chat_name=chat_name)
+        bucket_counts[key] = bucket_counts.get(key, 0) + 1
 
         messages.append(
             DayMessage(
@@ -97,7 +106,7 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
         )
 
     timeline = [
-        DayBucket(bucket=bucket, chat_name=chat, count=count) for (bucket, chat), count in sorted(bucket_counts.items())
+        DayBucket(bucket=k.bucket, chat_name=k.chat_name, count=count) for k, count in sorted(bucket_counts.items())
     ]
     senders = sorted(sender_freq, key=lambda s: -sender_freq[s])
 
