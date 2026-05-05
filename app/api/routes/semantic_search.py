@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+from search.embedder import EmbedderUnavailableError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -37,8 +38,6 @@ def semantic_search(
             status_code=503,
             detail="Semantic search index not available — run: just index --msgstore <path>",
         )
-
-    from search.embedder import EmbedderUnavailableError  # noqa: PLC0415
 
     logger.info(f"Semantic search: {q!r} (limit={limit}, chat_id={chat_id})")
     try:

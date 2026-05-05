@@ -24,7 +24,7 @@ class Embedder:
             try:
                 from FlagEmbedding import BGEM3FlagModel  # noqa: PLC0415
             except ImportError as e:
-                msg = "FlagEmbedding is not installed — run: uv sync --group search"
+                msg = "FlagEmbedding is not installed — run: uv sync --group semantic"
                 raise EmbedderUnavailableError(msg) from e
 
             logger.info(f"Loading embedding model {_MODEL_NAME}")

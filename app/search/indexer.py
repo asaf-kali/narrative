@@ -8,6 +8,10 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+from db.connection import DBConnection
+from db.contacts import build_sender_registry
+from db.loaders import DataLoader
+from models.config import AnalysisConfig
 from search.chunker import Session, chunk_messages
 from search.embedder import Embedder
 from search.state import SessionMeta, StateDB
@@ -120,11 +124,6 @@ def _run(
     gap_minutes: int,
     batch_size: int,
 ) -> None:
-    from db.connection import DBConnection  # noqa: PLC0415
-    from db.contacts import build_sender_registry  # noqa: PLC0415
-    from db.loaders import DataLoader  # noqa: PLC0415
-    from models.config import AnalysisConfig  # noqa: PLC0415
-
     state = StateDB(search_dir)
     store = VectorStore.open(search_dir)
     embedder = Embedder()

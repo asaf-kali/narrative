@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import lancedb
+import pandas as pd
 import pyarrow as pa
 
 if TYPE_CHECKING:
-    import lancedb
     from lancedb.table import Table
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,6 @@ class VectorStore:
 
     @classmethod
     def open(cls, search_dir: Path) -> VectorStore:
-        import lancedb  # noqa: PLC0415
-
         lance_dir = search_dir / "lance"
         lance_dir.mkdir(parents=True, exist_ok=True)
         db = lancedb.connect(str(lance_dir))
@@ -62,8 +61,6 @@ class VectorStore:
     def upsert_sessions(self, rows: list[dict[str, object]]) -> None:
         if not rows:
             return
-        import pandas as pd  # noqa: PLC0415
-
         df = pd.DataFrame(rows)
         existing_ids = set(df["session_id"].tolist())
         id_expr = ", ".join(repr(sid) for sid in existing_ids)
