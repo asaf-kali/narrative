@@ -77,7 +77,7 @@ lint: format
 # Misc
 
 index *args:
-    PYTHONPATH=app {{ RUN }} python app/search/indexer.py {{ args }}
+    PYTHONPATH=app {{ RUN }} python app/semantic_search/indexer.py {{ args }}
 
 decrypt key:
     cd data && wadecrypt {{ key }} msgstore.db.crypt15 msgstore.db
