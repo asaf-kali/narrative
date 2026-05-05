@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import pandas as pd
@@ -27,12 +28,11 @@ def _ts_ms(df: pd.DataFrame) -> pd.Series[int]:
     return ts.astype("int64")
 
 
-def _sessions_for_new_chats(full_df: pd.DataFrame, new_chats: set[int], gap_ms: int) -> list[Session]:
+def _sessions_for_new_chats(full_df: pd.DataFrame, new_chats: set[int], gap_seconds: int) -> Iterator[Session]:
     if not new_chats:
-        return []
-    sessions = chunk_messages(full_df[full_df["chat_row_id"].isin(new_chats)], gap_ms=gap_ms)
-    logger.info(f"New chats: {len(new_chats)}, sessions: {len(sessions)}")
-    return sessions  # type: ignore[no-any-return]
+        return
+    logger.info(f"New chats: {len(new_chats)}")
+    yield from chunk_messages(full_df[full_df["chat_row_id"].isin(new_chats)], gap_seconds=gap_seconds)
 
 
 def _sessions_for_updated_chat(
@@ -40,13 +40,13 @@ def _sessions_for_updated_chat(
     full_ts_ms: pd.Series[int],
     chat_id: int,
     max_indexed: int,
-    gap_ms: int,
+    gap_seconds: int,
     state: StateDB,
-) -> tuple[list[Session], list[str]]:
+) -> tuple[Iterator[Session], list[str]]:
     chat_mask = full_df["chat_row_id"] == chat_id
     new_df = full_df[chat_mask & (full_df["message_id"] > max_indexed)]
     if new_df.empty:
-        return [], []
+        return iter([]), []
 
     logger.info(f"Chat {chat_id}: {len(new_df)} new messages")
     to_delete: list[str] = []
@@ -58,7 +58,7 @@ def _sessions_for_updated_chat(
     else:
         combined = new_df
 
-    return chunk_messages(combined, gap_ms=gap_ms), to_delete
+    return chunk_messages(combined, gap_seconds=gap_seconds), to_delete
 
 
 def _embed_and_write(
@@ -121,13 +121,12 @@ def _run(
     msgstore_path: Path,
     wadb_path: Path | None,
     search_dir: Path,
-    gap_minutes: int,
+    gap_seconds: int,
     batch_size: int,
 ) -> None:
     state = StateDB(search_dir)
     store = VectorStore.open(search_dir)
     embedder = Embedder()
-    gap_ms = gap_minutes * 60 * 1000
 
     with DBConnection(msgstore_path=msgstore_path, wadb_path=wadb_path) as db:
         registry = build_sender_registry(wadb=db.wadb, csv_path=None, msgstore=db.msgstore, local_code=None)
@@ -142,16 +141,17 @@ def _run(
     known_chats = set(state.all_chat_ids())
     all_chats = {int(c) for c in full_df["chat_row_id"].unique()}
 
-    sessions: list[Session] = _sessions_for_new_chats(full_df, all_chats - known_chats, gap_ms)
     to_delete: list[str] = []
+    session_iters: list[Iterator[Session]] = [_sessions_for_new_chats(full_df, all_chats - known_chats, gap_seconds)]
 
     for chat_id in known_chats:
         new_s, new_del = _sessions_for_updated_chat(
-            full_df, full_ts_ms, chat_id, state.get_max_indexed(chat_id), gap_ms, state
+            full_df, full_ts_ms, chat_id, state.get_max_indexed(chat_id), gap_seconds, state
         )
-        sessions.extend(new_s)
+        session_iters.append(new_s)
         to_delete.extend(new_del)
 
+    sessions = [s for it in session_iters for s in it]
     if not sessions:
         logger.info("Index is up to date — nothing to embed")
         state.close()
@@ -176,7 +176,7 @@ def main(args: list[str] | None = None) -> None:
     parser.add_argument("--msgstore", type=Path, default=Path("data/msgstore.db"))
     parser.add_argument("--wadb", type=Path, default=None)
     parser.add_argument("--search-dir", type=Path, default=Path("data/search"), dest="search_dir")
-    parser.add_argument("--gap-minutes", type=int, default=5, dest="gap_minutes")
+    parser.add_argument("--gap-seconds", type=int, default=15 * 60, dest="gap_seconds")
     parser.add_argument("--batch-size", type=int, default=32, dest="batch_size")
     parsed = parser.parse_args(args)
 
@@ -189,7 +189,7 @@ def main(args: list[str] | None = None) -> None:
         msgstore_path=parsed.msgstore,
         wadb_path=wadb,
         search_dir=parsed.search_dir,
-        gap_minutes=parsed.gap_minutes,
+        gap_seconds=parsed.gap_seconds,
         batch_size=parsed.batch_size,
     )
 
