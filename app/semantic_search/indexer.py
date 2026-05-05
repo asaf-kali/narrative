@@ -6,6 +6,7 @@ import argparse
 import logging
 import sys
 from collections.abc import Iterator
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -19,6 +20,12 @@ from semantic_search.state import SessionMeta, StateDB
 from semantic_search.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _ChatUpdate:
+    sessions: Iterator[Session]
+    to_delete: list[str] = field(default_factory=list)
 
 
 def _ts_ms(df: pd.DataFrame) -> pd.Series[int]:
@@ -42,23 +49,20 @@ def _sessions_for_updated_chat(
     max_indexed: int,
     gap_seconds: int,
     state: StateDB,
-) -> tuple[Iterator[Session], list[str]]:
+) -> _ChatUpdate:
     chat_mask = full_df[COL_CHAT_ROW_ID] == chat_id
     new_df = full_df[chat_mask & (full_df[COL_MESSAGE_ID] > max_indexed)]
     if new_df.empty:
-        return iter([]), []
+        return _ChatUpdate(sessions=iter([]))
 
     logger.info(f"Chat {chat_id}: {len(new_df)} new messages")
-    to_delete: list[str] = []
     last = state.get_last_session(chat_id)
     if last is not None:
         boundary_mask = chat_mask & (full_ts_ms >= last.timestamp_start) & (full_df[COL_MESSAGE_ID] <= max_indexed)
         combined = pd.concat([full_df[boundary_mask], new_df]).drop_duplicates(COL_MESSAGE_ID)
-        to_delete.append(last.session_id)
-    else:
-        combined = new_df
+        return _ChatUpdate(sessions=chunk_messages(combined, gap_seconds=gap_seconds), to_delete=[last.session_id])
 
-    return chunk_messages(combined, gap_seconds=gap_seconds), to_delete
+    return _ChatUpdate(sessions=chunk_messages(new_df, gap_seconds=gap_seconds))
 
 
 def _embed_and_write(
@@ -145,11 +149,11 @@ def _run(
     session_iters: list[Iterator[Session]] = [_sessions_for_new_chats(full_df, all_chats - known_chats, gap_seconds)]
 
     for chat_id in known_chats:
-        new_s, new_del = _sessions_for_updated_chat(
+        update = _sessions_for_updated_chat(
             full_df, full_ts_ms, chat_id, state.get_max_indexed(chat_id), gap_seconds, state
         )
-        session_iters.append(new_s)
-        to_delete.extend(new_del)
+        session_iters.append(update.sessions)
+        to_delete.extend(update.to_delete)
 
     sessions = [s for it in session_iters for s in it]
     if not sessions:
