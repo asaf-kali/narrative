@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from search.embedder import EmbedderUnavailableError
+from semantic_search.embedder import EmbedderUnavailableError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

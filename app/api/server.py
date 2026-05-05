@@ -18,8 +18,8 @@ _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 # Semantic search route and store are only wired up when lancedb/pyarrow are installed.
 try:
     from api.routes.semantic_search import router as _semantic_router
-    from search.embedder import Embedder
-    from search.vector_store import VectorStore
+    from semantic_search.embedder import Embedder
+    from semantic_search.vector_store import VectorStore
 except ImportError:
     _semantic_router = None
 

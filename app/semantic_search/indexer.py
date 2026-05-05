@@ -13,10 +13,10 @@ from db.connection import DBConnection
 from db.contacts import build_sender_registry
 from db.loaders import DataLoader
 from models.config import AnalysisConfig
-from search.chunker import Session, chunk_messages
-from search.embedder import Embedder
-from search.state import SessionMeta, StateDB
-from search.vector_store import VectorStore
+from semantic_search.chunker import Session, chunk_messages
+from semantic_search.embedder import Embedder
+from semantic_search.state import SessionMeta, StateDB
+from semantic_search.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
