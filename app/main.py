@@ -83,7 +83,7 @@ All processing is local. No data is sent to any external service.
     parser.add_argument(
         "--search-dir",
         type=Path,
-        default=None,
+        default="data/search",
         help="Directory containing the semantic search index (optional)",
     )
     parser.add_argument("--port", type=int, default=8050, help="Port to run on (default: 8050)")
@@ -111,6 +111,8 @@ All processing is local. No data is sent to any external service.
             os.environ["WHATSAPP_CONTACTS"] = str(parsed.contacts)
         if parsed.local_code:
             os.environ["WHATSAPP_LOCAL_CODE"] = parsed.local_code
+        if parsed.search_dir:
+            os.environ["WHATSAPP_SEARCH_DIR"] = str(parsed.search_dir)
         uvicorn.run(
             "api.asgi:app",
             host=parsed.host,

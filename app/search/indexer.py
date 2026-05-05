@@ -196,4 +196,5 @@ def main(args: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+    logging.captureWarnings(True)  # noqa: FBT003
     main()
