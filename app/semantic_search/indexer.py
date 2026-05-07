@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import statistics
+import time
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import chain
 from pathlib import Path
 from types import TracebackType
@@ -24,6 +26,36 @@ from semantic_search.vector_store import VectorStore
 logger = logging.getLogger(__name__)
 
 _MIN_INDEX_ROWS = 256  # LanceDB requires this many rows before building an ANN index
+
+
+@dataclass
+class _IndexStats:
+    message_counts: list[int] = field(default_factory=list)
+    durations_sec: list[float] = field(default_factory=list)
+    embed_time_sec: float = 0.0
+
+    def record_batch(self, sessions: list[Session], embed_elapsed: float) -> None:
+        for s in sessions:
+            self.message_counts.append(s.message_count)
+            duration = (s.timestamp_end - s.timestamp_start).total_seconds()
+            self.durations_sec.append(duration)
+        self.embed_time_sec += embed_elapsed
+
+    def log_summary(self) -> None:
+        n = len(self.message_counts)
+        if n == 0:
+            logger.info("Index stats: no sessions written")
+            return
+        avg_msgs = statistics.mean(self.message_counts)
+        med_msgs = statistics.median(self.message_counts)
+        avg_dur = statistics.mean(self.durations_sec)
+        med_dur = statistics.median(self.durations_sec)
+        logger.info(
+            f"Index stats: {n} sessions | "
+            f"msgs/session avg={avg_msgs:.1f} median={med_msgs:.0f} | "
+            f"duration avg={avg_dur:.0f}s median={med_dur:.0f}s | "
+            f"embed total={self.embed_time_sec:.1f}s avg={self.embed_time_sec / n:.3f}s"
+        )
 
 
 @dataclass
@@ -76,6 +108,7 @@ class Indexer:
         total = count_messages(self._db.msgstore)
         logger.info(f"Messages in DB: {total}")
 
+        self._stats = _IndexStats()
         total_sessions = 0
         for i, chat_id in enumerate(all_chat_ids, 1):
             n = self._index_chat(chat_id=chat_id, known_chats=known_chats)
@@ -85,6 +118,7 @@ class Indexer:
         if is_first_run and total_sessions >= _MIN_INDEX_ROWS:
             self._store.build_index()
         logger.info(f"Done — {total_sessions} sessions across {len(all_chat_ids)} chats")
+        self._stats.log_summary()
 
     def _index_chat(self, chat_id: int, known_chats: set[int]) -> int:
         stream = self._open_chat_stream(chat_id=chat_id, known_chats=known_chats)
@@ -142,7 +176,10 @@ class Indexer:
         return sessions_written
 
     def _flush(self, sessions: list[Session], to_delete: list[str]) -> None:
+        embed_start = time.monotonic()
         vectors = self._embedder.embed([s.embed_text for s in sessions], batch_size=self._batch_size)
+        embed_elapsed = time.monotonic() - embed_start
+        self._stats.record_batch(sessions=sessions, embed_elapsed=embed_elapsed)
         if to_delete:
             self._store.delete_sessions(to_delete)
             for sid in to_delete:
