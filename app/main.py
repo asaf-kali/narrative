@@ -12,8 +12,10 @@ logger = logging.getLogger(__name__)
 
 try:
     from semantic_search.indexer import run as _run_index
+    from semantic_search.indexer import run_chat as _run_chat
 except ImportError:
     _run_index = None
+    _run_chat = None
 
 cli = typer.Typer(no_args_is_help=True)
 DEFAULT_INACTIVE_GAP_SECONDS = 60 * 60 * 2  # 2 hours
@@ -82,6 +84,7 @@ _ArgGapSeconds = Annotated[
 ]
 _ArgBatchSize = Annotated[int, typer.Option(help="Embedding batch size")]
 _ArgChunkSize = Annotated[int, typer.Option(help="Messages read per DB chunk (streaming)")]
+_ArgChatId = Annotated[int | None, typer.Option(help="Index only this chat ID (skip all others)")]
 
 
 @cli.command()
@@ -92,25 +95,39 @@ def index(
     gap_seconds: _ArgGapSeconds = DEFAULT_INACTIVE_GAP_SECONDS,
     batch_size: _ArgBatchSize = 32,
     chunk_size: _ArgChunkSize = 500,
+    chat_id: _ArgChatId = None,
 ) -> None:
     """Build or incrementally update the semantic search index."""
-    if _run_index is None:
-        logger.error("Semantic search deps not installed — run: uv sync --group semantic")
-        raise typer.Exit(code=1)
-
     if not msgstore.exists():
         logger.error(f"msgstore.db not found: {msgstore}")
         raise typer.Exit(code=1)
 
     wadb_path = wadb if wadb and wadb.exists() else None
-    _run_index(
-        msgstore_path=msgstore,
-        wadb_path=wadb_path,
-        search_dir=search_dir,
-        gap_seconds=gap_seconds,
-        batch_size=batch_size,
-        chunk_size=chunk_size,
-    )
+    if chat_id is not None:
+        if _run_chat is None:
+            logger.error("Semantic search deps not installed — run: uv sync --group semantic")
+            raise typer.Exit(code=1)
+        _run_chat(
+            chat_id=chat_id,
+            msgstore_path=msgstore,
+            wadb_path=wadb_path,
+            search_dir=search_dir,
+            gap_seconds=gap_seconds,
+            batch_size=batch_size,
+            chunk_size=chunk_size,
+        )
+    else:
+        if _run_index is None:
+            logger.error("Semantic search deps not installed — run: uv sync --group semantic")
+            raise typer.Exit(code=1)
+        _run_index(
+            msgstore_path=msgstore,
+            wadb_path=wadb_path,
+            search_dir=search_dir,
+            gap_seconds=gap_seconds,
+            batch_size=batch_size,
+            chunk_size=chunk_size,
+        )
 
 
 if __name__ == "__main__":

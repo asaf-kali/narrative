@@ -19,6 +19,7 @@ _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 try:
     from api.routes.semantic_search import router as _semantic_router
     from semantic_search.embedder import Embedder
+    from semantic_search.state import StateDB
     from semantic_search.vector_store import VectorStore
 except ImportError:
     _semantic_router = None
@@ -35,6 +36,7 @@ def create_api(
     async def _lifespan(app: FastAPI) -> AsyncGenerator[None]:
         app.state.msgstore_path = msgstore_path
         app.state.wadb_path = wadb_path
+        app.state.search_dir = search_dir
         with DBConnection(msgstore_path=msgstore_path, wadb_path=wadb_path) as db:
             app.state.sender_registry = build_sender_registry(
                 wadb=db.wadb,
@@ -43,20 +45,24 @@ def create_api(
                 local_code=local_code,
             )
 
-        if _semantic_router is not None and search_dir is not None and (search_dir / "lance").exists():
-            app.state.embedder = Embedder()
-            app.state.vector_store = VectorStore.open(search_dir)
-            logger.info(f"Semantic search index loaded from {search_dir}")
+        if _semantic_router is not None and search_dir is not None:
+            app.state.state_db = StateDB(search_dir)
+            if (search_dir / "lance").exists():
+                app.state.embedder = Embedder()
+                app.state.vector_store = VectorStore.open(search_dir)
+                logger.info(f"Semantic search index loaded from {search_dir}")
 
         logger.info(f"API initialized: msgstore={msgstore_path}")
         yield
+        if hasattr(app.state, "state_db"):
+            app.state.state_db.close()
 
     app = FastAPI(title="Narrative API", lifespan=_lifespan)
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173"],
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 

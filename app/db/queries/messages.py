@@ -64,6 +64,11 @@ def count_messages_for_chat(conn: sqlite3.Connection, chat_id: int, after_id: in
     return int(row[0]) if row else 0
 
 
+def get_max_message_id_for_chat(conn: sqlite3.Connection, chat_id: int) -> int:
+    row = conn.execute("SELECT MAX(_id) FROM message WHERE chat_row_id = ?", (chat_id,)).fetchone()
+    return int(row[0]) if row and row[0] is not None else 0
+
+
 # Cursor-based pagination on _id (stable PK, no timestamp ties).
 _MESSAGES_PAGED_SQL = _MESSAGES_SQL + " AND m.chat_row_id = ? AND m._id > ? ORDER BY m._id LIMIT ?"
 

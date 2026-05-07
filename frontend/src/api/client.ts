@@ -1,5 +1,6 @@
 import type {
   Chat,
+  ChatIndexStatus,
   ChatMessagesResponse,
   DayCount,
   DayDetail,
@@ -89,6 +90,14 @@ export const api = {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
     return res.json() as Promise<SemanticSearchHit[]>
   },
+  chatIndexStatus: (chatId: number): Promise<ChatIndexStatus> =>
+    get<ChatIndexStatus>(`/api/chats/${chatId}/index-status`),
+
+  indexChat: async (chatId: number): Promise<void> => {
+    const res = await fetch(`/api/chats/${chatId}/index`, { method: 'POST' })
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  },
+
   dayDetail: (date: string): Promise<DayDetail> => get(`/api/day/${date}`),
   rangeDetail: (from: string, to: string): Promise<RangeDetail> => {
     const params = new URLSearchParams({ date_from: from, date_to: to })

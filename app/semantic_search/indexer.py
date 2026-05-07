@@ -18,7 +18,7 @@ import tqdm as tqdm_lib
 from db.connection import DBConnection
 from db.contacts import build_sender_registry
 from db.loaders import DataLoader, IndexMessage
-from db.queries.messages import count_messages, count_messages_for_chat
+from db.queries.messages import count_messages, count_messages_for_chat, get_max_message_id_for_chat
 from semantic_search.chunker import iterate_sessions
 from semantic_search.embedder import Embedder
 from semantic_search.session import Session, SessionRecord
@@ -141,6 +141,17 @@ class Indexer:
         logger.info(f"Done — {global_stats.session_count} sessions across {len(all_chat_ids)} chats")
         global_stats.log_summary()
 
+    def index_single_chat(self, chat_id: int) -> None:
+        known_chats = set(self._state.all_chat_ids())
+        with logging_redirect_tqdm():
+            chat_stats = self._index_chat(chat_id=chat_id, known_chats=known_chats)
+        n = chat_stats.session_count
+        if n:
+            logger.info(f"chat {chat_id}: {n} sessions | {chat_stats.inline_str()}")
+        else:
+            logger.info(f"chat {chat_id}: up to date")
+        chat_stats.log_summary()
+
     def _index_chat(self, chat_id: int, known_chats: set[int]) -> _IndexStats:
         stream = self._open_chat_stream(chat_id=chat_id, known_chats=known_chats)
         if stream is None:
@@ -206,7 +217,7 @@ class Indexer:
         if batch:
             self._flush(sessions=batch, to_delete=batch_to_delete, stats=stats)
 
-        max_id = _get_max_message_id(conn=self._db.msgstore, chat_id=chat_id)
+        max_id = get_max_message_id_for_chat(conn=self._db.msgstore, chat_id=chat_id)
         self._state.upsert_state(chat_id=chat_id, max_id=max_id)
         return stats
 
@@ -256,14 +267,29 @@ def run(
         indexer.run()
 
 
+def run_chat(
+    chat_id: int,
+    msgstore_path: Path,
+    wadb_path: Path | None,
+    search_dir: Path,
+    gap_seconds: int,
+    batch_size: int,
+    chunk_size: int = 500,
+) -> None:
+    with Indexer(
+        msgstore_path=msgstore_path,
+        wadb_path=wadb_path,
+        search_dir=search_dir,
+        gap_seconds=gap_seconds,
+        batch_size=batch_size,
+        chunk_size=chunk_size,
+    ) as indexer:
+        indexer.index_single_chat(chat_id=chat_id)
+
+
 # ── private helpers ──────────────────────────────────────────────────────────
 
 
 def _get_all_chat_ids(conn: sqlite3.Connection) -> list[int]:
     rows = conn.execute("SELECT DISTINCT chat_row_id FROM message WHERE chat_row_id > 0").fetchall()
     return [int(r[0]) for r in rows]
-
-
-def _get_max_message_id(conn: sqlite3.Connection, chat_id: int) -> int:
-    row = conn.execute("SELECT MAX(_id) FROM message WHERE chat_row_id = ?", (chat_id,)).fetchone()
-    return int(row[0]) if row and row[0] is not None else 0

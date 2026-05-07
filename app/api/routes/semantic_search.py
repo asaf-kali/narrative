@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 from datetime import datetime
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 from semantic_search.embedder import EmbedderUnavailableError
 
@@ -11,6 +13,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _MIN_QUERY_LEN = 2
+_DEFAULT_GAP_SECONDS = 15 * 60
+_DEFAULT_BATCH_SIZE = 32
+_DEFAULT_CHUNK_SIZE = 500
 
 
 class SemanticSearchHit(BaseModel):
@@ -19,6 +24,11 @@ class SemanticSearchHit(BaseModel):
     timestamp_start: datetime
     timestamp_end: datetime
     score: float
+
+
+class ChatIndexStatus(BaseModel):
+    status: Literal["indexed", "partial", "none"]
+    session_count: int
 
 
 @router.get("/semantic-search", response_model=list[SemanticSearchHit])
@@ -56,3 +66,56 @@ def semantic_search(
         )
         for h in hits
     ]
+
+
+@router.get("/chats/{chat_id}/index-status", response_model=ChatIndexStatus)
+def get_chat_index_status(chat_id: int, request: Request) -> ChatIndexStatus:
+    from db.queries.messages import count_messages_for_chat  # noqa: PLC0415
+
+    state_db = getattr(request.app.state, "state_db", None)
+    if state_db is None:
+        return ChatIndexStatus(status="none", session_count=0)
+
+    max_indexed = state_db.get_max_indexed(chat_id=chat_id)
+    session_count = state_db.count_sessions_for_chat(chat_id=chat_id)
+
+    if max_indexed == 0:
+        return ChatIndexStatus(status="none", session_count=0)
+
+    msgstore_path = request.app.state.msgstore_path
+    with sqlite3.connect(str(msgstore_path)) as conn:
+        remaining = count_messages_for_chat(conn=conn, chat_id=chat_id, after_id=max_indexed)
+
+    status: Literal["indexed", "partial", "none"] = "indexed" if remaining == 0 else "partial"
+    return ChatIndexStatus(status=status, session_count=session_count)
+
+
+@router.post("/chats/{chat_id}/index")
+def index_chat(
+    chat_id: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+) -> dict[str, str]:
+    from semantic_search.indexer import run_chat  # noqa: PLC0415
+
+    state_db = getattr(request.app.state, "state_db", None)
+    if state_db is None:
+        raise HTTPException(status_code=503, detail="Semantic search not available")
+
+    msgstore_path = request.app.state.msgstore_path
+    wadb_path = getattr(request.app.state, "wadb_path", None)
+    search_dir = getattr(request.app.state, "search_dir", None)
+    if search_dir is None:
+        raise HTTPException(status_code=503, detail="Search directory not configured")
+
+    background_tasks.add_task(
+        run_chat,
+        chat_id=chat_id,
+        msgstore_path=msgstore_path,
+        wadb_path=wadb_path,
+        search_dir=search_dir,
+        gap_seconds=_DEFAULT_GAP_SECONDS,
+        batch_size=_DEFAULT_BATCH_SIZE,
+        chunk_size=_DEFAULT_CHUNK_SIZE,
+    )
+    return {"status": "started"}

@@ -91,3 +91,7 @@ class StateDB:
     def all_chat_ids(self) -> list[int]:
         rows = self._conn.execute("SELECT chat_id FROM index_state").fetchall()
         return [int(r[0]) for r in rows]
+
+    def count_sessions_for_chat(self, chat_id: int) -> int:
+        row = self._conn.execute("SELECT COUNT(*) FROM indexed_sessions WHERE chat_id = ?", (chat_id,)).fetchone()
+        return int(row[0]) if row else 0
