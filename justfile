@@ -56,7 +56,7 @@ run *args: frontend-build
     just backend {{ args }}
 
 run-dev *args:
-    just backend-dev {{ args }} & just frontend-dev
+    just backend-dev {{ args }} --wadb data/wa.db --contacts data/contacts.csv & just frontend-dev
 
 # Lint
 

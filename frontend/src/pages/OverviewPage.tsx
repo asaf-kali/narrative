@@ -56,21 +56,23 @@ function SemanticIndexBadge({ chatId }: { chatId: number }) {
   const cfg = INDEX_STATUS_CONFIG[statusData?.status ?? 'none']
 
   return (
-    <div className="bg-app-surface border border-app-border rounded-xl p-4 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <span style={{ color: cfg.color }} className="text-lg">●</span>
-        <div>
-          <div className="text-[11px] text-tx-secondary">🔍 Semantic Index</div>
-          <div className="text-sm font-semibold text-tx-primary">
-            {cfg.label}
-            {statusData?.session_count ? ` · ${statusData.session_count.toLocaleString()} sessions` : ''}
-          </div>
+    <div className="bg-app-surface border border-app-border rounded-xl p-4 flex flex-col">
+      <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Semantic Index</h3>
+      <div className="flex-1 flex flex-col items-center justify-center gap-2">
+        <span style={{ color: cfg.color }} className="text-4xl leading-none">●</span>
+        <div className="text-center">
+          <div className="text-sm font-semibold text-tx-primary">{cfg.label}</div>
+          {statusData?.session_count ? (
+            <div className="text-[11px] text-tx-secondary mt-0.5">
+              {statusData.session_count.toLocaleString()} sessions
+            </div>
+          ) : null}
         </div>
       </div>
       <button
         onClick={handleIndex}
         disabled={isIndexing}
-        className="text-xs px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
+        className="mt-4 w-full text-xs px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
       >
         {isIndexing ? 'Indexing…' : 'Index'}
       </button>
@@ -99,8 +101,7 @@ export default function OverviewPage() {
         <StatCard icon="🔗" label="Links" value={data.total_links} />
         <StatCard icon="📊" label="Types" value={data.type_breakdown.length} />
       </div>
-      <SemanticIndexBadge chatId={Number(chatId)} />
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="col-span-2 bg-app-surface border border-app-border rounded-xl p-4">
           <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Activity</h3>
           <ResponsiveContainer width="100%" height={180}>
@@ -141,6 +142,7 @@ export default function OverviewPage() {
             </PieChart>
           </ResponsiveContainer>
         </div>
+        <SemanticIndexBadge chatId={Number(chatId)} />
       </div>
     </div>
   )
@@ -156,8 +158,11 @@ function LoadingState() {
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="col-span-2 bg-app-surface border border-app-border rounded-xl p-4">
+          <CardSpinner className="h-48" />
+        </div>
+        <div className="bg-app-surface border border-app-border rounded-xl p-4">
           <CardSpinner className="h-48" />
         </div>
         <div className="bg-app-surface border border-app-border rounded-xl p-4">
