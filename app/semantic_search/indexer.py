@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 import statistics
+import sys
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -13,10 +14,11 @@ from pathlib import Path
 from types import TracebackType
 from typing import Self
 
+import tqdm as tqdm_lib
 from db.connection import DBConnection
 from db.contacts import build_sender_registry
 from db.loaders import DataLoader, IndexMessage
-from db.queries.messages import count_messages
+from db.queries.messages import count_messages, count_messages_for_chat
 from semantic_search.chunker import iterate_sessions
 from semantic_search.embedder import Embedder
 from semantic_search.session import Session, SessionRecord
@@ -75,6 +77,7 @@ class _ChatStream:
     messages: Iterator[IndexMessage]
     chat_name: str
     to_delete: list[str]
+    total_messages: int
 
 
 class Indexer:
@@ -163,16 +166,32 @@ class Indexer:
             if boundary:
                 to_delete = [last_session.session_id]
 
+        new_count = count_messages_for_chat(conn=self._db.msgstore, chat_id=chat_id, after_id=max_indexed)
+        total_messages = new_count + len(boundary)
         all_messages = chain(boundary, [first_msg], new_messages)
-        return _ChatStream(messages=all_messages, chat_name=first_msg.chat_name, to_delete=to_delete)
+        return _ChatStream(
+            messages=all_messages,
+            chat_name=first_msg.chat_name,
+            to_delete=to_delete,
+            total_messages=total_messages,
+        )
 
     def _index_sessions(self, stream: _ChatStream, chat_id: int) -> _IndexStats:
         stats = _IndexStats()
         batch: list[Session] = []
         batch_to_delete = stream.to_delete
 
+        progress = tqdm_lib.tqdm(
+            stream.messages,
+            total=stream.total_messages,
+            desc=stream.chat_name,
+            unit="msg",
+            file=sys.stdout,
+            leave=False,
+            dynamic_ncols=True,
+        )
         session_iterator = iterate_sessions(
-            messages=stream.messages, chat_id=chat_id, chat_name=stream.chat_name, gap_seconds=self._gap_seconds
+            messages=progress, chat_id=chat_id, chat_name=stream.chat_name, gap_seconds=self._gap_seconds
         )
         for session in session_iterator:
             batch.append(session)
