@@ -13,6 +13,7 @@ from db.loaders import (
     COL_MESSAGE_TYPE,
     COL_TEXT_DATA,
     COL_TIMESTAMP,
+    IndexMessage,
 )
 from models.message import MessageType
 from numpy.typing import NDArray
@@ -83,7 +84,7 @@ def _chunk_chat(
 
 
 def chunk_chat_streaming(
-    chunk_iter: Iterator[list[dict[str, object]]],
+    chunk_iter: Iterator[list[IndexMessage]],
     chat_id: int,
     chat_name: str,
     gap_seconds: int,
@@ -94,7 +95,7 @@ def chunk_chat_streaming(
     truncated mid-chunk.
     """
     gap_ms = gap_seconds * 1000
-    pending: list[dict[str, object]] = []
+    pending: list[IndexMessage] = []
 
     for chunk in chunk_iter:
         working = pending + chunk
@@ -102,8 +103,8 @@ def chunk_chat_streaming(
         session_start = 0
 
         for i in range(len(working) - 1):
-            if int(working[i + 1][COL_TIMESTAMP]) - int(working[i][COL_TIMESTAMP]) > gap_ms:  # type: ignore[call-overload]
-                session = _build_session_from_dicts(chat_id, chat_name, working, session_start, i + 1)
+            if working[i + 1].timestamp - working[i].timestamp > gap_ms:
+                session = _build_session_from_messages(chat_id, chat_name, working, session_start, i + 1)
                 if session is not None:
                     yield session
                 session_start = i + 1
@@ -111,40 +112,36 @@ def chunk_chat_streaming(
         pending = working[session_start:]
 
     if pending:
-        session = _build_session_from_dicts(chat_id, chat_name, pending, 0, len(pending))
+        session = _build_session_from_messages(chat_id, chat_name, pending, 0, len(pending))
         if session is not None:
             yield session
 
 
-def _build_session_from_dicts(
+def _build_session_from_messages(
     chat_id: int,
     chat_name: str,
-    rows: list[dict[str, object]],
+    rows: list[IndexMessage],
     start: int,
     end: int,
 ) -> Session | None:
     window = rows[start:end]
     session_texts = [
-        str(r[COL_TEXT_DATA])
+        r.text_data
         for r in window
-        if r.get(COL_MESSAGE_TYPE) == int(MessageType.TEXT)
-        and r.get(COL_TEXT_DATA) is not None
-        and str(r[COL_TEXT_DATA]).strip()
+        if r.message_type == int(MessageType.TEXT) and r.text_data is not None and r.text_data.strip()
     ]
     if not session_texts:
         return None
-    msg_ids = [int(r[COL_MESSAGE_ID]) for r in window]  # type: ignore[call-overload]
-    timestamps = [int(r[COL_TIMESTAMP]) for r in window]  # type: ignore[call-overload]
-    min_id = msg_ids[0]
+    min_id = window[0].message_id
     session_id = hashlib.sha256(f"{chat_id}:{min_id}".encode()).hexdigest()[:16]
     return Session(
         session_id=session_id,
         chat_id=chat_id,
         chat_name=chat_name,
-        timestamp_start=timestamps[0],
-        timestamp_end=timestamps[-1],
+        timestamp_start=window[0].timestamp,
+        timestamp_end=window[-1].timestamp,
         min_message_id=min_id,
-        max_message_id=msg_ids[-1],
+        max_message_id=window[-1].message_id,
         embed_text=" ".join(session_texts),
     )
 

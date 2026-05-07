@@ -9,7 +9,7 @@ from pathlib import Path
 
 from db.connection import DBConnection
 from db.contacts import build_sender_registry
-from db.loaders import COL_CHAT_NAME, DataLoader
+from db.loaders import DataLoader, IndexMessage
 from db.queries.messages import count_messages
 from semantic_search.chunker import Session, chunk_chat_streaming
 from semantic_search.embedder import Embedder
@@ -97,11 +97,11 @@ def _index_chat(
             first_chunk = boundary + first_chunk
             to_delete = [last_session.session_id]
 
-    def _full_iter() -> Iterator[list[dict[str, object]]]:
+    def _full_iter() -> Iterator[list[IndexMessage]]:
         yield first_chunk
         yield from chunk_iter
 
-    chat_name = str(first_chunk[0].get(COL_CHAT_NAME, ""))
+    chat_name = first_chunk[0].chat_name
     sessions_written = 0
     batch: list[Session] = []
     batch_to_delete = to_delete

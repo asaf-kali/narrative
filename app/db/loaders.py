@@ -14,6 +14,7 @@ from models.chat import ChatSummary, ChatType
 from models.config import AnalysisConfig
 from models.message import MessageType
 from models.sender import BROADCAST_SERVER, GROUP_SERVER, SenderRegistry
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,19 @@ COL_DAY_OF_WEEK = "day_of_week"
 COL_HOUR = "hour"
 COL_CHAT_NAME = "chat_name"
 COL_IS_GROUP = "is_group"
+
+
+class IndexMessage(BaseModel):
+    """Message row prepared for the streaming indexer pipeline."""
+
+    message_id: int
+    chat_row_id: int
+    timestamp: int  # ms UTC, no tz conversion
+    message_type: int
+    text_data: str | None
+    chat_name: str
+    sender_name: str
+
 
 # Use the system local timezone for timestamp display
 _LOCAL_TZ: datetime.tzinfo = datetime.datetime.now().astimezone().tzinfo or datetime.UTC
@@ -84,7 +98,7 @@ class DataLoader:
         chat_id: int,
         chunk_size: int,
         after_id: int = 0,
-    ) -> Generator[list[dict[str, object]]]:
+    ) -> Generator[list[IndexMessage]]:
         """Cursor-paginated message stream for one chat, excluding system messages."""
         cursor = after_id
         while True:
@@ -93,7 +107,7 @@ class DataLoader:
                 return
             non_system = [r for r in rows if r.message_type != int(MessageType.SYSTEM)]
             if non_system:
-                yield [_message_row_to_dict(r, self._registry) for r in non_system]
+                yield [_to_index_message(r, self._registry) for r in non_system]
             # Advance cursor on full page's last _id (even if those rows were filtered).
             cursor = rows[-1].message_id
             if len(rows) < chunk_size:
@@ -104,12 +118,12 @@ class DataLoader:
         chat_id: int,
         min_id: int,
         max_id: int,
-    ) -> list[dict[str, object]]:
+    ) -> list[IndexMessage]:
         """Load a previous session's messages for incremental boundary reconstruction."""
         rows = fetch_messages_for_chat_paged(
             self._db.msgstore, chat_id, after_id=min_id - 1, limit=max_id - min_id + 200
         )
-        return [_message_row_to_dict(r, self._registry) for r in rows if r.message_id <= max_id]
+        return [_to_index_message(r, self._registry) for r in rows if r.message_id <= max_id]
 
     def load_calls(self) -> pd.DataFrame:
         rows = list(fetch_calls(self._db.msgstore))
@@ -125,8 +139,7 @@ class DataLoader:
 # ── private helpers ──────────────────────────────────────────────────────────
 
 
-def _message_row_to_dict(row: RawMessageRow, registry: SenderRegistry) -> dict[str, object]:
-    """Scalar row-to-dict for streaming indexer (produces only the columns it needs)."""
+def _to_index_message(row: RawMessageRow, registry: SenderRegistry) -> IndexMessage:
     contacts = registry.as_dict()
     server = row.chat_server or ""
     phone = row.chat_phone or ""
@@ -150,15 +163,15 @@ def _message_row_to_dict(row: RawMessageRow, registry: SenderRegistry) -> dict[s
     else:
         sender_name = contacts.get(effective_phone) or effective_phone or "Unknown"
 
-    return {
-        COL_MESSAGE_ID: row.message_id,
-        COL_CHAT_ROW_ID: row.chat_row_id,
-        COL_TIMESTAMP: row.timestamp,  # raw int ms — no tz conversion needed for indexer
-        COL_MESSAGE_TYPE: row.message_type,
-        COL_TEXT_DATA: row.text_data,
-        COL_CHAT_NAME: chat_name,
-        COL_SENDER_NAME: sender_name,
-    }
+    return IndexMessage(
+        message_id=row.message_id,
+        chat_row_id=row.chat_row_id,
+        timestamp=row.timestamp,
+        message_type=row.message_type,
+        text_data=row.text_data,
+        chat_name=chat_name,
+        sender_name=sender_name,
+    )
 
 
 def _row_to_chat_summary(row: RawChatRow, registry: SenderRegistry) -> ChatSummary:
