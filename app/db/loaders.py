@@ -231,7 +231,7 @@ def _rows_to_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) ->
     # Derive time components used by analysis
     df[COL_DATE] = df[COL_TIMESTAMP].dt.date
     df[COL_YEAR] = df[COL_TIMESTAMP].dt.year
-    df[COL_MONTH] = df[COL_TIMESTAMP].dt.to_period("M").astype(str)
+    df[COL_MONTH] = df[COL_TIMESTAMP].dt.strftime("%Y-%m")
     df[COL_DAY_OF_WEEK] = df[COL_TIMESTAMP].dt.day_name()
     df[COL_HOUR] = df[COL_TIMESTAMP].dt.hour
 
