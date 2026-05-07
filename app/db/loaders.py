@@ -1,5 +1,6 @@
 import datetime
 import logging
+import sqlite3
 from collections.abc import Generator
 from pathlib import Path
 
@@ -7,7 +8,11 @@ import pandas as pd
 from db.connection import DBConnection
 from db.queries.calls import fetch_calls
 from db.queries.chats import fetch_chats
-from db.queries.messages import fetch_all_messages, fetch_messages_for_chat, fetch_messages_for_chat_paged
+from db.queries.messages import (
+    fetch_all_messages,
+    fetch_index_rows_paged,
+    fetch_messages_for_chat,
+)
 from db.queries.reactions import fetch_reactions
 from db.row_types import RawChatRow, RawMessageRow
 from models.chat import ChatSummary, ChatType
@@ -97,16 +102,17 @@ class DataLoader:
     ) -> Generator[IndexMessage]:
         """Flat message stream for one chat. Paginates DB internally; caller sees plain iterator."""
         contacts = self._registry.as_dict()
+        system_type = int(MessageType.SYSTEM)
         cursor = after_id
         while True:
-            rows = fetch_messages_for_chat_paged(self._db.msgstore, chat_id, cursor, chunk_size)
+            rows = fetch_index_rows_paged(self._db.msgstore, chat_id, cursor, chunk_size)
             if not rows:
                 return
             for r in rows:
-                if r.message_type != int(MessageType.SYSTEM):
-                    yield _to_index_message(row=r, registry=self._registry, contacts=contacts)
+                if r["message_type"] != system_type:
+                    yield _raw_row_to_index_message(row=r, registry=self._registry, contacts=contacts)
             # Advance cursor on full page's last _id (even if those rows were filtered).
-            cursor = rows[-1].message_id
+            cursor = rows[-1]["message_id"]
             if len(rows) < chunk_size:
                 return
 
@@ -118,11 +124,11 @@ class DataLoader:
     ) -> list[IndexMessage]:
         """Load a previous session's messages for incremental boundary reconstruction."""
         contacts = self._registry.as_dict()
-        rows = fetch_messages_for_chat_paged(
-            self._db.msgstore, chat_id, after_id=min_id - 1, limit=max_id - min_id + 200
-        )
+        rows = fetch_index_rows_paged(self._db.msgstore, chat_id, after_id=min_id - 1, limit=max_id - min_id + 200)
         return [
-            _to_index_message(row=r, registry=self._registry, contacts=contacts) for r in rows if r.message_id <= max_id
+            _raw_row_to_index_message(row=r, registry=self._registry, contacts=contacts)
+            for r in rows
+            if r["message_id"] <= max_id
         ]
 
     def load_calls(self) -> pd.DataFrame:
@@ -137,6 +143,41 @@ class DataLoader:
 
 
 # ── private helpers ──────────────────────────────────────────────────────────
+
+
+def _raw_row_to_index_message(row: sqlite3.Row, registry: SenderRegistry, contacts: dict[str, str]) -> IndexMessage:
+    """Build IndexMessage directly from a sqlite3.Row — no intermediate Pydantic model."""
+    server: str = row["chat_server"] or ""
+    phone: str = row["chat_phone"] or ""
+    subject: str = row["chat_subject"] or ""
+    is_grp = server.endswith(GROUP_SERVER)
+    is_broadcast = server == BROADCAST_SERVER
+
+    if subject:
+        chat_name: str = subject
+    elif is_grp:
+        chat_name = f"Group ({phone})"
+    elif is_broadcast:
+        chat_name = "Broadcast"
+    else:
+        chat_name = contacts.get(phone) or phone or "Unknown"
+
+    sender_phone: str = row["sender_phone"] or ""
+    effective_phone = sender_phone if (sender_phone or is_grp) else phone
+    if row["from_me"]:
+        sender_name: str = registry.me_name
+    else:
+        sender_name = contacts.get(effective_phone) or effective_phone or "Unknown"
+
+    return IndexMessage.model_construct(
+        message_id=row["message_id"],
+        chat_row_id=row["chat_row_id"],
+        timestamp=row["timestamp"],
+        message_type=row["message_type"],
+        text_data=row["text_data"],
+        chat_name=chat_name,
+        sender_name=sender_name,
+    )
 
 
 def _to_index_message(row: RawMessageRow, registry: SenderRegistry, contacts: dict[str, str]) -> IndexMessage:

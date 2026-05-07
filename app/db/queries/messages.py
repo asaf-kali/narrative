@@ -81,3 +81,13 @@ def fetch_messages_for_chat_paged(
 ) -> list[RawMessageRow]:
     rows = conn.execute(_MESSAGES_PAGED_SQL, (chat_id, after_id, limit)).fetchall()
     return [RawMessageRow.model_validate(dict(r)) for r in rows]
+
+
+def fetch_index_rows_paged(
+    conn: sqlite3.Connection,
+    chat_id: int,
+    after_id: int,
+    limit: int,
+) -> list[sqlite3.Row]:
+    """Return raw sqlite3.Row objects — no Pydantic overhead. For the indexer hot path only."""
+    return conn.execute(_MESSAGES_PAGED_SQL, (chat_id, after_id, limit)).fetchall()
