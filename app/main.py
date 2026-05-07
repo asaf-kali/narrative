@@ -1,4 +1,3 @@
-import datetime
 import logging
 import os
 from pathlib import Path
@@ -6,41 +5,10 @@ from typing import Annotated
 
 import typer
 import uvicorn
+from logger import configure_logging
 
-logging.captureWarnings(True)  # noqa: FBT003
-
-
-class _Formatter(logging.Formatter):
-    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:  # noqa: ARG002, N802
-        return (
-            datetime.datetime.fromtimestamp(record.created, tz=datetime.UTC).astimezone().strftime("%Y-%m-%d %H:%M:%S.")
-            + f"{record.msecs:03.0f}"
-        )
-
-
-_FMT = "[%(asctime)s] [%(levelname)-4.4s] %(message)s [%(name)s] [%(filename)s:%(lineno)d]"
-
-_handler = logging.StreamHandler()
-_handler.setFormatter(_Formatter(_FMT))
-logging.basicConfig(level=logging.INFO, handlers=[_handler])
-
+_LOG_CONFIG_DICT = configure_logging()
 logger = logging.getLogger(__name__)
-
-_UVICORN_LOG_CONFIG: dict[str, object] = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "default": {"()": _Formatter, "fmt": _FMT},
-    },
-    "handlers": {
-        "default": {"class": "logging.StreamHandler", "formatter": "default"},
-    },
-    "loggers": {
-        "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
-        "uvicorn.error": {"handlers": ["default"], "level": "INFO", "propagate": False},
-        "uvicorn.access": {"handlers": [], "level": "WARNING", "propagate": False},
-    },
-}
 
 try:
     from semantic_search.indexer import run as _run_index
@@ -48,18 +16,28 @@ except ImportError:
     _run_index = None
 
 cli = typer.Typer(no_args_is_help=True)
+DEFAULT_INACTIVE_GAP_SECONDS = 15 * 60
+
+_ArgMsgstore = Annotated[Path, typer.Option(help="Path to decrypted msgstore.db")]
+_ArgWadb = Annotated[Path | None, typer.Option(help="Path to decrypted wa.db (optional, for contact names)")]
+_ArgContacts = Annotated[Path | None, typer.Option(help="Google Contacts CSV export (optional)")]
+_ArgLocalCode = Annotated[str, typer.Option(help="Country code for local-format phone numbers (e.g. 972)")]
+_ArgSearchDir = Annotated[Path, typer.Option(help="Semantic search index directory")]
+_ArgPort = Annotated[int, typer.Option(help="Port to run on")]
+_ArgHost = Annotated[str, typer.Option(help="Host to bind to")]
+_ArgReload = Annotated[bool, typer.Option("--reload", help="Enable auto-reload (development mode)")]
 
 
 @cli.command()
 def serve(
-    msgstore: Annotated[Path, typer.Option(help="Path to decrypted msgstore.db")] = Path("data/msgstore.db"),
-    wadb: Annotated[Path | None, typer.Option(help="Path to decrypted wa.db (optional, for contact names)")] = None,
-    contacts: Annotated[Path | None, typer.Option(help="Google Contacts CSV export (optional)")] = None,
-    local_code: Annotated[str, typer.Option(help="Country code for local-format phone numbers (e.g. 972)")] = "972",
-    search_dir: Annotated[Path, typer.Option(help="Semantic search index directory")] = Path("data/search"),
-    port: Annotated[int, typer.Option(help="Port to run on")] = 8050,
-    host: Annotated[str, typer.Option(help="Host to bind to")] = "127.0.0.1",
-    reload: Annotated[bool, typer.Option("--reload", help="Enable auto-reload (development mode)")] = False,
+    msgstore: _ArgMsgstore = Path("data/msgstore.db"),
+    wadb: _ArgWadb = None,
+    contacts: _ArgContacts = None,
+    local_code: _ArgLocalCode = "972",
+    search_dir: _ArgSearchDir = Path("data/search"),
+    port: _ArgPort = 8050,
+    host: _ArgHost = "127.0.0.1",
+    reload: _ArgReload = False,
 ) -> None:
     """Run the Narrative analytics server."""
     if not msgstore.exists():
@@ -84,7 +62,7 @@ def serve(
             port=port,
             reload=True,
             reload_dirs=["app"],
-            log_config=_UVICORN_LOG_CONFIG,
+            log_config=_LOG_CONFIG_DICT,
         )
     else:
         from api.server import create_api  # noqa: PLC0415
@@ -96,18 +74,24 @@ def serve(
             local_code=local_code,
             search_dir=search_dir,
         )
-        uvicorn.run(api, host=host, port=port, log_config=_UVICORN_LOG_CONFIG)
+        uvicorn.run(api, host=host, port=port, log_config=_LOG_CONFIG_DICT)
+
+
+_ArgGapSeconds = Annotated[
+    int, typer.Option(help=f"Inactivity gap in seconds to split sessions (default: {DEFAULT_INACTIVE_GAP_SECONDS})")
+]
+_ArgBatchSize = Annotated[int, typer.Option(help="Embedding batch size")]
+_ArgChunkSize = Annotated[int, typer.Option(help="Messages read per DB chunk (streaming)")]
 
 
 @cli.command()
 def index(
-    msgstore: Annotated[Path, typer.Option(help="Path to decrypted msgstore.db")] = Path("data/msgstore.db"),
-    wadb: Annotated[Path | None, typer.Option(help="Path to decrypted wa.db (optional)")] = None,
-    search_dir: Annotated[Path, typer.Option(help="Semantic search index output directory")] = Path("data/search"),
-    gap_seconds: Annotated[int, typer.Option(help="Inactivity gap in seconds to split sessions (default: 15 min)")] = 15
-    * 60,
-    batch_size: Annotated[int, typer.Option(help="Embedding batch size")] = 32,
-    chunk_size: Annotated[int, typer.Option(help="Messages read per DB chunk (streaming)")] = 500,
+    msgstore: _ArgMsgstore = Path("data/msgstore.db"),
+    wadb: _ArgWadb = None,
+    search_dir: _ArgSearchDir = Path("data/search"),
+    gap_seconds: _ArgGapSeconds = DEFAULT_INACTIVE_GAP_SECONDS,
+    batch_size: _ArgBatchSize = 32,
+    chunk_size: _ArgChunkSize = 500,
 ) -> None:
     """Build or incrementally update the semantic search index."""
     if _run_index is None:
