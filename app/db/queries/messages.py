@@ -49,3 +49,22 @@ def fetch_messages_for_chat(conn: sqlite3.Connection, chat_id: int) -> Generator
     sql = _MESSAGES_SQL + " AND m.chat_row_id = ?"
     for row in conn.execute(sql, (chat_id,)):
         yield RawMessageRow.model_validate(dict(row))
+
+
+def count_messages(conn: sqlite3.Connection) -> int:
+    row = conn.execute("SELECT COUNT(*) FROM message WHERE chat_row_id > 0 AND message_type != 7").fetchone()
+    return int(row[0]) if row else 0
+
+
+# Cursor-based pagination on _id (stable PK, no timestamp ties).
+_MESSAGES_PAGED_SQL = _MESSAGES_SQL + " AND m.chat_row_id = ? AND m._id > ? ORDER BY m._id LIMIT ?"
+
+
+def fetch_messages_for_chat_paged(
+    conn: sqlite3.Connection,
+    chat_id: int,
+    after_id: int,
+    limit: int,
+) -> list[RawMessageRow]:
+    rows = conn.execute(_MESSAGES_PAGED_SQL, (chat_id, after_id, limit)).fetchall()
+    return [RawMessageRow.model_validate(dict(r)) for r in rows]

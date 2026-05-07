@@ -1,12 +1,13 @@
 import datetime
 import logging
+from collections.abc import Generator
 from pathlib import Path
 
 import pandas as pd
 from db.connection import DBConnection
 from db.queries.calls import fetch_calls
 from db.queries.chats import fetch_chats
-from db.queries.messages import fetch_all_messages, fetch_messages_for_chat
+from db.queries.messages import fetch_all_messages, fetch_messages_for_chat, fetch_messages_for_chat_paged
 from db.queries.reactions import fetch_reactions
 from db.row_types import RawChatRow, RawMessageRow
 from models.chat import ChatSummary, ChatType
@@ -78,6 +79,38 @@ class DataLoader:
             return pd.DataFrame(columns=["reaction_message_id", "parent_message_id", "emoji", "sender_phone"])
         return pd.DataFrame([r.model_dump() for r in rows])
 
+    def iter_chat_message_chunks(
+        self,
+        chat_id: int,
+        chunk_size: int,
+        after_id: int = 0,
+    ) -> Generator[list[dict[str, object]]]:
+        """Cursor-paginated message stream for one chat, excluding system messages."""
+        cursor = after_id
+        while True:
+            rows = fetch_messages_for_chat_paged(self._db.msgstore, chat_id, cursor, chunk_size)
+            if not rows:
+                return
+            non_system = [r for r in rows if r.message_type != int(MessageType.SYSTEM)]
+            if non_system:
+                yield [_message_row_to_dict(r, self._registry) for r in non_system]
+            # Advance cursor on full page's last _id (even if those rows were filtered).
+            cursor = rows[-1].message_id
+            if len(rows) < chunk_size:
+                return
+
+    def load_boundary_rows(
+        self,
+        chat_id: int,
+        min_id: int,
+        max_id: int,
+    ) -> list[dict[str, object]]:
+        """Load a previous session's messages for incremental boundary reconstruction."""
+        rows = fetch_messages_for_chat_paged(
+            self._db.msgstore, chat_id, after_id=min_id - 1, limit=max_id - min_id + 200
+        )
+        return [_message_row_to_dict(r, self._registry) for r in rows if r.message_id <= max_id]
+
     def load_calls(self) -> pd.DataFrame:
         rows = list(fetch_calls(self._db.msgstore))
         if not rows:
@@ -90,6 +123,42 @@ class DataLoader:
 
 
 # ── private helpers ──────────────────────────────────────────────────────────
+
+
+def _message_row_to_dict(row: RawMessageRow, registry: SenderRegistry) -> dict[str, object]:
+    """Scalar row-to-dict for streaming indexer (produces only the columns it needs)."""
+    contacts = registry.as_dict()
+    server = row.chat_server or ""
+    phone = row.chat_phone or ""
+    subject = row.chat_subject or ""
+    is_grp = server.endswith(GROUP_SERVER)
+    is_broadcast = server == BROADCAST_SERVER
+
+    if subject:
+        chat_name: str = subject
+    elif is_grp:
+        chat_name = f"Group ({phone})"
+    elif is_broadcast:
+        chat_name = "Broadcast"
+    else:
+        chat_name = contacts.get(phone) or phone or "Unknown"
+
+    sender_phone = row.sender_phone or ""
+    effective_phone = sender_phone if (sender_phone or is_grp) else phone
+    if row.from_me:
+        sender_name: str = registry.me_name
+    else:
+        sender_name = contacts.get(effective_phone) or effective_phone or "Unknown"
+
+    return {
+        COL_MESSAGE_ID: row.message_id,
+        COL_CHAT_ROW_ID: row.chat_row_id,
+        COL_TIMESTAMP: row.timestamp,  # raw int ms — no tz conversion needed for indexer
+        COL_MESSAGE_TYPE: row.message_type,
+        COL_TEXT_DATA: row.text_data,
+        COL_CHAT_NAME: chat_name,
+        COL_SENDER_NAME: sender_name,
+    }
 
 
 def _row_to_chat_summary(row: RawChatRow, registry: SenderRegistry) -> ChatSummary:

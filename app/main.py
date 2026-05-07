@@ -107,6 +107,7 @@ def index(
     gap_seconds: Annotated[int, typer.Option(help="Inactivity gap in seconds to split sessions (default: 15 min)")] = 15
     * 60,
     batch_size: Annotated[int, typer.Option(help="Embedding batch size")] = 32,
+    chunk_size: Annotated[int, typer.Option(help="Messages read per DB chunk (streaming)")] = 500,
 ) -> None:
     """Build or incrementally update the semantic search index."""
     if _run_index is None:
@@ -124,6 +125,7 @@ def index(
         search_dir=search_dir,
         gap_seconds=gap_seconds,
         batch_size=batch_size,
+        chunk_size=chunk_size,
     )
 
 
