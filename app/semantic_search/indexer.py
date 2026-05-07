@@ -24,6 +24,7 @@ from semantic_search.embedder import Embedder
 from semantic_search.session import Session, SessionRecord
 from semantic_search.state import StateDB
 from semantic_search.vector_store import VectorStore
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -124,14 +125,16 @@ class Indexer:
         logger.info(f"Messages in DB: {total}")
 
         global_stats = _IndexStats()
-        for i, chat_id in enumerate(all_chat_ids, 1):
-            chat_stats = self._index_chat(chat_id=chat_id, known_chats=known_chats)
-            global_stats.merge(chat_stats)
-            n = chat_stats.session_count
-            if n:
-                logger.info(f"[{i}/{len(all_chat_ids)}] chat {chat_id}: {n} sessions | {chat_stats.inline_str()}")
-            else:
-                logger.info(f"[{i}/{len(all_chat_ids)}] chat {chat_id}: up to date")
+        with logging_redirect_tqdm():
+            for i, chat_id in enumerate(all_chat_ids, 1):
+                chat_stats = self._index_chat(chat_id=chat_id, known_chats=known_chats)
+                global_stats.merge(chat_stats)
+                n = chat_stats.session_count
+                log_prefix = f"{i}/{len(all_chat_ids)}] chat {chat_id}"
+                if n:
+                    logger.info(f"[{log_prefix}: {n} sessions | {chat_stats.inline_str()}")
+                else:
+                    logger.info(f"[{log_prefix}: up to date")
 
         if is_first_run and global_stats.session_count >= _MIN_INDEX_ROWS:
             self._store.build_index()
