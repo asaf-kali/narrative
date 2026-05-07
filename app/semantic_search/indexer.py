@@ -53,7 +53,8 @@ class Indexer:
         self._chunk_size = chunk_size
 
     def __enter__(self) -> Self:
-        self._db = DBConnection(msgstore_path=self._msgstore_path, wadb_path=self._wadb_path).__enter__()
+        conn = DBConnection(msgstore_path=self._msgstore_path, wadb_path=self._wadb_path)
+        self._db = conn.__enter__()
         registry = build_sender_registry(wadb=self._db.wadb, csv_path=None, msgstore=self._db.msgstore, local_code=None)
         self._loader = DataLoader(db=self._db, registry=registry)
         return self

@@ -18,6 +18,19 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+
+class IndexMessage(BaseModel):
+    """Message row prepared for the streaming indexer pipeline."""
+
+    message_id: int
+    chat_row_id: int
+    timestamp: int  # ms UTC, no tz conversion
+    message_type: int
+    text_data: str | None
+    chat_name: str
+    sender_name: str
+
+
 # Messages DataFrame column names
 COL_MESSAGE_ID = "message_id"
 COL_CHAT_ROW_ID = "chat_row_id"
@@ -41,19 +54,6 @@ COL_DAY_OF_WEEK = "day_of_week"
 COL_HOUR = "hour"
 COL_CHAT_NAME = "chat_name"
 COL_IS_GROUP = "is_group"
-
-
-class IndexMessage(BaseModel):
-    """Message row prepared for the streaming indexer pipeline."""
-
-    message_id: int
-    chat_row_id: int
-    timestamp: int  # ms UTC, no tz conversion
-    message_type: int
-    text_data: str | None
-    chat_name: str
-    sender_name: str
-
 
 # Use the system local timezone for timestamp display
 _LOCAL_TZ: datetime.tzinfo = datetime.datetime.now().astimezone().tzinfo or datetime.UTC
@@ -96,6 +96,7 @@ class DataLoader:
         after_id: int = 0,
     ) -> Generator[IndexMessage]:
         """Flat message stream for one chat. Paginates DB internally; caller sees plain iterator."""
+        contacts = self._registry.as_dict()
         cursor = after_id
         while True:
             rows = fetch_messages_for_chat_paged(self._db.msgstore, chat_id, cursor, chunk_size)
@@ -103,7 +104,7 @@ class DataLoader:
                 return
             for r in rows:
                 if r.message_type != int(MessageType.SYSTEM):
-                    yield _to_index_message(r, self._registry)
+                    yield _to_index_message(row=r, registry=self._registry, contacts=contacts)
             # Advance cursor on full page's last _id (even if those rows were filtered).
             cursor = rows[-1].message_id
             if len(rows) < chunk_size:
@@ -116,10 +117,13 @@ class DataLoader:
         max_id: int,
     ) -> list[IndexMessage]:
         """Load a previous session's messages for incremental boundary reconstruction."""
+        contacts = self._registry.as_dict()
         rows = fetch_messages_for_chat_paged(
             self._db.msgstore, chat_id, after_id=min_id - 1, limit=max_id - min_id + 200
         )
-        return [_to_index_message(r, self._registry) for r in rows if r.message_id <= max_id]
+        return [
+            _to_index_message(row=r, registry=self._registry, contacts=contacts) for r in rows if r.message_id <= max_id
+        ]
 
     def load_calls(self) -> pd.DataFrame:
         rows = list(fetch_calls(self._db.msgstore))
@@ -135,8 +139,7 @@ class DataLoader:
 # ── private helpers ──────────────────────────────────────────────────────────
 
 
-def _to_index_message(row: RawMessageRow, registry: SenderRegistry) -> IndexMessage:
-    contacts = registry.as_dict()
+def _to_index_message(row: RawMessageRow, registry: SenderRegistry, contacts: dict[str, str]) -> IndexMessage:
     server = row.chat_server or ""
     phone = row.chat_phone or ""
     subject = row.chat_subject or ""
