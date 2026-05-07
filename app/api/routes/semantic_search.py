@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -50,8 +50,8 @@ def semantic_search(
         SemanticSearchHit(
             chat_id=h.chat_id,
             chat_name=h.chat_name,
-            timestamp_start=datetime.fromtimestamp(h.timestamp_start / 1000, tz=UTC),
-            timestamp_end=datetime.fromtimestamp(h.timestamp_end / 1000, tz=UTC),
+            timestamp_start=h.timestamp_start,
+            timestamp_end=h.timestamp_end,
             score=h.score,
         )
         for h in hits

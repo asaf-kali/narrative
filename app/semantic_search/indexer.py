@@ -6,6 +6,8 @@ import logging
 import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
+from types import TracebackType
+from typing import Self
 
 from db.connection import DBConnection
 from db.contacts import build_sender_registry
@@ -13,7 +15,8 @@ from db.loaders import DataLoader, IndexMessage
 from db.queries.messages import count_messages
 from semantic_search.chunker import Session, chunk_chat_streaming
 from semantic_search.embedder import Embedder
-from semantic_search.state import SessionMeta, StateDB
+from semantic_search.session import SessionMeta, SessionRecord
+from semantic_search.state import StateDB
 from semantic_search.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -24,11 +27,15 @@ _MIN_INDEX_ROWS = 256  # LanceDB requires this many rows before building an ANN 
 class Indexer:
     def __init__(
         self,
+        msgstore_path: Path,
+        wadb_path: Path | None,
         search_dir: Path,
         gap_seconds: int,
         batch_size: int,
         chunk_size: int = 500,
     ) -> None:
+        self._msgstore_path = msgstore_path
+        self._wadb_path = wadb_path
         self._state = StateDB(search_dir)
         self._store = VectorStore.open(search_dir)
         self._embedder = Embedder()
@@ -36,46 +43,53 @@ class Indexer:
         self._batch_size = batch_size
         self._chunk_size = chunk_size
 
-    def run(self, msgstore_path: Path, wadb_path: Path | None) -> None:
-        with DBConnection(msgstore_path=msgstore_path, wadb_path=wadb_path) as db:
-            registry = build_sender_registry(wadb=db.wadb, csv_path=None, msgstore=db.msgstore, local_code=None)
-            loader = DataLoader(db=db, registry=registry)
-            known_chats = set(self._state.all_chat_ids())
-            all_chat_ids = _get_all_chat_ids(db.msgstore)
-            is_first_run = not known_chats
+    def __enter__(self) -> Self:
+        self._db = DBConnection(msgstore_path=self._msgstore_path, wadb_path=self._wadb_path).__enter__()
+        registry = build_sender_registry(wadb=self._db.wadb, csv_path=None, msgstore=self._db.msgstore, local_code=None)
+        self._loader = DataLoader(db=self._db, registry=registry)
+        return self
 
-            total = count_messages(db.msgstore)
-            logger.info(f"Messages in DB: {total}")
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self._db.__exit__(exc_type, exc_val, exc_tb)
+        self._state.close()
 
-            total_sessions = 0
-            for i, chat_id in enumerate(all_chat_ids, 1):
-                n = self._index_chat(chat_id, db.msgstore, loader, known_chats)
-                total_sessions += n
-                logger.info(f"[{i}/{len(all_chat_ids)}] chat {chat_id}: {n} sessions")
+    def run(self) -> None:
+        known_chats = set(self._state.all_chat_ids())
+        all_chat_ids = _get_all_chat_ids(self._db.msgstore)
+        is_first_run = not known_chats
+
+        total = count_messages(self._db.msgstore)
+        logger.info(f"Messages in DB: {total}")
+
+        total_sessions = 0
+        for i, chat_id in enumerate(all_chat_ids, 1):
+            n = self._index_chat(chat_id, known_chats)
+            total_sessions += n
+            logger.info(f"[{i}/{len(all_chat_ids)}] chat {chat_id}: {n} sessions")
 
         if is_first_run and total_sessions >= _MIN_INDEX_ROWS:
             self._store.build_index()
-        self._state.close()
         logger.info(f"Done — {total_sessions} sessions across {len(all_chat_ids)} chats")
 
-    def _index_chat(
-        self,
-        chat_id: int,
-        conn: sqlite3.Connection,
-        loader: DataLoader,
-        known_chats: set[int],
-    ) -> int:
+    def _index_chat(self, chat_id: int, known_chats: set[int]) -> int:
         max_indexed = self._state.get_max_indexed(chat_id) if chat_id in known_chats else 0
         last_session = self._state.get_last_session(chat_id) if chat_id in known_chats else None
 
-        chunk_iter = loader.iter_chat_message_chunks(chat_id, self._chunk_size, after_id=max_indexed)
+        chunk_iter = self._loader.iter_chat_message_chunks(chat_id, self._chunk_size, after_id=max_indexed)
         first_chunk = next(chunk_iter, None)
         if first_chunk is None:
             return 0
 
         to_delete: list[str] = []
         if last_session is not None:
-            boundary = loader.load_boundary_rows(chat_id, last_session.min_message_id, last_session.max_message_id)
+            boundary = self._loader.load_boundary_rows(
+                chat_id, last_session.min_message_id, last_session.max_message_id
+            )
             if boundary:
                 first_chunk = boundary + first_chunk
                 to_delete = [last_session.session_id]
@@ -89,7 +103,8 @@ class Indexer:
         batch: list[Session] = []
         batch_to_delete = to_delete
 
-        for session in chunk_chat_streaming(_full_iter(), chat_id, chat_name, self._gap_seconds):
+        session_iterator = chunk_chat_streaming(_full_iter(), chat_id, chat_name, self._gap_seconds)
+        for session in session_iterator:
             batch.append(session)
             if len(batch) >= self._batch_size:
                 self._flush(batch, batch_to_delete)
@@ -101,7 +116,8 @@ class Indexer:
             self._flush(batch, batch_to_delete)
             sessions_written += len(batch)
 
-        self._state.upsert_state(chat_id, _get_max_message_id(conn, chat_id))
+        max_id = _get_max_message_id(self._db.msgstore, chat_id)
+        self._state.upsert_state(chat_id, max_id)
         return sessions_written
 
     def _flush(self, sessions: list[Session], to_delete: list[str]) -> None:
@@ -110,31 +126,30 @@ class Indexer:
             self._store.delete_sessions(to_delete)
             for sid in to_delete:
                 self._state.delete_session(sid)
-        rows: list[dict[str, object]] = [
-            {
-                "session_id": s.session_id,
-                "chat_id": s.chat_id,
-                "chat_name": s.chat_name,
-                "timestamp_start": s.timestamp_start,
-                "timestamp_end": s.timestamp_end,
-                "vector": v,
-            }
+        session_records = [
+            SessionRecord(
+                session_id=s.session_id,
+                chat_id=s.chat_id,
+                chat_name=s.chat_name,
+                timestamp_start=s.timestamp_start,
+                timestamp_end=s.timestamp_end,
+                vector=v,
+            )
             for s, v in zip(sessions, vectors, strict=True)
         ]
-        self._store.upsert_sessions(rows)
-        self._state.insert_sessions(
-            [
-                SessionMeta(
-                    session_id=s.session_id,
-                    chat_id=s.chat_id,
-                    min_message_id=s.min_message_id,
-                    max_message_id=s.max_message_id,
-                    timestamp_start=s.timestamp_start,
-                    timestamp_end=s.timestamp_end,
-                )
-                for s in sessions
-            ]
-        )
+        self._store.upsert_sessions(session_records)
+        session_metadatas = [
+            SessionMeta(
+                session_id=s.session_id,
+                chat_id=s.chat_id,
+                min_message_id=s.min_message_id,
+                max_message_id=s.max_message_id,
+                timestamp_start=s.timestamp_start,
+                timestamp_end=s.timestamp_end,
+            )
+            for s in sessions
+        ]
+        self._state.insert_sessions(session_metadatas)
 
 
 # ── module-level entry point (called by main.py) ─────────────────────────────
@@ -148,12 +163,15 @@ def run(
     batch_size: int,
     chunk_size: int = 500,
 ) -> None:
-    Indexer(
+    with Indexer(
+        msgstore_path=msgstore_path,
+        wadb_path=wadb_path,
         search_dir=search_dir,
         gap_seconds=gap_seconds,
         batch_size=batch_size,
         chunk_size=chunk_size,
-    ).run(msgstore_path=msgstore_path, wadb_path=wadb_path)
+    ) as indexer:
+        indexer.run()
 
 
 # ── private helpers ──────────────────────────────────────────────────────────

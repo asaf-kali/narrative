@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+
+from semantic_search.session import SessionMeta
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS index_state (
@@ -19,16 +21,6 @@ CREATE TABLE IF NOT EXISTS indexed_sessions (
     timestamp_end INTEGER NOT NULL
 );
 """
-
-
-@dataclass
-class SessionMeta:
-    session_id: str
-    chat_id: int
-    min_message_id: int
-    max_message_id: int
-    timestamp_start: int
-    timestamp_end: int
 
 
 class StateDB:
@@ -62,7 +54,14 @@ class StateDB:
             "(session_id, chat_id, min_message_id, max_message_id, timestamp_start, timestamp_end) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             [
-                (s.session_id, s.chat_id, s.min_message_id, s.max_message_id, s.timestamp_start, s.timestamp_end)
+                (
+                    s.session_id,
+                    s.chat_id,
+                    s.min_message_id,
+                    s.max_message_id,
+                    int(s.timestamp_start.timestamp() * 1000),
+                    int(s.timestamp_end.timestamp() * 1000),
+                )
                 for s in sessions
             ],
         )
@@ -85,8 +84,8 @@ class StateDB:
             chat_id=row[1],
             min_message_id=row[2],
             max_message_id=row[3],
-            timestamp_start=row[4],
-            timestamp_end=row[5],
+            timestamp_start=datetime.fromtimestamp(row[4] / 1000, tz=UTC),
+            timestamp_end=datetime.fromtimestamp(row[5] / 1000, tz=UTC),
         )
 
     def all_chat_ids(self) -> list[int]:

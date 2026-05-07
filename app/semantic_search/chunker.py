@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
@@ -26,8 +27,8 @@ class Session:
     session_id: str
     chat_id: int
     chat_name: str
-    timestamp_start: int  # ms UTC
-    timestamp_end: int  # ms UTC
+    timestamp_start: datetime
+    timestamp_end: datetime
     min_message_id: int
     max_message_id: int
     embed_text: str  # joined text for embedding only — not stored persistently
@@ -138,8 +139,8 @@ def _build_session_from_messages(
         session_id=session_id,
         chat_id=chat_id,
         chat_name=chat_name,
-        timestamp_start=window[0].timestamp,
-        timestamp_end=window[-1].timestamp,
+        timestamp_start=datetime.fromtimestamp(window[0].timestamp / 1000, tz=UTC),
+        timestamp_end=datetime.fromtimestamp(window[-1].timestamp / 1000, tz=UTC),
         min_message_id=min_id,
         max_message_id=window[-1].message_id,
         embed_text=" ".join(session_texts),
@@ -164,8 +165,8 @@ def _build_session(
         session_id=session_id,
         chat_id=chat_id,
         chat_name=chat_name,
-        timestamp_start=int(timestamps[start]),
-        timestamp_end=int(timestamps[end - 1]),
+        timestamp_start=datetime.fromtimestamp(int(timestamps[start]) / 1000, tz=UTC),
+        timestamp_end=datetime.fromtimestamp(int(timestamps[end - 1]) / 1000, tz=UTC),
         min_message_id=min_id,
         max_message_id=int(msg_ids[end - 1]),
         embed_text=" ".join(session_texts),
