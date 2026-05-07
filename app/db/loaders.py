@@ -89,21 +89,21 @@ class DataLoader:
             return pd.DataFrame(columns=["reaction_message_id", "parent_message_id", "emoji", "sender_phone"])
         return pd.DataFrame([r.model_dump() for r in rows])
 
-    def iter_chat_message_chunks(
+    def iter_chat_messages(
         self,
         chat_id: int,
         chunk_size: int,
         after_id: int = 0,
-    ) -> Generator[list[IndexMessage]]:
-        """Cursor-paginated message stream for one chat, excluding system messages."""
+    ) -> Generator[IndexMessage]:
+        """Flat message stream for one chat. Paginates DB internally; caller sees plain iterator."""
         cursor = after_id
         while True:
             rows = fetch_messages_for_chat_paged(self._db.msgstore, chat_id, cursor, chunk_size)
             if not rows:
                 return
-            non_system = [r for r in rows if r.message_type != int(MessageType.SYSTEM)]
-            if non_system:
-                yield [_to_index_message(r, self._registry) for r in non_system]
+            for r in rows:
+                if r.message_type != int(MessageType.SYSTEM):
+                    yield _to_index_message(r, self._registry)
             # Advance cursor on full page's last _id (even if those rows were filtered).
             cursor = rows[-1].message_id
             if len(rows) < chunk_size:

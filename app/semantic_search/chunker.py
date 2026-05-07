@@ -31,6 +31,7 @@ class Session:
     timestamp_end: datetime
     min_message_id: int
     max_message_id: int
+    message_count: int
     embed_text: str  # joined text for embedding only — not stored persistently
 
 
@@ -84,36 +85,27 @@ def _chunk_chat(
         yield session
 
 
-def chunk_chat_streaming(
-    chunk_iter: Iterator[list[IndexMessage]],
+def iterate_sessions(
+    messages: Iterator[IndexMessage],
     chat_id: int,
     chat_name: str,
     gap_seconds: int,
 ) -> Iterator[Session]:
-    """Chunk one chat's messages into Sessions from a paginated chunk iterator.
-
-    Maintains a pending buffer across chunk boundaries so sessions are never
-    truncated mid-chunk.
-    """
     gap_ms = gap_seconds * 1000
-    pending: list[IndexMessage] = []
+    buffer: list[IndexMessage] = []
 
-    for chunk in chunk_iter:
-        working = pending + chunk
-        pending = []
-        session_start = 0
+    for msg in messages:
+        if buffer and msg.timestamp - buffer[-1].timestamp > gap_ms:
+            session = _build_session_from_messages(
+                chat_id=chat_id, chat_name=chat_name, rows=buffer, start=0, end=len(buffer)
+            )
+            if session is not None:
+                yield session
+            buffer = []
+        buffer.append(msg)
 
-        for i in range(len(working) - 1):
-            if working[i + 1].timestamp - working[i].timestamp > gap_ms:
-                session = _build_session_from_messages(chat_id, chat_name, working, session_start, i + 1)
-                if session is not None:
-                    yield session
-                session_start = i + 1
-
-        pending = working[session_start:]
-
-    if pending:
-        session = _build_session_from_messages(chat_id, chat_name, pending, 0, len(pending))
+    if buffer:
+        session = _build_session_from_messages(chat_id, chat_name, buffer, 0, len(buffer))
         if session is not None:
             yield session
 
@@ -143,6 +135,7 @@ def _build_session_from_messages(
         timestamp_end=datetime.fromtimestamp(window[-1].timestamp / 1000, tz=UTC),
         min_message_id=min_id,
         max_message_id=window[-1].message_id,
+        message_count=len(window),
         embed_text=" ".join(session_texts),
     )
 
@@ -169,5 +162,6 @@ def _build_session(
         timestamp_end=datetime.fromtimestamp(int(timestamps[end - 1]) / 1000, tz=UTC),
         min_message_id=min_id,
         max_message_id=int(msg_ids[end - 1]),
+        message_count=end - start,
         embed_text=" ".join(session_texts),
     )

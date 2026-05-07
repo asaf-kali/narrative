@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import sqlite3
 from collections.abc import Iterator
+from dataclasses import dataclass
+from itertools import chain
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -13,7 +15,7 @@ from db.connection import DBConnection
 from db.contacts import build_sender_registry
 from db.loaders import DataLoader, IndexMessage
 from db.queries.messages import count_messages
-from semantic_search.chunker import Session, chunk_chat_streaming
+from semantic_search.chunker import Session, iterate_sessions
 from semantic_search.embedder import Embedder
 from semantic_search.session import SessionMeta, SessionRecord
 from semantic_search.state import StateDB
@@ -22,6 +24,13 @@ from semantic_search.vector_store import VectorStore
 logger = logging.getLogger(__name__)
 
 _MIN_INDEX_ROWS = 256  # LanceDB requires this many rows before building an ANN index
+
+
+@dataclass
+class _ChatStream:
+    messages: Iterator[IndexMessage]
+    chat_name: str
+    to_delete: list[str]
 
 
 class Indexer:
@@ -68,7 +77,7 @@ class Indexer:
 
         total_sessions = 0
         for i, chat_id in enumerate(all_chat_ids, 1):
-            n = self._index_chat(chat_id, known_chats)
+            n = self._index_chat(chat_id=chat_id, known_chats=known_chats)
             total_sessions += n
             logger.info(f"[{i}/{len(all_chat_ids)}] chat {chat_id}: {n} sessions")
 
@@ -77,47 +86,57 @@ class Indexer:
         logger.info(f"Done — {total_sessions} sessions across {len(all_chat_ids)} chats")
 
     def _index_chat(self, chat_id: int, known_chats: set[int]) -> int:
+        stream = self._open_chat_stream(chat_id=chat_id, known_chats=known_chats)
+        if stream is None:
+            return 0
+        return self._write_sessions(stream=stream, chat_id=chat_id)
+
+    def _open_chat_stream(self, chat_id: int, known_chats: set[int]) -> _ChatStream | None:
         max_indexed = self._state.get_max_indexed(chat_id) if chat_id in known_chats else 0
         last_session = self._state.get_last_session(chat_id) if chat_id in known_chats else None
 
-        chunk_iter = self._loader.iter_chat_message_chunks(chat_id, self._chunk_size, after_id=max_indexed)
-        first_chunk = next(chunk_iter, None)
-        if first_chunk is None:
-            return 0
+        new_messages = self._loader.iter_chat_messages(
+            chat_id=chat_id, chunk_size=self._chunk_size, after_id=max_indexed
+        )
+        first_msg = next(new_messages, None)
+        if first_msg is None:
+            return None
 
         to_delete: list[str] = []
+        boundary: list[IndexMessage] = []
         if last_session is not None:
             boundary = self._loader.load_boundary_rows(
-                chat_id, last_session.min_message_id, last_session.max_message_id
+                chat_id=chat_id,
+                min_id=last_session.min_message_id,
+                max_id=last_session.max_message_id,
             )
             if boundary:
-                first_chunk = boundary + first_chunk
                 to_delete = [last_session.session_id]
 
-        def _full_iter() -> Iterator[list[IndexMessage]]:
-            yield first_chunk
-            yield from chunk_iter
+        all_messages = chain(boundary, [first_msg], new_messages)
+        return _ChatStream(messages=all_messages, chat_name=first_msg.chat_name, to_delete=to_delete)
 
-        chat_name = first_chunk[0].chat_name
+    def _write_sessions(self, stream: _ChatStream, chat_id: int) -> int:
         sessions_written = 0
         batch: list[Session] = []
-        batch_to_delete = to_delete
+        batch_to_delete = stream.to_delete
 
-        session_iterator = chunk_chat_streaming(_full_iter(), chat_id, chat_name, self._gap_seconds)
-        for session in session_iterator:
+        for session in iterate_sessions(
+            messages=stream.messages, chat_id=chat_id, chat_name=stream.chat_name, gap_seconds=self._gap_seconds
+        ):
             batch.append(session)
             if len(batch) >= self._batch_size:
-                self._flush(batch, batch_to_delete)
+                self._flush(sessions=batch, to_delete=batch_to_delete)
                 batch_to_delete = []
                 sessions_written += len(batch)
                 batch = []
 
         if batch:
-            self._flush(batch, batch_to_delete)
+            self._flush(sessions=batch, to_delete=batch_to_delete)
             sessions_written += len(batch)
 
-        max_id = _get_max_message_id(self._db.msgstore, chat_id)
-        self._state.upsert_state(chat_id, max_id)
+        max_id = _get_max_message_id(conn=self._db.msgstore, chat_id=chat_id)
+        self._state.upsert_state(chat_id=chat_id, max_id=max_id)
         return sessions_written
 
     def _flush(self, sessions: list[Session], to_delete: list[str]) -> None:
