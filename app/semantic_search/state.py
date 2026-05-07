@@ -4,7 +4,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from semantic_search.session import SessionMeta
+from semantic_search.session import Session, SessionMeta
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS index_state (
@@ -48,7 +48,7 @@ class StateDB:
         )
         self._conn.commit()
 
-    def insert_sessions(self, sessions: list[SessionMeta]) -> None:
+    def insert_sessions(self, sessions: list[Session]) -> None:
         self._conn.executemany(
             "INSERT OR REPLACE INTO indexed_sessions "
             "(session_id, chat_id, min_message_id, max_message_id, timestamp_start, timestamp_end) "

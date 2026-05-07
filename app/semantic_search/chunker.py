@@ -2,24 +2,11 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterator
-from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from db.loaders import IndexMessage
 from models.message import MessageType
-
-
-@dataclass
-class Session:
-    session_id: str
-    chat_id: int
-    chat_name: str
-    timestamp_start: datetime
-    timestamp_end: datetime
-    min_message_id: int
-    max_message_id: int
-    message_count: int
-    embed_text: str  # joined text for embedding only — not stored persistently
+from semantic_search.session import Session
 
 
 def iterate_sessions(
@@ -51,7 +38,7 @@ def _build_session(
     rows: list[IndexMessage],
 ) -> Session | None:
     session_texts = [
-        r.text_data
+        f"{r.sender_name}: {r.text_data}"
         for r in rows
         if r.message_type == int(MessageType.TEXT) and r.text_data is not None and r.text_data.strip()
     ]
@@ -68,5 +55,5 @@ def _build_session(
         min_message_id=min_id,
         max_message_id=rows[-1].message_id,
         message_count=len(rows),
-        embed_text=" ".join(session_texts),
+        embed_text="\n".join(session_texts),
     )

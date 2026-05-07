@@ -15,9 +15,9 @@ from db.connection import DBConnection
 from db.contacts import build_sender_registry
 from db.loaders import DataLoader, IndexMessage
 from db.queries.messages import count_messages
-from semantic_search.chunker import Session, iterate_sessions
+from semantic_search.chunker import iterate_sessions
 from semantic_search.embedder import Embedder
-from semantic_search.session import SessionMeta, SessionRecord
+from semantic_search.session import Session, SessionRecord
 from semantic_search.state import StateDB
 from semantic_search.vector_store import VectorStore
 
@@ -90,7 +90,7 @@ class Indexer:
         stream = self._open_chat_stream(chat_id=chat_id, known_chats=known_chats)
         if stream is None:
             return 0
-        return self._write_sessions(stream=stream, chat_id=chat_id)
+        return self._index_sessions(stream=stream, chat_id=chat_id)
 
     def _open_chat_stream(self, chat_id: int, known_chats: set[int]) -> _ChatStream | None:
         max_indexed = self._state.get_max_indexed(chat_id) if chat_id in known_chats else 0
@@ -117,14 +117,15 @@ class Indexer:
         all_messages = chain(boundary, [first_msg], new_messages)
         return _ChatStream(messages=all_messages, chat_name=first_msg.chat_name, to_delete=to_delete)
 
-    def _write_sessions(self, stream: _ChatStream, chat_id: int) -> int:
+    def _index_sessions(self, stream: _ChatStream, chat_id: int) -> int:
         sessions_written = 0
         batch: list[Session] = []
         batch_to_delete = stream.to_delete
 
-        for session in iterate_sessions(
+        session_iterator = iterate_sessions(
             messages=stream.messages, chat_id=chat_id, chat_name=stream.chat_name, gap_seconds=self._gap_seconds
-        ):
+        )
+        for session in session_iterator:
             batch.append(session)
             if len(batch) >= self._batch_size:
                 self._flush(sessions=batch, to_delete=batch_to_delete)
@@ -158,18 +159,7 @@ class Indexer:
             for s, v in zip(sessions, vectors, strict=True)
         ]
         self._store.upsert_sessions(session_records)
-        session_metadatas = [
-            SessionMeta(
-                session_id=s.session_id,
-                chat_id=s.chat_id,
-                min_message_id=s.min_message_id,
-                max_message_id=s.max_message_id,
-                timestamp_start=s.timestamp_start,
-                timestamp_end=s.timestamp_end,
-            )
-            for s in sessions
-        ]
-        self._state.insert_sessions(session_metadatas)
+        self._state.insert_sessions(sessions)
 
 
 # ── module-level entry point (called by main.py) ─────────────────────────────
