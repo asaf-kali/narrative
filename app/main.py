@@ -16,7 +16,7 @@ except ImportError:
     _run_index = None
 
 cli = typer.Typer(no_args_is_help=True)
-DEFAULT_INACTIVE_GAP_SECONDS = 15 * 60
+DEFAULT_INACTIVE_GAP_SECONDS = 60 * 60 * 2  # 2 hours
 
 _ArgMsgstore = Annotated[Path, typer.Option(help="Path to decrypted msgstore.db")]
 _ArgWadb = Annotated[Path | None, typer.Option(help="Path to decrypted wa.db (optional, for contact names)")]

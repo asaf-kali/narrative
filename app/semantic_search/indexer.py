@@ -184,7 +184,7 @@ class Indexer:
         progress = tqdm_lib.tqdm(
             stream.messages,
             total=stream.total_messages,
-            desc=stream.chat_name,
+            desc=f"Chat {chat_id}",
             unit="msg",
             file=sys.stdout,
             leave=False,
