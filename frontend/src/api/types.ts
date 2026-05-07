@@ -171,3 +171,8 @@ export interface RangeDetail {
   timeline: RangeBucket[]
   messages: RangeMessage[]
 }
+
+export interface ChatIndexStatus {
+  status: 'indexed' | 'partial' | 'none'
+  session_count: number
+}

@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import lancedb
 import pandas as pd
 import pyarrow as pa
+from pydantic import BaseModel
+from semantic_search.session import SessionRecord
 
 if TYPE_CHECKING:
     from lancedb.table import Table
@@ -30,13 +32,12 @@ SCHEMA = pa.schema(
 )
 
 
-@dataclass
-class SearchHit:
+class SearchHit(BaseModel):
     session_id: str
     chat_id: int
     chat_name: str
-    timestamp_start: int  # ms UTC
-    timestamp_end: int  # ms UTC
+    timestamp_start: datetime
+    timestamp_end: datetime
     score: float
 
 
@@ -58,10 +59,22 @@ class VectorStore:
 
         return cls(db=db, table=table)
 
-    def upsert_sessions(self, rows: list[dict[str, object]]) -> None:
-        if not rows:
+    def upsert_sessions(self, records: list[SessionRecord]) -> None:
+        if not records:
             return
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(
+            [
+                {
+                    "session_id": r.session_id,
+                    "chat_id": r.chat_id,
+                    "chat_name": r.chat_name,
+                    "timestamp_start": int(r.timestamp_start.timestamp() * 1000),
+                    "timestamp_end": int(r.timestamp_end.timestamp() * 1000),
+                    "vector": r.vector,
+                }
+                for r in records
+            ]
+        )
         existing_ids = set(df["session_id"].tolist())
         id_expr = ", ".join(repr(sid) for sid in existing_ids)
         with contextlib.suppress(Exception):
@@ -98,8 +111,8 @@ class VectorStore:
                 session_id=str(r["session_id"]),
                 chat_id=int(r["chat_id"]),
                 chat_name=str(r["chat_name"]),
-                timestamp_start=int(r["timestamp_start"]),
-                timestamp_end=int(r["timestamp_end"]),
+                timestamp_start=datetime.fromtimestamp(int(r["timestamp_start"]) / 1000, tz=UTC),
+                timestamp_end=datetime.fromtimestamp(int(r["timestamp_end"]) / 1000, tz=UTC),
                 score=float(1.0 - r.get("_distance", 0.0)),
             )
             for r in results

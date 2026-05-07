@@ -1,20 +1,40 @@
 import datetime
 import logging
+import sqlite3
+from collections.abc import Generator
 from pathlib import Path
 
 import pandas as pd
 from db.connection import DBConnection
 from db.queries.calls import fetch_calls
 from db.queries.chats import fetch_chats
-from db.queries.messages import fetch_all_messages, fetch_messages_for_chat
+from db.queries.messages import (
+    fetch_all_messages,
+    fetch_index_rows_paged,
+    fetch_messages_for_chat,
+)
 from db.queries.reactions import fetch_reactions
 from db.row_types import RawChatRow, RawMessageRow
 from models.chat import ChatSummary, ChatType
 from models.config import AnalysisConfig
 from models.message import MessageType
 from models.sender import BROADCAST_SERVER, GROUP_SERVER, SenderRegistry
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+class IndexMessage(BaseModel):
+    """Message row prepared for the streaming indexer pipeline."""
+
+    message_id: int
+    chat_row_id: int
+    timestamp: int  # ms UTC, no tz conversion
+    message_type: int
+    text_data: str | None
+    chat_name: str
+    sender_name: str
+
 
 # Messages DataFrame column names
 COL_MESSAGE_ID = "message_id"
@@ -50,11 +70,7 @@ class DataLoader:
         self._registry = registry or SenderRegistry(contacts={})
 
     def load_chats(self, search: str | None = None, limit: int = 100) -> list[ChatSummary]:
-        summaries = [
-            _row_to_chat_summary(row, self._registry)
-            for row in fetch_chats(self._db.msgstore)
-            if row.chat_id is not None
-        ]
+        summaries = [_row_to_chat_summary(row, self._registry) for row in fetch_chats(self._db.msgstore)]
         if search:
             needle = search.lower()
             return [s for s in summaries if needle in s.display_name.lower()]
@@ -78,6 +94,43 @@ class DataLoader:
             return pd.DataFrame(columns=["reaction_message_id", "parent_message_id", "emoji", "sender_phone"])
         return pd.DataFrame([r.model_dump() for r in rows])
 
+    def iter_chat_messages(
+        self,
+        chat_id: int,
+        chunk_size: int,
+        after_id: int = 0,
+    ) -> Generator[IndexMessage]:
+        """Flat message stream for one chat. Paginates DB internally; caller sees plain iterator."""
+        contacts = self._registry.as_dict()
+        system_type = int(MessageType.SYSTEM)
+        cursor = after_id
+        while True:
+            rows = fetch_index_rows_paged(self._db.msgstore, chat_id, cursor, chunk_size)
+            if not rows:
+                return
+            for r in rows:
+                if r["message_type"] != system_type:
+                    yield _raw_row_to_index_message(row=r, registry=self._registry, contacts=contacts)
+            # Advance cursor on full page's last _id (even if those rows were filtered).
+            cursor = rows[-1]["message_id"]
+            if len(rows) < chunk_size:
+                return
+
+    def load_boundary_rows(
+        self,
+        chat_id: int,
+        min_id: int,
+        max_id: int,
+    ) -> list[IndexMessage]:
+        """Load a previous session's messages for incremental boundary reconstruction."""
+        contacts = self._registry.as_dict()
+        rows = fetch_index_rows_paged(self._db.msgstore, chat_id, after_id=min_id - 1, limit=max_id - min_id + 200)
+        return [
+            _raw_row_to_index_message(row=r, registry=self._registry, contacts=contacts)
+            for r in rows
+            if r["message_id"] <= max_id
+        ]
+
     def load_calls(self) -> pd.DataFrame:
         rows = list(fetch_calls(self._db.msgstore))
         if not rows:
@@ -90,6 +143,75 @@ class DataLoader:
 
 
 # ── private helpers ──────────────────────────────────────────────────────────
+
+
+def _raw_row_to_index_message(row: sqlite3.Row, registry: SenderRegistry, contacts: dict[str, str]) -> IndexMessage:
+    """Build IndexMessage directly from a sqlite3.Row — no intermediate Pydantic model."""
+    server: str = row["chat_server"] or ""
+    phone: str = row["chat_phone"] or ""
+    subject: str = row["chat_subject"] or ""
+    is_grp = server.endswith(GROUP_SERVER)
+    is_broadcast = server == BROADCAST_SERVER
+
+    if subject:
+        chat_name: str = subject
+    elif is_grp:
+        chat_name = f"Group ({phone})"
+    elif is_broadcast:
+        chat_name = "Broadcast"
+    else:
+        chat_name = contacts.get(phone) or phone or "Unknown"
+
+    sender_phone: str = row["sender_phone"] or ""
+    effective_phone = sender_phone if (sender_phone or is_grp) else phone
+    if row["from_me"]:
+        sender_name: str = registry.me_name
+    else:
+        sender_name = contacts.get(effective_phone) or effective_phone or "Unknown"
+
+    return IndexMessage.model_construct(
+        message_id=row["message_id"],
+        chat_row_id=row["chat_row_id"],
+        timestamp=row["timestamp"],
+        message_type=row["message_type"],
+        text_data=row["text_data"],
+        chat_name=chat_name,
+        sender_name=sender_name,
+    )
+
+
+def _to_index_message(row: RawMessageRow, registry: SenderRegistry, contacts: dict[str, str]) -> IndexMessage:
+    server = row.chat_server or ""
+    phone = row.chat_phone or ""
+    subject = row.chat_subject or ""
+    is_grp = server.endswith(GROUP_SERVER)
+    is_broadcast = server == BROADCAST_SERVER
+
+    if subject:
+        chat_name: str = subject
+    elif is_grp:
+        chat_name = f"Group ({phone})"
+    elif is_broadcast:
+        chat_name = "Broadcast"
+    else:
+        chat_name = contacts.get(phone) or phone or "Unknown"
+
+    sender_phone = row.sender_phone or ""
+    effective_phone = sender_phone if (sender_phone or is_grp) else phone
+    if row.from_me:
+        sender_name: str = registry.me_name
+    else:
+        sender_name = contacts.get(effective_phone) or effective_phone or "Unknown"
+
+    return IndexMessage(
+        message_id=row.message_id,
+        chat_row_id=row.chat_row_id,
+        timestamp=row.timestamp,
+        message_type=row.message_type,
+        text_data=row.text_data,
+        chat_name=chat_name,
+        sender_name=sender_name,
+    )
 
 
 def _row_to_chat_summary(row: RawChatRow, registry: SenderRegistry) -> ChatSummary:
@@ -150,7 +272,7 @@ def _rows_to_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) ->
     # Derive time components used by analysis
     df[COL_DATE] = df[COL_TIMESTAMP].dt.date
     df[COL_YEAR] = df[COL_TIMESTAMP].dt.year
-    df[COL_MONTH] = df[COL_TIMESTAMP].dt.to_period("M").astype(str)
+    df[COL_MONTH] = df[COL_TIMESTAMP].dt.strftime("%Y-%m")
     df[COL_DAY_OF_WEEK] = df[COL_TIMESTAMP].dt.day_name()
     df[COL_HOUR] = df[COL_TIMESTAMP].dt.hour
 

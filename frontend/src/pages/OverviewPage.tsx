@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
@@ -17,6 +18,64 @@ function StatCard({ icon, label, value }: { icon: string; label: string; value: 
       <div className="text-2xl font-bold text-tx-primary tabular-nums">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </div>
+    </div>
+  )
+}
+
+const INDEX_STATUS_CONFIG = {
+  indexed: { color: '#22c55e', label: 'Indexed' },
+  partial: { color: '#f97316', label: 'Partially indexed' },
+  none: { color: '#ef4444', label: 'Not indexed' },
+}
+
+function SemanticIndexBadge({ chatId }: { chatId: number }) {
+  const [isIndexing, setIsIndexing] = useState(false)
+
+  const { data: statusData, refetch } = useQuery({
+    queryKey: ['indexStatus', chatId],
+    queryFn: () => api.chatIndexStatus(chatId),
+    refetchInterval: isIndexing ? 1500 : false,
+  })
+
+  useEffect(() => {
+    if (isIndexing && statusData?.status === 'indexed') {
+      setIsIndexing(false)
+    }
+  }, [statusData, isIndexing])
+
+  const handleIndex = async () => {
+    setIsIndexing(true)
+    try {
+      await api.indexChat(chatId)
+    } catch {
+      setIsIndexing(false)
+    }
+    refetch()
+  }
+
+  const cfg = INDEX_STATUS_CONFIG[statusData?.status ?? 'none']
+
+  return (
+    <div className="bg-app-surface border border-app-border rounded-xl p-4 flex flex-col">
+      <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Semantic Index</h3>
+      <div className="flex-1 flex flex-col items-center justify-center gap-2">
+        <span style={{ color: cfg.color }} className="text-4xl leading-none">●</span>
+        <div className="text-center">
+          <div className="text-sm font-semibold text-tx-primary">{cfg.label}</div>
+          {statusData?.session_count ? (
+            <div className="text-[11px] text-tx-secondary mt-0.5">
+              {statusData.session_count.toLocaleString()} sessions
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <button
+        onClick={handleIndex}
+        disabled={isIndexing}
+        className="mt-4 w-full text-xs px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors"
+      >
+        {isIndexing ? 'Indexing…' : 'Index'}
+      </button>
     </div>
   )
 }
@@ -42,7 +101,7 @@ export default function OverviewPage() {
         <StatCard icon="🔗" label="Links" value={data.total_links} />
         <StatCard icon="📊" label="Types" value={data.type_breakdown.length} />
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="col-span-2 bg-app-surface border border-app-border rounded-xl p-4">
           <h3 className="text-xs font-semibold text-tx-secondary uppercase tracking-widest mb-4">Activity</h3>
           <ResponsiveContainer width="100%" height={180}>
@@ -83,6 +142,7 @@ export default function OverviewPage() {
             </PieChart>
           </ResponsiveContainer>
         </div>
+        <SemanticIndexBadge chatId={Number(chatId)} />
       </div>
     </div>
   )
@@ -98,8 +158,11 @@ function LoadingState() {
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="col-span-2 bg-app-surface border border-app-border rounded-xl p-4">
+          <CardSpinner className="h-48" />
+        </div>
+        <div className="bg-app-surface border border-app-border rounded-xl p-4">
           <CardSpinner className="h-48" />
         </div>
         <div className="bg-app-surface border border-app-border rounded-xl p-4">

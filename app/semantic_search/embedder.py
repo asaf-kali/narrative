@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import logging
 from typing import TYPE_CHECKING
 
@@ -34,11 +36,12 @@ class Embedder:
 
     def embed(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         model = self._load()
-        output = model.encode(
-            texts,
-            batch_size=batch_size,
-            return_dense=True,
-            return_sparse=False,
-            return_colbert_vecs=False,
-        )
+        with contextlib.redirect_stderr(io.StringIO()):
+            output = model.encode(
+                texts,
+                batch_size=batch_size,
+                return_dense=True,
+                return_sparse=False,
+                return_colbert_vecs=False,
+            )
         return [vec.tolist() for vec in output["dense_vecs"]]
