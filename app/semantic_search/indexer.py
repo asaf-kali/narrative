@@ -34,28 +34,40 @@ class _IndexStats:
     durations_sec: list[float] = field(default_factory=list)
     embed_time_sec: float = 0.0
 
+    @property
+    def session_count(self) -> int:
+        return len(self.message_counts)
+
     def record_batch(self, sessions: list[Session], embed_elapsed: float) -> None:
         for s in sessions:
             self.message_counts.append(s.message_count)
-            duration = (s.timestamp_end - s.timestamp_start).total_seconds()
-            self.durations_sec.append(duration)
+            self.durations_sec.append((s.timestamp_end - s.timestamp_start).total_seconds())
         self.embed_time_sec += embed_elapsed
 
-    def log_summary(self) -> None:
-        n = len(self.message_counts)
-        if n == 0:
-            logger.info("Index stats: no sessions written")
-            return
+    def merge(self, other: _IndexStats) -> None:
+        self.message_counts.extend(other.message_counts)
+        self.durations_sec.extend(other.durations_sec)
+        self.embed_time_sec += other.embed_time_sec
+
+    def inline_str(self) -> str:
+        if not self.message_counts:
+            return "no sessions"
         avg_msgs = statistics.mean(self.message_counts)
         med_msgs = statistics.median(self.message_counts)
         avg_dur = statistics.mean(self.durations_sec)
         med_dur = statistics.median(self.durations_sec)
-        logger.info(
-            f"Index stats: {n} sessions | "
-            f"msgs/session avg={avg_msgs:.1f} median={med_msgs:.0f} | "
-            f"duration avg={avg_dur:.0f}s median={med_dur:.0f}s | "
-            f"embed total={self.embed_time_sec:.1f}s avg={self.embed_time_sec / n:.3f}s"
+        return (
+            f"msgs avg={avg_msgs:.1f} med={med_msgs:.0f} | "
+            f"dur avg={avg_dur:.0f}s med={med_dur:.0f}s | "
+            f"embed={self.embed_time_sec:.1f}s"
         )
+
+    def log_summary(self) -> None:
+        n = self.session_count
+        if n == 0:
+            logger.info("Index stats: no sessions written")
+            return
+        logger.info(f"Index stats: {n} sessions | {self.inline_str()}")
 
 
 @dataclass
@@ -108,22 +120,25 @@ class Indexer:
         total = count_messages(self._db.msgstore)
         logger.info(f"Messages in DB: {total}")
 
-        self._stats = _IndexStats()
-        total_sessions = 0
+        global_stats = _IndexStats()
         for i, chat_id in enumerate(all_chat_ids, 1):
-            n = self._index_chat(chat_id=chat_id, known_chats=known_chats)
-            total_sessions += n
-            logger.info(f"[{i}/{len(all_chat_ids)}] chat {chat_id}: {n} sessions")
+            chat_stats = self._index_chat(chat_id=chat_id, known_chats=known_chats)
+            global_stats.merge(chat_stats)
+            n = chat_stats.session_count
+            if n:
+                logger.info(f"[{i}/{len(all_chat_ids)}] chat {chat_id}: {n} sessions | {chat_stats.inline_str()}")
+            else:
+                logger.info(f"[{i}/{len(all_chat_ids)}] chat {chat_id}: up to date")
 
-        if is_first_run and total_sessions >= _MIN_INDEX_ROWS:
+        if is_first_run and global_stats.session_count >= _MIN_INDEX_ROWS:
             self._store.build_index()
-        logger.info(f"Done — {total_sessions} sessions across {len(all_chat_ids)} chats")
-        self._stats.log_summary()
+        logger.info(f"Done — {global_stats.session_count} sessions across {len(all_chat_ids)} chats")
+        global_stats.log_summary()
 
-    def _index_chat(self, chat_id: int, known_chats: set[int]) -> int:
+    def _index_chat(self, chat_id: int, known_chats: set[int]) -> _IndexStats:
         stream = self._open_chat_stream(chat_id=chat_id, known_chats=known_chats)
         if stream is None:
-            return 0
+            return _IndexStats()
         return self._index_sessions(stream=stream, chat_id=chat_id)
 
     def _open_chat_stream(self, chat_id: int, known_chats: set[int]) -> _ChatStream | None:
@@ -151,8 +166,8 @@ class Indexer:
         all_messages = chain(boundary, [first_msg], new_messages)
         return _ChatStream(messages=all_messages, chat_name=first_msg.chat_name, to_delete=to_delete)
 
-    def _index_sessions(self, stream: _ChatStream, chat_id: int) -> int:
-        sessions_written = 0
+    def _index_sessions(self, stream: _ChatStream, chat_id: int) -> _IndexStats:
+        stats = _IndexStats()
         batch: list[Session] = []
         batch_to_delete = stream.to_delete
 
@@ -162,24 +177,22 @@ class Indexer:
         for session in session_iterator:
             batch.append(session)
             if len(batch) >= self._batch_size:
-                self._flush(sessions=batch, to_delete=batch_to_delete)
+                self._flush(sessions=batch, to_delete=batch_to_delete, stats=stats)
                 batch_to_delete = []
-                sessions_written += len(batch)
                 batch = []
 
         if batch:
-            self._flush(sessions=batch, to_delete=batch_to_delete)
-            sessions_written += len(batch)
+            self._flush(sessions=batch, to_delete=batch_to_delete, stats=stats)
 
         max_id = _get_max_message_id(conn=self._db.msgstore, chat_id=chat_id)
         self._state.upsert_state(chat_id=chat_id, max_id=max_id)
-        return sessions_written
+        return stats
 
-    def _flush(self, sessions: list[Session], to_delete: list[str]) -> None:
+    def _flush(self, sessions: list[Session], to_delete: list[str], stats: _IndexStats) -> None:
         embed_start = time.monotonic()
         vectors = self._embedder.embed([s.embed_text for s in sessions], batch_size=self._batch_size)
         embed_elapsed = time.monotonic() - embed_start
-        self._stats.record_batch(sessions=sessions, embed_elapsed=embed_elapsed)
+        stats.record_batch(sessions=sessions, embed_elapsed=embed_elapsed)
         if to_delete:
             self._store.delete_sessions(to_delete)
             for sid in to_delete:
