@@ -90,6 +90,7 @@ class Indexer:
         gap_seconds: int,
         batch_size: int,
         chunk_size: int = 500,
+        min_session_chars: int = 0,
     ) -> None:
         self._msgstore_path = msgstore_path
         self._wadb_path = wadb_path
@@ -99,6 +100,7 @@ class Indexer:
         self._gap_seconds = gap_seconds
         self._batch_size = batch_size
         self._chunk_size = chunk_size
+        self._min_session_chars = min_session_chars
 
     def __enter__(self) -> Self:
         conn = DBConnection(msgstore_path=self._msgstore_path, wadb_path=self._wadb_path)
@@ -205,7 +207,11 @@ class Indexer:
             dynamic_ncols=True,
         )
         session_iterator = iterate_sessions(
-            messages=progress, chat_id=chat_id, chat_name=stream.chat_name, gap_seconds=self._gap_seconds
+            messages=progress,
+            chat_id=chat_id,
+            chat_name=stream.chat_name,
+            gap_seconds=self._gap_seconds,
+            min_session_chars=self._min_session_chars,
         )
         for session in session_iterator:
             batch.append(session)
@@ -255,6 +261,7 @@ def run(
     gap_seconds: int,
     batch_size: int,
     chunk_size: int = 500,
+    min_session_chars: int = 0,
 ) -> None:
     with Indexer(
         msgstore_path=msgstore_path,
@@ -263,6 +270,7 @@ def run(
         gap_seconds=gap_seconds,
         batch_size=batch_size,
         chunk_size=chunk_size,
+        min_session_chars=min_session_chars,
     ) as indexer:
         indexer.run()
 
@@ -275,6 +283,7 @@ def run_chat(
     gap_seconds: int,
     batch_size: int,
     chunk_size: int = 500,
+    min_session_chars: int = 0,
 ) -> None:
     with Indexer(
         msgstore_path=msgstore_path,
@@ -283,6 +292,7 @@ def run_chat(
         gap_seconds=gap_seconds,
         batch_size=batch_size,
         chunk_size=chunk_size,
+        min_session_chars=min_session_chars,
     ) as indexer:
         indexer.index_single_chat(chat_id=chat_id)
 

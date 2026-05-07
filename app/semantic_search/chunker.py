@@ -14,17 +14,23 @@ def iterate_sessions(
     chat_id: int,
     chat_name: str,
     gap_seconds: int,
+    min_session_chars: int = 0,
 ) -> Iterator[Session]:
     gap_ms = gap_seconds * 1000
+    text_type = int(MessageType.TEXT)
     buffer: list[IndexMessage] = []
+    buffer_text_chars = 0
 
     for msg in messages:
-        if buffer and msg.timestamp - buffer[-1].timestamp > gap_ms:
+        if buffer and msg.timestamp - buffer[-1].timestamp > gap_ms and buffer_text_chars >= min_session_chars:
             session = _build_session(chat_id=chat_id, chat_name=chat_name, rows=buffer)
             if session is not None:
                 yield session
             buffer = []
+            buffer_text_chars = 0
         buffer.append(msg)
+        if msg.message_type == text_type and msg.text_data:
+            buffer_text_chars += len(msg.text_data)
 
     if buffer:
         session = _build_session(chat_id=chat_id, chat_name=chat_name, rows=buffer)

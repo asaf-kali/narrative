@@ -85,6 +85,10 @@ _ArgGapSeconds = Annotated[
 _ArgBatchSize = Annotated[int, typer.Option(help="Embedding batch size")]
 _ArgChunkSize = Annotated[int, typer.Option(help="Messages read per DB chunk (streaming)")]
 _ArgChatId = Annotated[int | None, typer.Option(help="Index only this chat ID (skip all others)")]
+_ArgMinSessionChars = Annotated[
+    int,
+    typer.Option(help="Min text chars to flush a session on gap; keep appending if below threshold (0 = disabled)"),
+]
 
 
 @cli.command()
@@ -96,6 +100,7 @@ def index(
     batch_size: _ArgBatchSize = 32,
     chunk_size: _ArgChunkSize = 500,
     chat_id: _ArgChatId = None,
+    min_session_chars: _ArgMinSessionChars = 500,
 ) -> None:
     """Build or incrementally update the semantic search index."""
     if not msgstore.exists():
@@ -115,6 +120,7 @@ def index(
             gap_seconds=gap_seconds,
             batch_size=batch_size,
             chunk_size=chunk_size,
+            min_session_chars=min_session_chars,
         )
     else:
         if _run_index is None:
@@ -127,6 +133,7 @@ def index(
             gap_seconds=gap_seconds,
             batch_size=batch_size,
             chunk_size=chunk_size,
+            min_session_chars=min_session_chars,
         )
 
 
