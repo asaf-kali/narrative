@@ -1,17 +1,22 @@
 import logging
-from datetime import UTC, datetime, tzinfo
+from datetime import datetime
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import pandas as pd
-from api.deps import get_df
+from db.loaders import build_messages_df, datetime_to_ms, open_connection
+from db.queries.messages import (
+    count_filtered_messages,
+    fetch_distinct_chat_ids,
+    fetch_messages_page,
+    fetch_sender_counts,
+)
 from fastapi import APIRouter, Query, Request
-from models.config import AnalysisConfig
 from models.message import MessageType
+from models.sender import SenderRegistry
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-_LOCAL_TZ: tzinfo = datetime.now().astimezone().tzinfo or UTC
 
 _TYPE_LABELS: dict[int, str] = {
     MessageType.IMAGE: "[Image]",
@@ -38,95 +43,107 @@ def get_global_messages(
     sort: Literal["asc", "desc"] = "desc",
 ) -> dict[str, Any]:
     logger.info(
-        f"Fetching messages with filters: date_from={date_from}, date_to={date_to}, "
+        f"Fetching messages: date_from={date_from}, date_to={date_to}, "
         f"search={search}, chat_ids={chat_ids}, sender_ids={sender_ids}"
     )
-    config = AnalysisConfig(chat_id=None, exclude_system=True)
-    df = get_df(request, config)
-    if df.empty:
-        return {"total": 0, "messages": []}
+    date_from_ms = datetime_to_ms(date_from) if date_from else None
+    date_to_ms = datetime_to_ms(date_to) if date_to else None
 
-    if date_from is not None:
-        df = df[df["timestamp"] >= _to_ts(date_from)]
-    if date_to is not None:
-        df = df[df["timestamp"] <= _to_ts(date_to)]
+    msgstore: Path = request.app.state.msgstore_path
+    wadb: Path | None = request.app.state.wadb_path
+    registry: SenderRegistry = request.app.state.sender_registry
 
-    # Snapshot after date filtering only — used to derive available filter options.
-    df_date = df
-
-    if chat_ids:
-        df = df[df["chat_row_id"].isin(chat_ids)]
-    if sender_ids:
-        df = df[_build_sender_id_series(df).isin(sender_ids)]
-    if search:
-        df = df[df["text_data"].str.contains(search, case=False, na=False)]
-
-    df = df.sort_values("timestamp", ascending=sort == "asc")
-    total = len(df)
-    page = df.iloc[offset : offset + limit]
-
-    messages = []
-    for _, row in page.iterrows():
-        text = row.get("text_data")
-        if not text:
-            text = _TYPE_LABELS.get(int(row["message_type"]))
-        phone = str(row.get("sender_phone", "") or "")
-        from_me = int(row.get("from_me", 0))
-        s_id = "me" if from_me else (phone or str(row["sender_name"]))
-        messages.append(
-            {
-                "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S%z"),
-                "chat_id": int(row["chat_row_id"]),
-                "chat_name": str(row.get("chat_name", "")),
-                "sender_name": str(row["sender_name"]),
-                "sender_id": s_id,
-                "text": str(text) if text else None,
-                "message_type": int(row["message_type"]),
-            }
+    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+        total = count_filtered_messages(
+            db.msgstore,
+            chat_ids=chat_ids,
+            date_from_ms=date_from_ms,
+            date_to_ms=date_to_ms,
+            sender_ids=sender_ids,
+            search=search,
+        )
+        raw_rows = fetch_messages_page(
+            db.msgstore,
+            chat_ids=chat_ids,
+            date_from_ms=date_from_ms,
+            date_to_ms=date_to_ms,
+            sender_ids=sender_ids,
+            search=search,
+            sort_asc=sort == "asc",
+            limit=limit,
+            offset=offset,
+        )
+        available_chat_ids = fetch_distinct_chat_ids(
+            db.msgstore,
+            date_from_ms=date_from_ms,
+            date_to_ms=date_to_ms,
         )
 
-    available_chat_ids = sorted(df_date["chat_row_id"].dropna().astype(int).unique().tolist())
-    available_sender_ids = sorted(_build_sender_id_series(df_date).unique().tolist())
+    if not raw_rows:
+        return {"total": 0, "messages": [], "available_chat_ids": available_chat_ids, "available_sender_ids": []}
+
+    df = build_messages_df(raw_rows, registry)
+    messages = _df_to_message_list(df, include_chat_id=True)
 
     return {
         "total": total,
         "messages": messages,
-        "available_chat_ids": available_chat_ids,
-        "available_sender_ids": available_sender_ids,
+        "available_chat_ids": sorted(available_chat_ids),
+        "available_sender_ids": [],
     }
 
 
 @router.get("/senders")
 def get_senders(request: Request) -> list[dict[str, Any]]:
     logger.info("Fetching senders with message counts")
-    config = AnalysisConfig(chat_id=None, exclude_system=True)
-    df = get_df(request, config)
-    if df.empty:
-        return []
+    msgstore: Path = request.app.state.msgstore_path
+    wadb: Path | None = request.app.state.wadb_path
+    registry: SenderRegistry = request.app.state.sender_registry
+    contacts = registry.as_dict()
 
-    # For 1-on-1 received messages, sender_phone is "" — the peer's phone is in
-    # chat_phone. Use that as the effective phone so name+phone search both work.
-    phone_col = df["sender_phone"].fillna("").astype(str)
-    chat_phone_col = df["chat_phone"].fillna("").astype(str)
-    from_me_mask = df["from_me"] == 1
-    effective_phone = phone_col.where(
-        (phone_col != "") | df["is_group"] | from_me_mask,
-        chat_phone_col,
-    )
-    df = df.assign(_sender_id=_build_sender_id_series(df), _effective_phone=effective_phone)
-    counts = df.groupby("_sender_id").size().rename("message_count")
-    df_unique = df.drop_duplicates(subset="_sender_id").join(counts, on="_sender_id")
-    df_unique = df_unique.sort_values("message_count", ascending=False)
+    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+        rows = fetch_sender_counts(db.msgstore)
 
-    return [
-        {
-            "sender_id": str(row["_sender_id"]),
+    result = []
+    for row in rows:
+        if row.from_me:
+            sender_name = registry.me_name
+            phone = ""
+        else:
+            phone = row.effective_phone
+            sender_name = contacts.get(phone) or phone or "Unknown"
+        result.append(
+            {
+                "sender_id": row.sender_id,
+                "sender_name": sender_name,
+                "phone": phone,
+                "message_count": row.message_count,
+            }
+        )
+    return result
+
+
+def _df_to_message_list(df: pd.DataFrame, *, include_chat_id: bool = False) -> list[dict[str, Any]]:
+    messages = []
+    for _, row in df.iterrows():
+        text = row.get("text_data")
+        if not text:
+            text = _TYPE_LABELS.get(int(row["message_type"]))
+        phone = str(row.get("sender_phone", "") or "")
+        from_me = int(row.get("from_me", 0))
+        s_id = "me" if from_me else (phone or str(row["sender_name"]))
+        entry: dict[str, Any] = {
+            "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "chat_name": str(row.get("chat_name", "")),
             "sender_name": str(row["sender_name"]),
-            "phone": str(row["_effective_phone"]),
-            "message_count": int(row["message_count"]),
+            "sender_id": s_id,
+            "text": str(text) if text else None,
+            "message_type": int(row["message_type"]),
         }
-        for _, row in df_unique.iterrows()
-    ]
+        if include_chat_id:
+            entry["chat_id"] = int(row["chat_row_id"])
+        messages.append(entry)
+    return messages
 
 
 def _build_sender_id_series(df: pd.DataFrame) -> pd.Series:
@@ -144,11 +161,3 @@ def _build_sender_id_series(df: pd.DataFrame) -> pd.Series:
     )
     sender_id = effective_phone.where(effective_phone != "", name_col)
     return sender_id.mask(df["from_me"] == 1, "me")
-
-
-def _to_ts(dt: datetime) -> pd.Timestamp:
-    """Convert a (possibly tz-naive) datetime to a tz-aware Timestamp in local time."""
-    ts = pd.Timestamp(dt)
-    if ts.tzinfo is None:
-        return ts.tz_localize(_LOCAL_TZ)
-    return ts.tz_convert(_LOCAL_TZ)

@@ -77,16 +77,22 @@ class DataLoader:
         return summaries[:limit]
 
     def load_messages(self, config: AnalysisConfig) -> pd.DataFrame:
-        rows = list(
-            fetch_messages_for_chat(self._db.msgstore, config.chat_id)
-            if config.chat_id is not None
-            else fetch_all_messages(self._db.msgstore)
-        )
+        rows = self._fetch_raw_messages(config)
         if not rows:
             return _empty_messages_df()
+        return build_messages_df(rows, self._registry)
 
-        df = _rows_to_messages_df(rows, self._registry)
-        return _apply_config_filters(df, config)
+    def _fetch_raw_messages(self, config: AnalysisConfig) -> list[RawMessageRow]:
+        date_from_ms = datetime_to_ms(config.date_from) if config.date_from is not None else None
+        date_to_ms = datetime_to_ms(config.date_to) if config.date_to is not None else None
+        kwargs = {
+            "date_from_ms": date_from_ms,
+            "date_to_ms": date_to_ms,
+            "exclude_system": config.exclude_system,
+        }
+        if config.chat_id is not None:
+            return list(fetch_messages_for_chat(self._db.msgstore, chat_id=config.chat_id, **kwargs))
+        return list(fetch_all_messages(self._db.msgstore, **kwargs))
 
     def load_reactions(self) -> pd.DataFrame:
         rows = list(fetch_reactions(self._db.msgstore))
@@ -247,7 +253,7 @@ def _row_to_chat_summary(row: RawChatRow, registry: SenderRegistry) -> ChatSumma
     )
 
 
-def _rows_to_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) -> pd.DataFrame:
+def build_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) -> pd.DataFrame:
     df = pd.DataFrame([r.model_dump() for r in rows])
 
     # Normalise timestamps
@@ -290,19 +296,6 @@ def _rows_to_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) ->
     return df
 
 
-def _apply_config_filters(df: pd.DataFrame, config: AnalysisConfig) -> pd.DataFrame:
-    if config.exclude_system:
-        df = df[df[COL_MESSAGE_TYPE] != MessageType.SYSTEM]
-
-    if config.date_from is not None:
-        df = df[df[COL_TIMESTAMP] >= _to_local_ts(config.date_from)]
-
-    if config.date_to is not None:
-        df = df[df[COL_TIMESTAMP] <= _to_local_ts(config.date_to)]
-
-    return df
-
-
 def _empty_messages_df() -> pd.DataFrame:
     columns = [
         COL_MESSAGE_ID,
@@ -331,11 +324,11 @@ def _empty_messages_df() -> pd.DataFrame:
     return pd.DataFrame(columns=columns)
 
 
-def _to_local_ts(dt: datetime.datetime) -> pd.Timestamp:
-    ts = pd.Timestamp(dt)
-    if ts.tzinfo is None:
-        return ts.tz_localize(_LOCAL_TZ)
-    return ts.tz_convert(_LOCAL_TZ)
+def datetime_to_ms(dt: datetime.datetime) -> int:
+    """Convert datetime to UTC milliseconds (DB timestamp format). Treats tz-naive as local."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_LOCAL_TZ)
+    return int(dt.timestamp() * 1000)
 
 
 def open_connection(msgstore_path: Path, wadb_path: Path | None = None) -> DBConnection:

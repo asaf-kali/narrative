@@ -13,10 +13,13 @@ from analysis.network import NetworkGraph, build_coactivity_graph, build_global_
 from analysis.participants import per_sender_stats
 from analysis.timeline import active_days_count, daily_timeline, hourly_heatmap, monthly_timeline
 from api.deps import get_df
-from db.loaders import DataLoader, open_connection
+from api.routes.messages import _df_to_message_list
+from db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
+from db.queries.messages import count_filtered_messages, fetch_messages_page
 from fastapi import APIRouter, Request
 from models.config import AnalysisConfig
 from models.message import AUDIO_TYPES, MEDIA_TYPES, MessageType
+from models.sender import SenderRegistry
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -203,53 +206,42 @@ def get_messages(
     sender_id: str | None = None,
     sort: Literal["asc", "desc"] = "asc",
 ) -> dict[str, Any]:
-    config = _config(chat_id, exclude_system, date_from, date_to)
-    df = get_df(request, config)
-    if df.empty:
-        return {"total": 0, "messages": []}
+    date_from_ms = datetime_to_ms(date_from) if date_from else None
+    date_to_ms = datetime_to_ms(date_to) if date_to else None
+    sender_ids = [sender_id] if sender_id else None
 
-    df_sorted = df.sort_values("timestamp", ascending=sort == "asc")
-    if search:
-        df_sorted = df_sorted[df_sorted["text_data"].str.contains(search, case=False, na=False)]
-    if sender_id:
-        if sender_id == "me":
-            df_sorted = df_sorted[df_sorted["from_me"] == 1]
-        else:
-            df_sorted = df_sorted[df_sorted["sender_phone"] == sender_id]
-    total = len(df_sorted)
-    page = df_sorted.iloc[offset : offset + limit]
+    msgstore: Path = request.app.state.msgstore_path
+    wadb: Path | None = request.app.state.wadb_path
+    registry: SenderRegistry = request.app.state.sender_registry
 
-    type_labels: dict[int, str] = {
-        MessageType.IMAGE: "[Image]",
-        MessageType.AUDIO: "[Audio]",
-        MessageType.VIDEO: "[Video]",
-        MessageType.CONTACT: "[Contact]",
-        MessageType.LOCATION: "[Location]",
-        MessageType.DOCUMENT: "[Document]",
-        MessageType.STICKER: "[Sticker]",
-        MessageType.GIF: "[GIF]",
-    }
-
-    messages = []
-    for _, row in page.iterrows():
-        text = row.get("text_data")
-        if not text:
-            text = type_labels.get(int(row["message_type"]))
-        phone = str(row.get("sender_phone", "") or "")
-        from_me = int(row.get("from_me", 0))
-        s_id = "me" if from_me else (phone or str(row["sender_name"]))
-        messages.append(
-            {
-                "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S%z"),
-                "chat_name": str(row.get("chat_name", "")),
-                "sender_name": str(row["sender_name"]),
-                "sender_id": s_id,
-                "text": str(text) if text else None,
-                "message_type": int(row["message_type"]),
-            }
+    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+        total = count_filtered_messages(
+            db.msgstore,
+            chat_id=chat_id,
+            date_from_ms=date_from_ms,
+            date_to_ms=date_to_ms,
+            exclude_system=exclude_system,
+            sender_ids=sender_ids,
+            search=search,
+        )
+        raw_rows = fetch_messages_page(
+            db.msgstore,
+            chat_id=chat_id,
+            date_from_ms=date_from_ms,
+            date_to_ms=date_to_ms,
+            exclude_system=exclude_system,
+            sender_ids=sender_ids,
+            search=search,
+            sort_asc=sort == "asc",
+            limit=limit,
+            offset=offset,
         )
 
-    return {"total": total, "messages": messages}
+    if not raw_rows:
+        return {"total": 0, "messages": []}
+
+    df = build_messages_df(raw_rows, registry)
+    return {"total": total, "messages": _df_to_message_list(df)}
 
 
 @router.get("/chats/{chat_id}/media")

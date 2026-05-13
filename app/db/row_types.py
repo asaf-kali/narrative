@@ -93,3 +93,10 @@ class RawCallRow(_RowBase):
     is_video: int
     from_me: int
     caller_phone: str
+
+
+class RawSenderCount(_RowBase):
+    sender_id: str
+    from_me: int
+    effective_phone: str
+    message_count: int
