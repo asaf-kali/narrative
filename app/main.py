@@ -1,5 +1,6 @@
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
@@ -17,10 +18,22 @@ except ImportError:
     _run_index = None
     _run_chat = None
 
+
+@dataclass
+class ResolvedPaths:
+    msgstore: Path
+    wadb: Path | None
+    contacts: Path | None
+
+
 cli = typer.Typer(no_args_is_help=True)
 DEFAULT_INACTIVE_GAP_SECONDS = 60 * 60 * 2  # 2 hours
 
-_ArgMsgstore = Annotated[Path, typer.Option(help="Path to decrypted msgstore.db")]
+_ArgDataDir = Annotated[
+    Path | None,
+    typer.Option(help="Directory containing msgstore.db; wa.db and contacts.csv auto-detected if present"),
+]
+_ArgMsgstore = Annotated[Path | None, typer.Option(help="Path to decrypted msgstore.db")]
 _ArgWadb = Annotated[Path | None, typer.Option(help="Path to decrypted wa.db (optional, for contact names)")]
 _ArgContacts = Annotated[Path | None, typer.Option(help="Google Contacts CSV export (optional)")]
 _ArgLocalCode = Annotated[str, typer.Option(help="Country code for local-format phone numbers (e.g. 972)")]
@@ -30,9 +43,38 @@ _ArgHost = Annotated[str, typer.Option(help="Host to bind to")]
 _ArgReload = Annotated[bool, typer.Option("--reload", help="Enable auto-reload (development mode)")]
 
 
+def _resolve_data_dir(
+    data_dir: Path | None,
+    msgstore: Path | None,
+    wadb: Path | None,
+    contacts: Path | None,
+) -> ResolvedPaths | None:
+    """Return resolved paths, or None if msgstore cannot be determined."""
+    if data_dir is not None:
+        logger.info(f"Auto-detecting files in {data_dir}")
+        resolved_msgstore = data_dir / "msgstore.db"
+        resolved_wadb = data_dir / "wa.db"
+        resolved_contacts = data_dir / "contacts.csv"
+        logger.info(f"  msgstore : {resolved_msgstore} ({'found' if resolved_msgstore.exists() else 'NOT FOUND'})")
+        wadb_result = resolved_wadb if resolved_wadb.exists() else None
+        logger.info(f"  wa.db    : {resolved_wadb} ({'found' if wadb_result else 'not found'})")
+        contacts_result = resolved_contacts if resolved_contacts.exists() else None
+        logger.info(f"  contacts : {resolved_contacts} ({'found' if contacts_result else 'not found'})")
+        return ResolvedPaths(msgstore=resolved_msgstore, wadb=wadb_result, contacts=contacts_result)
+    if msgstore is None:
+        return None
+    logger.info(f"  msgstore : {msgstore}")
+    if wadb:
+        logger.info(f"  wa.db    : {wadb}")
+    if contacts:
+        logger.info(f"  contacts : {contacts}")
+    return ResolvedPaths(msgstore=msgstore, wadb=wadb, contacts=contacts)
+
+
 @cli.command()
 def serve(
-    msgstore: _ArgMsgstore = Path("data/msgstore.db"),
+    data_dir: _ArgDataDir = Path("data"),
+    msgstore: _ArgMsgstore = None,
     wadb: _ArgWadb = None,
     contacts: _ArgContacts = None,
     local_code: _ArgLocalCode = "972",
@@ -42,19 +84,23 @@ def serve(
     reload: _ArgReload = False,
 ) -> None:
     """Run the Narrative analytics server."""
-    if not msgstore.exists():
-        logger.error(f"msgstore.db not found: {msgstore}")
+    resolved = _resolve_data_dir(data_dir, msgstore, wadb, contacts)
+    if resolved is None:
+        logger.error("Provide --data-dir or --msgstore")
+        raise typer.Exit(code=1)
+    if not resolved.msgstore.exists():
+        logger.error(f"msgstore.db not found: {resolved.msgstore}")
         raise typer.Exit(code=1)
 
     logger.info(f"Starting Narrative on http://{host}:{port}")
 
     if reload:
         # uvicorn requires an import string to enable --reload; pass paths via env vars
-        os.environ["WHATSAPP_MSGSTORE"] = str(msgstore)
-        if wadb:
-            os.environ["WHATSAPP_WADB"] = str(wadb)
-        if contacts:
-            os.environ["WHATSAPP_CONTACTS"] = str(contacts)
+        os.environ["WHATSAPP_MSGSTORE"] = str(resolved.msgstore)
+        if resolved.wadb:
+            os.environ["WHATSAPP_WADB"] = str(resolved.wadb)
+        if resolved.contacts:
+            os.environ["WHATSAPP_CONTACTS"] = str(resolved.contacts)
         if local_code:
             os.environ["WHATSAPP_LOCAL_CODE"] = local_code
         os.environ["WHATSAPP_SEARCH_DIR"] = str(search_dir)
@@ -70,9 +116,9 @@ def serve(
         from api.server import create_api  # noqa: PLC0415
 
         api = create_api(
-            msgstore_path=msgstore,
-            wadb_path=wadb,
-            contacts_path=contacts,
+            msgstore_path=resolved.msgstore,
+            wadb_path=resolved.wadb,
+            contacts_path=resolved.contacts,
             local_code=local_code,
             search_dir=search_dir,
         )
@@ -93,7 +139,8 @@ _ArgMinSessionChars = Annotated[
 
 @cli.command()
 def index(
-    msgstore: _ArgMsgstore = Path("data/msgstore.db"),
+    data_dir: _ArgDataDir = Path("data"),
+    msgstore: _ArgMsgstore = None,
     wadb: _ArgWadb = None,
     search_dir: _ArgSearchDir = Path("data/search"),
     gap_seconds: _ArgGapSeconds = DEFAULT_INACTIVE_GAP_SECONDS,
@@ -103,18 +150,22 @@ def index(
     min_session_chars: _ArgMinSessionChars = 500,
 ) -> None:
     """Build or incrementally update the semantic search index."""
-    if not msgstore.exists():
-        logger.error(f"msgstore.db not found: {msgstore}")
+    resolved = _resolve_data_dir(data_dir, msgstore, wadb, contacts=None)
+    if resolved is None:
+        logger.error("Provide --data-dir or --msgstore")
+        raise typer.Exit(code=1)
+    if not resolved.msgstore.exists():
+        logger.error(f"msgstore.db not found: {resolved.msgstore}")
         raise typer.Exit(code=1)
 
-    wadb_path = wadb if wadb and wadb.exists() else None
+    wadb_path = resolved.wadb if resolved.wadb and resolved.wadb.exists() else None
     if chat_id is not None:
         if _run_chat is None:
             logger.error("Semantic search deps not installed — run: uv sync --group semantic")
             raise typer.Exit(code=1)
         _run_chat(
             chat_id=chat_id,
-            msgstore_path=msgstore,
+            msgstore_path=resolved.msgstore,
             wadb_path=wadb_path,
             search_dir=search_dir,
             gap_seconds=gap_seconds,
@@ -127,7 +178,7 @@ def index(
             logger.error("Semantic search deps not installed — run: uv sync --group semantic")
             raise typer.Exit(code=1)
         _run_index(
-            msgstore_path=msgstore,
+            msgstore_path=resolved.msgstore,
             wadb_path=wadb_path,
             search_dir=search_dir,
             gap_seconds=gap_seconds,
