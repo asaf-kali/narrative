@@ -5,6 +5,7 @@ import { CardSpinner } from '../components/Spinner'
 import DatetimeInput, { DATETIME_RE, formatDatetime, toApiDatetime } from '../components/DatetimeInput'
 import SearchableChipFilter from '../components/messages/SearchableChipFilter'
 import MessagesCard from '../components/messages/MessagesCard'
+import ExportButton from '../components/ExportButton'
 import { useDebounce } from '../hooks/useDebounce'
 import type { SemanticSearchHit } from '../api/types'
 
@@ -316,6 +317,26 @@ export default function GlobalMessagesPage() {
                     </button>
                   )
                 })}
+              </div>
+
+              <div className="ml-auto">
+                <ExportButton
+                  total={data?.total ?? 0}
+                  filename="messages"
+                  disabled={!data || data.total === 0 || rangeInvalid || !fromValid || !toValid}
+                  onFetchPage={(limit, offset) =>
+                    api.globalMessages(
+                      limit,
+                      offset,
+                      dateFrom && fromValid ? toApiDatetime(dateFrom) : undefined,
+                      dateTo && toValid ? toApiDatetime(dateTo) : undefined,
+                      searchTerm || undefined,
+                      activeChats.size > 0 ? [...activeChats] : undefined,
+                      activeSenders.size > 0 ? [...activeSenders] : undefined,
+                      'asc',
+                    )
+                  }
+                />
               </div>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { CardSpinner } from '../components/Spinner'
 import DatetimeInput, { DATETIME_RE, formatDatetime, toApiDatetime } from '../components/DatetimeInput'
 import SenderFilterCard from '../components/messages/SenderFilterCard'
 import MessagesCard from '../components/messages/MessagesCard'
+import ExportButton from '../components/ExportButton'
 import { useDebounce } from '../hooks/useDebounce'
 
 // ── constants ─────────────────────────────────────────────────────────────────
@@ -192,6 +193,26 @@ export default function MessagesPage() {
                 </button>
               )
             })}
+          </div>
+
+          <div className="ml-auto">
+            <ExportButton
+              total={data?.total ?? 0}
+              filename={`chat-${chatId}`}
+              disabled={!data || data.total === 0 || rangeInvalid || !fromValid || !toValid}
+              onFetchPage={(limit, offset) =>
+                api.chatMessages(
+                  Number(chatId),
+                  limit,
+                  offset,
+                  dateFrom && fromValid ? toApiDatetime(dateFrom) : undefined,
+                  dateTo && toValid ? toApiDatetime(dateTo) : undefined,
+                  searchTerm || undefined,
+                  senderId || undefined,
+                  'asc',
+                )
+              }
+            />
           </div>
         </div>
       </div>

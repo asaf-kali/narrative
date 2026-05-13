@@ -1,6 +1,6 @@
 import logging
 from datetime import UTC, datetime, tzinfo
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import pandas as pd
 from api.deps import get_df
@@ -35,6 +35,7 @@ def get_global_messages(
     search: str | None = None,
     chat_ids: Annotated[list[int] | None, Query()] = None,
     sender_ids: Annotated[list[str] | None, Query()] = None,
+    sort: Literal["asc", "desc"] = "desc",
 ) -> dict[str, Any]:
     logger.info(
         f"Fetching messages with filters: date_from={date_from}, date_to={date_to}, "
@@ -60,7 +61,7 @@ def get_global_messages(
     if search:
         df = df[df["text_data"].str.contains(search, case=False, na=False)]
 
-    df = df.sort_values("timestamp", ascending=False)
+    df = df.sort_values("timestamp", ascending=sort == "asc")
     total = len(df)
     page = df.iloc[offset : offset + limit]
 
@@ -74,7 +75,7 @@ def get_global_messages(
         s_id = "me" if from_me else (phone or str(row["sender_name"]))
         messages.append(
             {
-                "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S%z"),
                 "chat_id": int(row["chat_row_id"]),
                 "chat_name": str(row.get("chat_name", "")),
                 "sender_name": str(row["sender_name"]),

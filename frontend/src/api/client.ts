@@ -54,12 +54,14 @@ export const api = {
     dateTo?: string,
     search?: string,
     senderId?: string,
+    sort?: 'asc' | 'desc',
   ): Promise<ChatMessagesResponse> => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (dateFrom) params.set('date_from', dateFrom)
     if (dateTo) params.set('date_to', dateTo)
     if (search) params.set('search', search)
     if (senderId) params.set('sender_id', senderId)
+    if (sort) params.set('sort', sort)
     return get(`/api/chats/${chatId}/messages?${params}`)
   },
   globalMessages: (
@@ -70,6 +72,7 @@ export const api = {
     search?: string,
     chatIds?: number[],
     senderIds?: string[],
+    sort?: 'asc' | 'desc',
   ): Promise<ChatMessagesResponse> => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (dateFrom) params.set('date_from', dateFrom)
@@ -77,6 +80,7 @@ export const api = {
     if (search) params.set('search', search)
     chatIds?.forEach((id) => params.append('chat_ids', String(id)))
     senderIds?.forEach((id) => params.append('sender_ids', id))
+    if (sort) params.set('sort', sort)
     return get(`/api/messages?${params}`)
   },
   senders: (): Promise<SenderInfo[]> => get('/api/senders'),

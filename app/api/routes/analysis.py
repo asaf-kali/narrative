@@ -4,7 +4,7 @@ from base64 import b64encode
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pandas as pd
 from analysis.content import build_word_cloud_text, emoji_counts, word_frequencies
@@ -201,13 +201,14 @@ def get_messages(
     offset: int = 0,
     search: str | None = None,
     sender_id: str | None = None,
+    sort: Literal["asc", "desc"] = "asc",
 ) -> dict[str, Any]:
     config = _config(chat_id, exclude_system, date_from, date_to)
     df = get_df(request, config)
     if df.empty:
         return {"total": 0, "messages": []}
 
-    df_sorted = df.sort_values("timestamp")
+    df_sorted = df.sort_values("timestamp", ascending=sort == "asc")
     if search:
         df_sorted = df_sorted[df_sorted["text_data"].str.contains(search, case=False, na=False)]
     if sender_id:
@@ -239,7 +240,7 @@ def get_messages(
         s_id = "me" if from_me else (phone or str(row["sender_name"]))
         messages.append(
             {
-                "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
+                "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S%z"),
                 "chat_name": str(row.get("chat_name", "")),
                 "sender_name": str(row["sender_name"]),
                 "sender_id": s_id,
