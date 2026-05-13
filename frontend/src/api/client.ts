@@ -5,8 +5,11 @@ import type {
   DayCount,
   DayDetail,
   EmojiItem,
+  GlobalMessagesResponse,
   HeatmapPoint,
   MediaData,
+  MessageBounds,
+  MessagesMetadata,
   NetworkGraph,
   OverviewData,
   Participant,
@@ -64,6 +67,27 @@ export const api = {
     if (sort) params.set('sort', sort)
     return get(`/api/chats/${chatId}/messages?${params}`)
   },
+  messageBounds: (chatId?: number): Promise<MessageBounds> => {
+    const params = new URLSearchParams()
+    if (chatId !== undefined) params.set('chat_id', String(chatId))
+    const qs = params.toString()
+    return get(`/api/messages/bounds${qs ? `?${qs}` : ''}`)
+  },
+  messagesMetadata: (
+    dateFrom?: string,
+    dateTo?: string,
+    search?: string,
+    chatIds?: number[],
+    senderIds?: string[],
+  ): Promise<MessagesMetadata> => {
+    const params = new URLSearchParams()
+    if (dateFrom) params.set('date_from', dateFrom)
+    if (dateTo) params.set('date_to', dateTo)
+    if (search) params.set('search', search)
+    chatIds?.forEach((id) => params.append('chat_ids', String(id)))
+    senderIds?.forEach((id) => params.append('sender_ids', id))
+    return get(`/api/messages/metadata?${params}`)
+  },
   globalMessages: (
     limit = 100,
     offset = 0,
@@ -73,7 +97,7 @@ export const api = {
     chatIds?: number[],
     senderIds?: string[],
     sort?: 'asc' | 'desc',
-  ): Promise<ChatMessagesResponse> => {
+  ): Promise<GlobalMessagesResponse> => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (dateFrom) params.set('date_from', dateFrom)
     if (dateTo) params.set('date_to', dateTo)
@@ -83,7 +107,12 @@ export const api = {
     if (sort) params.set('sort', sort)
     return get(`/api/messages?${params}`)
   },
-  senders: (): Promise<SenderInfo[]> => get('/api/senders'),
+  senders: (senderIds?: string[]): Promise<SenderInfo[]> => {
+    const params = new URLSearchParams()
+    senderIds?.forEach((id) => params.append('sender_ids', id))
+    const qs = params.toString()
+    return get(`/api/senders${qs ? `?${qs}` : ''}`)
+  },
   search: (q: string, limit = 50): Promise<SearchResult[]> =>
     get(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   semanticSearch: async (q: string, limit = 10, chatId?: number): Promise<SemanticSearchHit[]> => {

@@ -5,12 +5,7 @@ from typing import Annotated, Any, Literal
 
 import pandas as pd
 from db.loaders import build_messages_df, datetime_to_ms, open_connection
-from db.queries.messages import (
-    count_filtered_messages,
-    fetch_distinct_chat_ids,
-    fetch_messages_page,
-    fetch_sender_counts,
-)
+from db.queries.messages import fetch_message_bounds, fetch_messages_metadata, fetch_messages_page, fetch_sender_counts
 from fastapi import APIRouter, Query, Request
 from models.message import MessageType
 from models.sender import SenderRegistry
@@ -28,6 +23,48 @@ _TYPE_LABELS: dict[int, str] = {
     MessageType.STICKER: "[Sticker]",
     MessageType.GIF: "[GIF]",
 }
+
+
+@router.get("/messages/bounds")
+def get_messages_bounds(request: Request, chat_id: int | None = None) -> dict[str, Any]:
+    msgstore: Path = request.app.state.msgstore_path
+    wadb: Path | None = request.app.state.wadb_path
+    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+        bounds = fetch_message_bounds(db.msgstore, chat_id=chat_id)
+    if bounds is None:
+        return {"first_ts": None, "last_ts": None}
+    return {"first_ts": bounds[0], "last_ts": bounds[1]}
+
+
+@router.get("/messages/metadata")
+def get_global_messages_metadata(
+    request: Request,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    search: str | None = None,
+    chat_ids: Annotated[list[int] | None, Query()] = None,
+    sender_ids: Annotated[list[str] | None, Query()] = None,
+) -> dict[str, Any]:
+    date_from_ms = datetime_to_ms(date_from) if date_from else None
+    date_to_ms = datetime_to_ms(date_to) if date_to else None
+    msgstore: Path = request.app.state.msgstore_path
+    wadb: Path | None = request.app.state.wadb_path
+
+    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+        meta = fetch_messages_metadata(
+            db.msgstore,
+            chat_ids=chat_ids,
+            date_from_ms=date_from_ms,
+            date_to_ms=date_to_ms,
+            sender_ids=sender_ids,
+            search=search,
+        )
+
+    return {
+        "total": meta.total,
+        "available_chat_ids": meta.available_chat_ids,
+        "available_sender_ids": meta.available_sender_ids,
+    }
 
 
 @router.get("/messages")
@@ -48,20 +85,11 @@ def get_global_messages(
     )
     date_from_ms = datetime_to_ms(date_from) if date_from else None
     date_to_ms = datetime_to_ms(date_to) if date_to else None
-
     msgstore: Path = request.app.state.msgstore_path
     wadb: Path | None = request.app.state.wadb_path
     registry: SenderRegistry = request.app.state.sender_registry
 
     with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        total = count_filtered_messages(
-            db.msgstore,
-            chat_ids=chat_ids,
-            date_from_ms=date_from_ms,
-            date_to_ms=date_to_ms,
-            sender_ids=sender_ids,
-            search=search,
-        )
         raw_rows = fetch_messages_page(
             db.msgstore,
             chat_ids=chat_ids,
@@ -73,36 +101,25 @@ def get_global_messages(
             limit=limit,
             offset=offset,
         )
-        available_chat_ids = fetch_distinct_chat_ids(
-            db.msgstore,
-            date_from_ms=date_from_ms,
-            date_to_ms=date_to_ms,
-        )
 
-    if not raw_rows:
-        return {"total": 0, "messages": [], "available_chat_ids": available_chat_ids, "available_sender_ids": []}
-
-    df = build_messages_df(raw_rows, registry)
-    messages = _df_to_message_list(df, include_chat_id=True)
-
-    return {
-        "total": total,
-        "messages": messages,
-        "available_chat_ids": sorted(available_chat_ids),
-        "available_sender_ids": [],
-    }
+    messages = _df_to_message_list(build_messages_df(raw_rows, registry), include_chat_id=True) if raw_rows else []
+    return {"messages": messages}
 
 
 @router.get("/senders")
-def get_senders(request: Request) -> list[dict[str, Any]]:
+def get_senders(
+    request: Request,
+    sender_ids: Annotated[list[str] | None, Query()] = None,
+) -> list[dict[str, Any]]:
     logger.info("Fetching senders with message counts")
     msgstore: Path = request.app.state.msgstore_path
     wadb: Path | None = request.app.state.wadb_path
     registry: SenderRegistry = request.app.state.sender_registry
     contacts = registry.as_dict()
 
+    sender_id_set = set(sender_ids) if sender_ids else None
     with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        rows = fetch_sender_counts(db.msgstore)
+        rows = fetch_sender_counts(db.msgstore, sender_ids=sender_id_set)
 
     result = []
     for row in rows:

@@ -100,3 +100,9 @@ class RawSenderCount(_RowBase):
     from_me: int
     effective_phone: str
     message_count: int
+
+
+class MessagesMetadata(BaseModel):
+    total: int
+    available_sender_ids: list[str]
+    available_chat_ids: list[int]

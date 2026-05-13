@@ -25,13 +25,27 @@ const PRESETS: { label: string; value: Preset }[] = [
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function presetDates(preset: Preset): { from: string; to: string } {
-  if (preset === 'all') return { from: '', to: '' }
+function presetDates(preset: Exclude<Preset, 'all'>): { from: string; to: string } {
   const days = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 }[preset]
   const from = new Date()
   from.setDate(from.getDate() - days)
   from.setHours(0, 0, 0, 0)
   return { from: formatDatetime(from), to: '' }
+}
+
+function floorToHour(ms: number): string {
+  const d = new Date(ms)
+  d.setMinutes(0, 0, 0)
+  return formatDatetime(d)
+}
+
+function ceilToHour(ms: number): string {
+  const d = new Date(ms)
+  if (d.getMinutes() !== 0 || d.getSeconds() !== 0 || d.getMilliseconds() !== 0) {
+    d.setHours(d.getHours() + 1)
+  }
+  d.setMinutes(0, 0, 0)
+  return formatDatetime(d)
 }
 
 // ── main page ─────────────────────────────────────────────────────────────────
@@ -50,6 +64,16 @@ export default function MessagesPage() {
   const fromValid = !dateFrom || DATETIME_RE.test(dateFrom)
   const toValid = !dateTo || DATETIME_RE.test(dateTo)
   const rangeInvalid = !!(dateFrom && dateTo && fromValid && toValid && dateTo < dateFrom)
+
+  const apiDateFrom = dateFrom && fromValid ? toApiDatetime(dateFrom) : undefined
+  const apiDateTo = dateTo && toValid ? toApiDatetime(dateTo) : undefined
+
+  const { data: bounds } = useQuery({
+    queryKey: ['messages-bounds', chatId],
+    queryFn: () => api.messageBounds(Number(chatId)),
+    enabled: !!chatId,
+    staleTime: Infinity,
+  })
 
   const { data: participants = [], isLoading: isParticipantsLoading } = useQuery({
     queryKey: ['participants', chatId],
@@ -76,21 +100,26 @@ export default function MessagesPage() {
         Number(chatId),
         PAGE_SIZE,
         offset,
-        dateFrom && fromValid ? toApiDatetime(dateFrom) : undefined,
-        dateTo && toValid ? toApiDatetime(dateTo) : undefined,
+        apiDateFrom,
+        apiDateTo,
         searchTerm || undefined,
         senderId || undefined,
       ),
-    enabled: !!chatId && !rangeInvalid && fromValid && toValid,
+    enabled: !!chatId && !rangeInvalid && fromValid && toValid && !!dateFrom,
   })
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
   const currentPage = Math.floor(offset / PAGE_SIZE)
 
   function applyPreset(p: Preset) {
-    const { from, to } = presetDates(p)
-    setDateFrom(from)
-    setDateTo(to)
+    if (p === 'all') {
+      setDateFrom(bounds?.first_ts ? floorToHour(bounds.first_ts) : '')
+      setDateTo(bounds?.last_ts ? ceilToHour(bounds.last_ts) : '')
+    } else {
+      const { from, to } = presetDates(p)
+      setDateFrom(from)
+      setDateTo(to)
+    }
     setOffset(0)
   }
 
@@ -177,8 +206,9 @@ export default function MessagesPage() {
           {/* Preset shortcuts */}
           <div className="flex gap-1">
             {PRESETS.map((p) => {
-              const { from } = presetDates(p.value)
-              const active = from.slice(0, 10) === dateFrom.slice(0, 10) && (p.value === 'all' ? !dateTo : !dateTo || true)
+              const active = p.value === 'all'
+                ? (bounds?.first_ts ? dateFrom === floorToHour(bounds.first_ts) : !dateFrom)
+                : presetDates(p.value).from.slice(0, 10) === dateFrom.slice(0, 10) && !dateTo
               return (
                 <button
                   key={p.value}
@@ -205,8 +235,8 @@ export default function MessagesPage() {
                   Number(chatId),
                   limit,
                   offset,
-                  dateFrom && fromValid ? toApiDatetime(dateFrom) : undefined,
-                  dateTo && toValid ? toApiDatetime(dateTo) : undefined,
+                  apiDateFrom,
+                  apiDateTo,
                   searchTerm || undefined,
                   senderId || undefined,
                   'asc',

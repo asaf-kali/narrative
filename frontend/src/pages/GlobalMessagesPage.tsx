@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { api, SemanticUnavailableError } from '../api/client'
+import type { MessagesMetadata } from '../api/types'
 import { CardSpinner } from '../components/Spinner'
 import DatetimeInput, { DATETIME_RE, formatDatetime, toApiDatetime } from '../components/DatetimeInput'
 import SearchableChipFilter from '../components/messages/SearchableChipFilter'
@@ -26,13 +27,27 @@ const PRESETS: { label: string; value: Preset }[] = [
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function presetDates(preset: Preset): { from: string; to: string } {
-  if (preset === 'all') return { from: '', to: '' }
+function presetDates(preset: Exclude<Preset, 'all'>): { from: string; to: string } {
   const days = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 }[preset]
   const from = new Date()
   from.setDate(from.getDate() - days)
   from.setHours(0, 0, 0, 0)
   return { from: formatDatetime(from), to: '' }
+}
+
+function floorToHour(ms: number): string {
+  const d = new Date(ms)
+  d.setMinutes(0, 0, 0)
+  return formatDatetime(d)
+}
+
+function ceilToHour(ms: number): string {
+  const d = new Date(ms)
+  if (d.getMinutes() !== 0 || d.getSeconds() !== 0 || d.getMilliseconds() !== 0) {
+    d.setHours(d.getHours() + 1)
+  }
+  d.setMinutes(0, 0, 0)
+  return formatDatetime(d)
 }
 
 function isoToLocal(iso: string): string {
@@ -122,24 +137,69 @@ export default function GlobalMessagesPage() {
   const toValid = !dateTo || DATETIME_RE.test(dateTo)
   const rangeInvalid = !!(dateFrom && dateTo && fromValid && toValid && dateTo < dateFrom)
 
-  const { data: chats = [], isLoading: isChatsLoading } = useQuery({ queryKey: ['chats'], queryFn: () => api.chats() })
-  const { data: senders = [], isLoading: isSendersLoading } = useQuery({ queryKey: ['senders'], queryFn: api.senders })
-
-  // keyword query
-  const { data, isLoading } = useQuery({
-    queryKey: ['global-messages', offset, dateFrom, dateTo, searchTerm, [...activeChats].sort(), [...activeSenders].sort()],
-    queryFn: () =>
-      api.globalMessages(
-        PAGE_SIZE,
-        offset,
-        dateFrom && fromValid ? toApiDatetime(dateFrom) : undefined,
-        dateTo && toValid ? toApiDatetime(dateTo) : undefined,
-        searchTerm || undefined,
-        activeChats.size > 0 ? [...activeChats] : undefined,
-        activeSenders.size > 0 ? [...activeSenders] : undefined,
-      ),
-    enabled: searchMode === 'keyword' && !rangeInvalid && fromValid && toValid,
+  const apiDateFrom = dateFrom && fromValid ? toApiDatetime(dateFrom) : undefined
+  const apiDateTo = dateTo && toValid ? toApiDatetime(dateTo) : undefined
+  const { data: bounds } = useQuery({
+    queryKey: ['messages-bounds'],
+    queryFn: () => api.messageBounds(),
+    staleTime: Infinity,
   })
+
+  const filterReady = searchMode === 'keyword' && !rangeInvalid && fromValid && toValid && !!dateFrom
+
+  const sortedChatIds = useMemo(() => [...activeChats].sort(), [activeChats])
+  const sortedSenderIds = useMemo(() => [...activeSenders].sort(), [activeSenders])
+  const chatIdsParam = activeChats.size > 0 ? [...activeChats] : undefined
+  const senderIdsParam = activeSenders.size > 0 ? [...activeSenders] : undefined
+
+  // Step 1: metadata — total count + available IDs (fast: COUNT + DISTINCT only)
+  const { data: metadata, isLoading: isMetaLoading } = useQuery<MessagesMetadata>({
+    queryKey: ['global-messages-metadata', apiDateFrom, apiDateTo, searchTerm, sortedChatIds, sortedSenderIds],
+    queryFn: () => api.messagesMetadata(apiDateFrom, apiDateTo, searchTerm || undefined, chatIdsParam, senderIdsParam),
+    enabled: filterReady,
+  })
+
+  // Step 2a: messages page (fires after metadata resolves, using same filters)
+  const { data: messagesData, isLoading: isMessagesLoading } = useQuery({
+    queryKey: ['global-messages', offset, apiDateFrom, apiDateTo, searchTerm, sortedChatIds, sortedSenderIds],
+    queryFn: () =>
+      api.globalMessages(PAGE_SIZE, offset, apiDateFrom, apiDateTo, searchTerm || undefined, chatIdsParam, senderIdsParam),
+    enabled: !!metadata,
+  })
+
+  // Step 2b: all chats — fires after metadata resolves
+  const { data: chats = [], isLoading: isChatsLoading } = useQuery({
+    queryKey: ['chats'],
+    queryFn: () => api.chats(),
+    enabled: !!metadata,
+  })
+
+  // Step 2c: sender names — batched at 100 IDs per request to avoid 431 errors
+  const availableSenderIds = useMemo(
+    () => metadata?.available_sender_ids ?? [],
+    [metadata],
+  )
+  const senderIdBatches = useMemo(() => {
+    const batches: string[][] = []
+    for (let i = 0; i < availableSenderIds.length; i += 100) {
+      batches.push(availableSenderIds.slice(i, i + 100))
+    }
+    return batches
+  }, [availableSenderIds])
+
+  const senderBatchResults = useQueries({
+    queries: senderIdBatches.map((batch) => ({
+      queryKey: ['senders', batch],
+      queryFn: () => api.senders(batch),
+      enabled: batch.length > 0,
+    })),
+  })
+  const isSendersLoading = senderBatchResults.some((r) => r.isLoading)
+  const senders = useMemo(
+    () => senderBatchResults.flatMap((r) => r.data ?? []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [senderBatchResults.map((r) => r.dataUpdatedAt).join(',')],
+  )
 
   // semantic query
   const {
@@ -156,12 +216,8 @@ export default function GlobalMessagesPage() {
   const isUnavailable = semanticError instanceof SemanticUnavailableError
 
   const availableChatIds = useMemo(
-    () => data?.available_chat_ids ? new Set(data.available_chat_ids) : null,
-    [data],
-  )
-  const availableSenderIds = useMemo(
-    () => data?.available_sender_ids ? new Set(data.available_sender_ids) : null,
-    [data],
+    () => metadata?.available_chat_ids ? new Set(metadata.available_chat_ids) : null,
+    [metadata],
   )
 
   const chatItems = useMemo(
@@ -174,22 +230,25 @@ export default function GlobalMessagesPage() {
   )
 
   const senderItems = useMemo(
-    () =>
-      senders
-        .filter((s) => !availableSenderIds || availableSenderIds.has(s.sender_id))
-        .map((s) => ({ id: s.sender_id, label: s.sender_name, searchText: `${s.sender_name} ${s.phone}` })),
-    [senders, availableSenderIds],
+    () => senders.map((s) => ({ id: s.sender_id, label: s.sender_name, searchText: `${s.sender_name} ${s.phone}` })),
+    [senders],
   )
 
-  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
+  const total = metadata?.total ?? 0
+  const totalPages = Math.ceil(total / PAGE_SIZE)
   const currentPage = Math.floor(offset / PAGE_SIZE)
 
   function reset() { setOffset(0) }
 
   function applyPreset(p: Preset) {
-    const { from, to } = presetDates(p)
-    setDateFrom(from)
-    setDateTo(to)
+    if (p === 'all') {
+      setDateFrom(bounds?.first_ts ? floorToHour(bounds.first_ts) : '')
+      setDateTo(bounds?.last_ts ? ceilToHour(bounds.last_ts) : '')
+    } else {
+      const { from, to } = presetDates(p)
+      setDateFrom(from)
+      setDateTo(to)
+    }
     reset()
   }
 
@@ -300,10 +359,9 @@ export default function GlobalMessagesPage() {
 
               <div className="flex gap-1">
                 {PRESETS.map((p) => {
-                  const { from } = presetDates(p.value)
                   const active = p.value === 'all'
-                    ? (!dateFrom && !dateTo)
-                    : from.slice(0, 10) === dateFrom.slice(0, 10) && !dateTo
+                    ? (bounds?.first_ts ? dateFrom === floorToHour(bounds.first_ts) : !dateFrom)
+                    : presetDates(p.value).from.slice(0, 10) === dateFrom.slice(0, 10) && !dateTo
                   return (
                     <button
                       key={p.value}
@@ -321,15 +379,15 @@ export default function GlobalMessagesPage() {
 
               <div className="ml-auto">
                 <ExportButton
-                  total={data?.total ?? 0}
+                  total={total}
                   filename="messages"
-                  disabled={!data || data.total === 0 || rangeInvalid || !fromValid || !toValid}
+                  disabled={!metadata || total === 0 || rangeInvalid || !fromValid || !toValid}
                   onFetchPage={(limit, offset) =>
                     api.globalMessages(
                       limit,
                       offset,
-                      dateFrom && fromValid ? toApiDatetime(dateFrom) : undefined,
-                      dateTo && toValid ? toApiDatetime(dateTo) : undefined,
+                      apiDateFrom,
+                      apiDateTo,
                       searchTerm || undefined,
                       activeChats.size > 0 ? [...activeChats] : undefined,
                       activeSenders.size > 0 ? [...activeSenders] : undefined,
@@ -344,38 +402,40 @@ export default function GlobalMessagesPage() {
           <div className="flex gap-4 items-start">
             <div className="flex-1 min-w-0">
               <SearchableChipFilter
-                title={`Chats (${chatItems.length})`}
+                title={`Chats (${isChatsLoading || isMetaLoading ? '…' : chatItems.length})`}
                 items={chatItems}
                 activeIds={activeChatIds}
                 onToggle={toggleChat}
                 onClear={() => { setActiveChats(new Set()); reset() }}
-                isLoading={isChatsLoading}
+                isLoading={isChatsLoading || isMetaLoading}
               />
             </div>
             <div className="flex-1 min-w-0">
               <SearchableChipFilter
-                title={`Senders (${senderItems.length})`}
+                title={`Senders (${isSendersLoading || isMetaLoading ? '…' : senderItems.length})`}
                 items={senderItems}
                 activeIds={activeSenders}
                 onToggle={toggleSender}
                 onClear={() => { setActiveSenders(new Set()); reset() }}
-                isLoading={isSendersLoading}
+                isLoading={isSendersLoading || isMetaLoading}
               />
             </div>
           </div>
 
-          {isLoading ? (
+          {isMetaLoading || isMessagesLoading ? (
             <div className="bg-app-surface border border-app-border rounded-xl">
               <CardSpinner className="h-64" />
             </div>
-          ) : !data || data.total === 0 ? (
+          ) : !metadata || total === 0 ? (
             <div className="bg-app-surface border border-app-border rounded-xl p-8 text-center text-tx-muted text-sm">
-              {searchTerm ? `No messages matching "${searchTerm}"` : 'No messages in this range'}
+              {filterReady
+                ? (searchTerm ? `No messages matching "${searchTerm}"` : 'No messages in this range')
+                : 'Select a date range to browse messages'}
             </div>
           ) : (
             <MessagesCard
-              messages={[...data.messages].reverse()}
-              total={data.total}
+              messages={messagesData ? [...messagesData.messages].reverse() : []}
+              total={total}
               showChat
               dayOnly={false}
               height="calc(100vh - 420px)"

@@ -2,7 +2,7 @@ import logging
 import sqlite3
 from collections.abc import Generator
 
-from db.row_types import RawMessageRow, RawSenderCount
+from db.row_types import MessagesMetadata, RawMessageRow, RawSenderCount
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +179,61 @@ def fetch_distinct_chat_ids(
     return [r[0] for r in conn.execute(sql, params).fetchall()]
 
 
+def fetch_distinct_sender_ids(
+    conn: sqlite3.Connection,
+    date_from_ms: int | None = None,
+    date_to_ms: int | None = None,
+    exclude_system: bool = True,
+) -> list[str]:
+    # Needs full JOINs so _SENDER_ID_CASE can resolve pj/sj/cj columns.
+    where, params = _build_browse_filter(
+        date_from_ms=date_from_ms,
+        date_to_ms=date_to_ms,
+        exclude_system=exclude_system,
+    )
+    sql = f"SELECT DISTINCT ({_SENDER_ID_CASE}) AS sender_id" + _MESSAGES_SQL[_MESSAGES_SQL.index("\nFROM") :] + where
+    return [r[0] for r in conn.execute(sql, params).fetchall()]
+
+
+def fetch_messages_metadata(
+    conn: sqlite3.Connection,
+    chat_id: int | None = None,
+    chat_ids: list[int] | None = None,
+    date_from_ms: int | None = None,
+    date_to_ms: int | None = None,
+    exclude_system: bool = True,
+    sender_ids: list[str] | None = None,
+    search: str | None = None,
+) -> MessagesMetadata:
+    total = count_filtered_messages(
+        conn,
+        chat_id=chat_id,
+        chat_ids=chat_ids,
+        date_from_ms=date_from_ms,
+        date_to_ms=date_to_ms,
+        exclude_system=exclude_system,
+        sender_ids=sender_ids,
+        search=search,
+    )
+    # Available options reflect the date range only (pre-chat/sender filter).
+    avail_senders = fetch_distinct_sender_ids(
+        conn,
+        date_from_ms=date_from_ms,
+        date_to_ms=date_to_ms,
+        exclude_system=exclude_system,
+    )
+    avail_chats = (
+        fetch_distinct_chat_ids(conn, date_from_ms=date_from_ms, date_to_ms=date_to_ms, exclude_system=exclude_system)
+        if chat_id is None
+        else []
+    )
+    return MessagesMetadata(
+        total=total,
+        available_sender_ids=sorted(avail_senders),
+        available_chat_ids=sorted(avail_chats),
+    )
+
+
 def fetch_all_messages(
     conn: sqlite3.Connection,
     date_from_ms: int | None = None,
@@ -207,7 +262,7 @@ def fetch_messages_for_chat(
         yield RawMessageRow.model_validate(dict(row))
 
 
-_SENDER_COUNTS_SQL = """
+_SENDER_COUNTS_BASE_SQL = """
 SELECT
     (CASE
         WHEN m.from_me = 1 THEN 'me'
@@ -228,15 +283,39 @@ LEFT JOIN jid_map lm   ON sj._id = lm.lid_row_id AND sj.server = 'lid'
 LEFT JOIN jid pj       ON lm.jid_row_id = pj._id
 LEFT JOIN chat c       ON m.chat_row_id = c._id
 LEFT JOIN jid cj       ON c.jid_row_id = cj._id
-WHERE m.chat_row_id > 0 AND m.message_type != {_SYSTEM_TYPE}
-GROUP BY sender_id
-ORDER BY message_count DESC
 """
 
 
-def fetch_sender_counts(conn: sqlite3.Connection) -> list[RawSenderCount]:
-    sql = _SENDER_COUNTS_SQL.format(_SYSTEM_TYPE=_SYSTEM_TYPE)
-    return [RawSenderCount.model_validate(dict(r)) for r in conn.execute(sql).fetchall()]
+def fetch_sender_counts(
+    conn: sqlite3.Connection,
+    sender_ids: set[str] | None = None,
+) -> list[RawSenderCount]:
+    sql = (
+        _SENDER_COUNTS_BASE_SQL
+        + f"WHERE m.chat_row_id > 0 AND m.message_type != {_SYSTEM_TYPE}\n"
+        + "GROUP BY sender_id\nORDER BY message_count DESC"
+    )
+    rows = [RawSenderCount.model_validate(dict(r)) for r in conn.execute(sql).fetchall()]
+    if sender_ids is not None:
+        rows = [r for r in rows if r.sender_id in sender_ids]
+    return rows
+
+
+_BOUNDS_SQL_GLOBAL = "SELECT MIN(timestamp), MAX(timestamp) FROM message WHERE chat_row_id > 0 AND message_type != 7"
+_BOUNDS_SQL_CHAT = "SELECT MIN(timestamp), MAX(timestamp) FROM message WHERE chat_row_id = ? AND message_type != 7"
+
+
+def fetch_message_bounds(
+    conn: sqlite3.Connection,
+    chat_id: int | None = None,
+) -> tuple[int, int] | None:
+    if chat_id is not None:
+        row = conn.execute(_BOUNDS_SQL_CHAT, (chat_id,)).fetchone()
+    else:
+        row = conn.execute(_BOUNDS_SQL_GLOBAL).fetchone()
+    if row and row[0] is not None and row[1] is not None:
+        return (int(row[0]), int(row[1]))
+    return None
 
 
 def count_messages(conn: sqlite3.Connection) -> int:

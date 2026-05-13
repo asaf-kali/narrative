@@ -15,7 +15,7 @@ from analysis.timeline import active_days_count, daily_timeline, hourly_heatmap,
 from api.deps import get_df
 from api.routes.messages import _df_to_message_list
 from db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
-from db.queries.messages import count_filtered_messages, fetch_messages_page
+from db.queries.messages import fetch_messages_metadata, fetch_messages_page
 from fastapi import APIRouter, Request
 from models.config import AnalysisConfig
 from models.message import AUDIO_TYPES, MEDIA_TYPES, MessageType
@@ -215,7 +215,7 @@ def get_messages(
     registry: SenderRegistry = request.app.state.sender_registry
 
     with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        total = count_filtered_messages(
+        meta = fetch_messages_metadata(
             db.msgstore,
             chat_id=chat_id,
             date_from_ms=date_from_ms,
@@ -241,7 +241,7 @@ def get_messages(
         return {"total": 0, "messages": []}
 
     df = build_messages_df(raw_rows, registry)
-    return {"total": total, "messages": _df_to_message_list(df)}
+    return {"total": meta.total, "messages": _df_to_message_list(df)}
 
 
 @router.get("/chats/{chat_id}/media")

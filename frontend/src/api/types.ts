@@ -83,8 +83,21 @@ export interface FeedMessage {
 export interface ChatMessagesResponse {
   total: number
   messages: FeedMessage[]
-  available_chat_ids?: number[]
-  available_sender_ids?: string[]
+}
+
+export interface GlobalMessagesResponse {
+  messages: FeedMessage[]
+}
+
+export interface MessagesMetadata {
+  total: number
+  available_chat_ids: number[]
+  available_sender_ids: string[]
+}
+
+export interface MessageBounds {
+  first_ts: number | null
+  last_ts: number | null
 }
 
 export interface DayMessage {
