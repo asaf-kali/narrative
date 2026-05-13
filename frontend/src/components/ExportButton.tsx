@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import type { ChatMessagesResponse, FeedMessage } from '../api/types'
+import type { FeedMessage } from '../api/types'
 
 const PAGE_SIZE = 1000
 
 type Format = 'csv' | 'json'
 
 interface Props {
-  onFetchPage: (limit: number, offset: number) => Promise<ChatMessagesResponse>
+  onFetchPage: (limit: number, offset: number) => Promise<{ messages: FeedMessage[] }>
   total: number
   filename: string
   disabled?: boolean
