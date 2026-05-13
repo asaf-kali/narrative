@@ -258,7 +258,11 @@ def build_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) -> pd
 
     # Normalise timestamps
     df[COL_TIMESTAMP] = pd.to_datetime(df[COL_TIMESTAMP], unit="ms", utc=True).dt.tz_convert(_LOCAL_TZ)
-    received_ms = df[COL_RECEIVED_TIMESTAMP].where(df[COL_RECEIVED_TIMESTAMP] > 0)
+    # Clamp received_timestamp: 0/negative = missing; >_MAX_MS_TS = sentinel/corrupt (would overflow int64 ns)
+    _MAX_MS_TS = 9_000_000_000_000  # ~year 2255, safely below int64 nanosecond overflow
+    received_ms = df[COL_RECEIVED_TIMESTAMP].where(
+        (df[COL_RECEIVED_TIMESTAMP] > 0) & (df[COL_RECEIVED_TIMESTAMP] < _MAX_MS_TS)
+    )
     df[COL_RECEIVED_TIMESTAMP] = pd.to_datetime(received_ms, unit="ms", utc=True, errors="coerce").dt.tz_convert(
         _LOCAL_TZ
     )
