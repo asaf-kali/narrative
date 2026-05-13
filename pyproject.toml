@@ -41,6 +41,9 @@ semantic = [
     "lancedb >= 0.20",
     "pyarrow >= 18",
 ]
+mock = [
+    "faker",
+]
 
 # UV
 

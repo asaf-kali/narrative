@@ -56,7 +56,7 @@ run *args: frontend-build
     just backend {{ args }}
 
 run-dev *args:
-    just backend-dev {{ args }} --wadb data/wa.db --contacts data/contacts.csv & just frontend-dev
+    just backend-dev {{ args }} & just frontend-dev
 
 # Lint
 
@@ -82,3 +82,6 @@ index *args:
 decrypt key:
     cd data && wadecrypt {{ key }} msgstore.db.crypt15 msgstore.db
     -cd data && wadecrypt {{ key }} wa.db.crypt15 wa.db
+
+generate-mock out_dir="data/mock":
+    uv run scripts/generate_mock_db.py {{ out_dir }}
