@@ -83,5 +83,10 @@ decrypt key:
     cd data && wadecrypt {{ key }} msgstore.db.crypt15 msgstore.db
     -cd data && wadecrypt {{ key }} wa.db.crypt15 wa.db
 
+# Fetch encrypted WhatsApp DBs from connected Android device via adb.
+# Override adb binary with ADB=..., base dir on device with WA_BASE_DIR=...
+fetch-db dest="data":
+    ./scripts/fetch_db.sh {{ dest }}
+
 generate-mock out_dir="data/mock":
     uv run scripts/generate_mock_db.py {{ out_dir }}
