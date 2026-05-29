@@ -106,10 +106,11 @@ def _add_csv_row(contacts: dict[str, str], row: dict[str, str], local_code: str 
 
 
 def _resolve_lids(msgstore: sqlite3.Connection, contacts: dict[str, str]) -> dict[str, str]:
-    """Build {lid_user: display_name} for LIDs whose phone is already in contacts.
+    """Build {lid_user: display} for every LID with a phone JID in jid_map.
 
-    jid_map maps lid_row_id → jid_row_id (the real phone JID), allowing LID-based
-    chats to be resolved via the existing contacts dict.
+    Prefer the contact name when the phone is known; otherwise fall back to
+    the phone digits themselves so the UI shows a real number rather than the
+    opaque LID.
     """
     try:
         rows = msgstore.execute("""
@@ -125,11 +126,16 @@ def _resolve_lids(msgstore: sqlite3.Connection, contacts: dict[str, str]) -> dic
         return {}
 
     resolved: dict[str, str] = {}
+    named = 0
     for row in rows:
-        name = contacts.get(row["phone_user"])
+        phone = row["phone_user"]
+        name = contacts.get(phone)
         if name:
             resolved[row["lid_user"]] = name
-    logger.info(f"Resolved {len(resolved)} LID contacts via jid_map")
+            named += 1
+        else:
+            resolved[row["lid_user"]] = phone
+    logger.info(f"Resolved {len(resolved)} LIDs via jid_map ({named} with names, {len(resolved) - named} phone-only)")
     return resolved
 
 
