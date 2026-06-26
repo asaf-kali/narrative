@@ -91,6 +91,6 @@ fetch-db dest="data":
 generate-mock out_dir="data/mock":
     uv run scripts/generate_mock_db.py {{ out_dir }}
 
-# Compress raw DBs and contacts into a timestamped 7z archive.
+# Compress raw DBs and contacts into a 7z archive.
 backup:
-    cd data && 7z a "backup_$(date +%Y%m%d_%H%M%S).7z" msgstore.db wa.db contacts.csv
+    cd data && 7z a "Backup.7z" msgstore.db wa.db contacts.csv
