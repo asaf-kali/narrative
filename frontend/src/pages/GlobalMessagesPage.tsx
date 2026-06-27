@@ -8,6 +8,7 @@ import SearchableChipFilter from '../components/messages/SearchableChipFilter'
 import MessagesCard from '../components/messages/MessagesCard'
 import ExportButton from '../components/ExportButton'
 import { useDebounce } from '../hooks/useDebounce'
+import { formatDateTime } from '../utils/datetime'
 import type { SemanticSearchHit } from '../api/types'
 
 // ── constants ─────────────────────────────────────────────────────────────────
@@ -50,11 +51,6 @@ function ceilToHour(ms: number): string {
   return formatDatetime(d)
 }
 
-function isoToLocal(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
-}
-
 // ── semantic results ──────────────────────────────────────────────────────────
 
 function SemanticHitCard({ hit }: { hit: SemanticSearchHit }) {
@@ -83,10 +79,10 @@ function SemanticHitCard({ hit }: { hit: SemanticSearchHit }) {
         <div className="flex-1 min-w-0">
           <span className="font-medium text-sm text-tx-primary truncate block">{hit.chat_name}</span>
           <span className="text-xs text-tx-muted">
-            {isoToLocal(hit.timestamp_start)} – {isoToLocal(hit.timestamp_end)}
+            {formatDateTime(hit.timestamp_start)} – {formatDateTime(hit.timestamp_end)}
           </span>
           {!expanded && hit.text && (
-            <span className="block text-xs text-tx-secondary mt-1 line-clamp-2 whitespace-pre-line">{hit.text}</span>
+            <span className="text-xs text-tx-secondary mt-1 line-clamp-3 whitespace-pre-line">{hit.text}</span>
           )}
         </div>
         <span
@@ -478,6 +474,23 @@ export default function GlobalMessagesPage() {
                 Search
               </button>
             </form>
+
+            <div className="mt-3 text-[11px] leading-relaxed text-tx-muted space-y-1">
+              <p className="font-medium text-tx-secondary">How to search</p>
+              <p>
+                Describe <span className="text-tx-secondary">what was said</span>, not how you'd ask it. A short phrase
+                works better than a single word, and you don't need a question — searching for the topic or a
+                paraphrase of the actual message is best.
+              </p>
+              <p>
+                If you remember any <span className="text-tx-secondary">distinctive words, names, or places</span> from
+                the conversation, include them — exact terms sharpen the match on top of the meaning-based search.
+              </p>
+              <p>
+                Results are whole <span className="text-tx-secondary">conversation windows</span> ranked by relevance,
+                not single messages — click one to read the surrounding chat.
+              </p>
+            </div>
           </div>
 
           {isUnavailable ? (

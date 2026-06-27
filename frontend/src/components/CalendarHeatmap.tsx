@@ -1,5 +1,6 @@
 import type { DayCount } from '../api/types'
 import { useTheme } from '../context/ThemeContext'
+import { formatDate } from '../utils/datetime'
 
 interface Props {
   data: DayCount[]
@@ -125,7 +126,7 @@ export default function CalendarHeatmap({ data, selectedDate, onSelectDate }: Pr
             {week.map((cell, di) => (
               <div
                 key={di}
-                title={cell.date ? `${cell.date}: ${cell.count.toLocaleString()} messages` : ''}
+                title={cell.date ? `${formatDate(cell.date)}: ${cell.count.toLocaleString()} messages` : ''}
                 onClick={() => cell.date && cell.count > 0 && onSelectDate(cell.date)}
                 className={`rounded-sm flex-shrink-0 ${cell.date && cell.count > 0 ? 'cursor-pointer hover:ring-1 hover:ring-accent/60' : ''}`}
                 style={{
