@@ -16,7 +16,8 @@ class Session(BaseModel):
     min_message_id: int
     max_message_id: int
     message_count: int
-    embed_text: str  # joined text for embedding only — not stored persistently
+    embed_text: str  # clean message text (no sender names) — fed to the embedding model
+    display_text: str  # "Sender: text" lines — persisted for snippets + reranking
 
 
 class SessionMeta(BaseModel):
@@ -38,4 +39,5 @@ class SessionRecord(BaseModel):
     chat_name: str
     timestamp_start: datetime
     timestamp_end: datetime
+    text: str
     vector: list[float]

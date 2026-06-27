@@ -21,6 +21,11 @@ from db.loaders import DataLoader, IndexMessage
 from db.queries.messages import count_messages, count_messages_for_chat, get_max_message_id_for_chat
 from semantic_search.chunker import iterate_sessions
 from semantic_search.embedder import Embedder
+from semantic_search.params import (
+    DEFAULT_CHUNK_SIZE,
+    DEFAULT_MAX_SESSION_MESSAGES,
+    DEFAULT_MIN_SESSION_CHARS,
+)
 from semantic_search.session import Session, SessionRecord
 from semantic_search.state import StateDB
 from semantic_search.vector_store import VectorStore
@@ -36,6 +41,7 @@ class _IndexStats:
     message_counts: list[int] = field(default_factory=list)
     durations_sec: list[float] = field(default_factory=list)
     embed_time_sec: float = 0.0
+    chat_name: str | None = None  # per-chat only; not propagated by merge()
 
     @property
     def session_count(self) -> int:
@@ -89,8 +95,9 @@ class Indexer:
         search_dir: Path,
         gap_seconds: int,
         batch_size: int,
-        chunk_size: int = 500,
-        min_session_chars: int = 0,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+        min_session_chars: int = DEFAULT_MIN_SESSION_CHARS,
+        max_session_messages: int = DEFAULT_MAX_SESSION_MESSAGES,
     ) -> None:
         self._msgstore_path = msgstore_path
         self._wadb_path = wadb_path
@@ -101,6 +108,7 @@ class Indexer:
         self._batch_size = batch_size
         self._chunk_size = chunk_size
         self._min_session_chars = min_session_chars
+        self._max_session_messages = max_session_messages
 
     def __enter__(self) -> Self:
         conn = DBConnection(msgstore_path=self._msgstore_path, wadb_path=self._wadb_path)
@@ -134,12 +142,14 @@ class Indexer:
                 n = chat_stats.session_count
                 log_prefix = f"{i}/{len(all_chat_ids)}] chat {chat_id}"
                 if n:
-                    logger.info(f"[{log_prefix}: {n} sessions | {chat_stats.inline_str()}")
+                    logger.info(f"[{log_prefix}: [{chat_stats.chat_name}] {n} sessions | {chat_stats.inline_str()}")
                 else:
                     logger.info(f"[{log_prefix}: up to date")
 
         if is_first_run and global_stats.session_count >= _MIN_INDEX_ROWS:
             self._store.build_index()
+        if global_stats.session_count > 0:
+            self._store.build_fts_index()
         logger.info(f"Done — {global_stats.session_count} sessions across {len(all_chat_ids)} chats")
         global_stats.log_summary()
 
@@ -147,9 +157,11 @@ class Indexer:
         known_chats = set(self._state.all_chat_ids())
         with logging_redirect_tqdm():
             chat_stats = self._index_chat(chat_id=chat_id, known_chats=known_chats)
+        if chat_stats.session_count > 0:
+            self._store.build_fts_index()
         n = chat_stats.session_count
         if n:
-            logger.info(f"chat {chat_id}: {n} sessions | {chat_stats.inline_str()}")
+            logger.info(f"chat {chat_id}: [{chat_stats.chat_name}] {n} sessions | {chat_stats.inline_str()}")
         else:
             logger.info(f"chat {chat_id}: up to date")
         chat_stats.log_summary()
@@ -193,7 +205,7 @@ class Indexer:
         )
 
     def _index_sessions(self, stream: _ChatStream, chat_id: int) -> _IndexStats:
-        stats = _IndexStats()
+        stats = _IndexStats(chat_name=stream.chat_name)
         batch: list[Session] = []
         batch_to_delete = stream.to_delete
 
@@ -212,6 +224,7 @@ class Indexer:
             chat_name=stream.chat_name,
             gap_seconds=self._gap_seconds,
             min_session_chars=self._min_session_chars,
+            max_session_messages=self._max_session_messages,
         )
         for session in session_iterator:
             batch.append(session)
@@ -243,6 +256,7 @@ class Indexer:
                 chat_name=s.chat_name,
                 timestamp_start=s.timestamp_start,
                 timestamp_end=s.timestamp_end,
+                text=s.display_text,
                 vector=v,
             )
             for s, v in zip(sessions, vectors, strict=True)
@@ -260,8 +274,9 @@ def run(
     search_dir: Path,
     gap_seconds: int,
     batch_size: int,
-    chunk_size: int = 500,
-    min_session_chars: int = 0,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    min_session_chars: int = DEFAULT_MIN_SESSION_CHARS,
+    max_session_messages: int = DEFAULT_MAX_SESSION_MESSAGES,
 ) -> None:
     with Indexer(
         msgstore_path=msgstore_path,
@@ -271,6 +286,7 @@ def run(
         batch_size=batch_size,
         chunk_size=chunk_size,
         min_session_chars=min_session_chars,
+        max_session_messages=max_session_messages,
     ) as indexer:
         indexer.run()
 
@@ -282,8 +298,9 @@ def run_chat(
     search_dir: Path,
     gap_seconds: int,
     batch_size: int,
-    chunk_size: int = 500,
-    min_session_chars: int = 0,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    min_session_chars: int = DEFAULT_MIN_SESSION_CHARS,
+    max_session_messages: int = DEFAULT_MAX_SESSION_MESSAGES,
 ) -> None:
     with Indexer(
         msgstore_path=msgstore_path,
@@ -293,6 +310,7 @@ def run_chat(
         batch_size=batch_size,
         chunk_size=chunk_size,
         min_session_chars=min_session_chars,
+        max_session_messages=max_session_messages,
     ) as indexer:
         indexer.index_single_chat(chat_id=chat_id)
 

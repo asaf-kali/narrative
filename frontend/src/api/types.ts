@@ -171,6 +171,7 @@ export interface SemanticSearchHit {
   chat_name: string
   timestamp_start: string  // ISO 8601 datetime
   timestamp_end: string    // ISO 8601 datetime
+  text: string             // "Sender: message" lines for this session — snippet/preview
   score: number
 }
 
