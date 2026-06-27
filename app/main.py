@@ -7,6 +7,13 @@ from typing import Annotated
 import typer
 import uvicorn
 from logger import configure_logging
+from semantic_search.params import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_CHUNK_SIZE,
+    DEFAULT_GAP_SECONDS,
+    DEFAULT_MAX_SESSION_MESSAGES,
+    DEFAULT_MIN_SESSION_CHARS,
+)
 
 _LOG_CONFIG_DICT = configure_logging()
 logger = logging.getLogger(__name__)
@@ -27,7 +34,6 @@ class ResolvedPaths:
 
 
 cli = typer.Typer(no_args_is_help=True)
-DEFAULT_INACTIVE_GAP_SECONDS = 60 * 60 * 2  # 2 hours
 
 _ArgDataDir = Annotated[
     Path | None,
@@ -126,7 +132,7 @@ def serve(
 
 
 _ArgGapSeconds = Annotated[
-    int, typer.Option(help=f"Inactivity gap in seconds to split sessions (default: {DEFAULT_INACTIVE_GAP_SECONDS})")
+    int, typer.Option(help=f"Inactivity gap in seconds to split sessions (default: {DEFAULT_GAP_SECONDS})")
 ]
 _ArgBatchSize = Annotated[int, typer.Option(help="Embedding batch size")]
 _ArgChunkSize = Annotated[int, typer.Option(help="Messages read per DB chunk (streaming)")]
@@ -134,6 +140,10 @@ _ArgChatId = Annotated[int | None, typer.Option(help="Index only this chat ID (s
 _ArgMinSessionChars = Annotated[
     int,
     typer.Option(help="Min text chars to flush a session on gap; keep appending if below threshold (0 = disabled)"),
+]
+_ArgMaxSessionMessages = Annotated[
+    int,
+    typer.Option(help="Hard cap on messages per session; splits long bursts to keep vectors focused (0 = disabled)"),
 ]
 
 
@@ -143,11 +153,12 @@ def index(
     msgstore: _ArgMsgstore = None,
     wadb: _ArgWadb = None,
     search_dir: _ArgSearchDir = Path("data/search"),
-    gap_seconds: _ArgGapSeconds = DEFAULT_INACTIVE_GAP_SECONDS,
-    batch_size: _ArgBatchSize = 32,
-    chunk_size: _ArgChunkSize = 500,
+    gap_seconds: _ArgGapSeconds = DEFAULT_GAP_SECONDS,
+    batch_size: _ArgBatchSize = DEFAULT_BATCH_SIZE,
+    chunk_size: _ArgChunkSize = DEFAULT_CHUNK_SIZE,
     chat_id: _ArgChatId = None,
-    min_session_chars: _ArgMinSessionChars = 500,
+    min_session_chars: _ArgMinSessionChars = DEFAULT_MIN_SESSION_CHARS,
+    max_session_messages: _ArgMaxSessionMessages = DEFAULT_MAX_SESSION_MESSAGES,
 ) -> None:
     """Build or incrementally update the semantic search index."""
     resolved = _resolve_data_dir(data_dir, msgstore, wadb, contacts=None)
@@ -172,6 +183,7 @@ def index(
             batch_size=batch_size,
             chunk_size=chunk_size,
             min_session_chars=min_session_chars,
+            max_session_messages=max_session_messages,
         )
     else:
         if _run_index is None:
@@ -185,6 +197,7 @@ def index(
             batch_size=batch_size,
             chunk_size=chunk_size,
             min_session_chars=min_session_chars,
+            max_session_messages=max_session_messages,
         )
 
 

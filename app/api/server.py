@@ -19,6 +19,7 @@ _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 try:
     from api.routes.semantic_search import router as _semantic_router
     from semantic_search.embedder import Embedder
+    from semantic_search.reranker import Reranker
     from semantic_search.state import StateDB
     from semantic_search.vector_store import VectorStore
 except ImportError:
@@ -50,6 +51,7 @@ def create_api(
             if (search_dir / "lance").exists():
                 app.state.embedder = Embedder()
                 app.state.vector_store = VectorStore.open(search_dir)
+                app.state.reranker = Reranker()
                 logger.info(f"Semantic search index loaded from {search_dir}")
 
         logger.info(f"API initialized: msgstore={msgstore_path}")

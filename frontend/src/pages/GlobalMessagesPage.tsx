@@ -85,6 +85,9 @@ function SemanticHitCard({ hit }: { hit: SemanticSearchHit }) {
           <span className="text-xs text-tx-muted">
             {isoToLocal(hit.timestamp_start)} – {isoToLocal(hit.timestamp_end)}
           </span>
+          {!expanded && hit.text && (
+            <span className="block text-xs text-tx-secondary mt-1 line-clamp-2 whitespace-pre-line">{hit.text}</span>
+          )}
         </div>
         <span
           className="text-[11px] px-1.5 py-0.5 rounded bg-accent/10 text-accent-light font-mono"
