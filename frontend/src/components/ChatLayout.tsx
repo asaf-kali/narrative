@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { formatDate } from '../utils/datetime'
 import type { Chat } from '../api/types'
 
 const TABS = [
@@ -18,11 +19,6 @@ const TYPE_COLOR: Record<string, string> = {
   direct: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
   group: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
   broadcast: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 function Chip({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {

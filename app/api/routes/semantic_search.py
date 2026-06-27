@@ -6,7 +6,9 @@ from datetime import datetime
 from itertools import chain
 from typing import Literal
 
+from db.queries.chats import fetch_chat_names
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from models.sender import SenderRegistry
 from pydantic import BaseModel
 from semantic_search.embedder import EmbedderUnavailableError
 from semantic_search.params import (
@@ -67,10 +69,12 @@ def semantic_search(
         raise HTTPException(status_code=503, detail=str(e)) from e
 
     hits = _retrieve(store=store, reranker=reranker, query=query, query_vec=query_vec, limit=limit, chat_id=chat_id)
+    chat_ids = [h.chat_id for h in hits]
+    names = _resolve_chat_names(request=request, chat_ids=chat_ids)
     return [
         SemanticSearchHit(
             chat_id=h.chat_id,
-            chat_name=h.chat_name,
+            chat_name=names.get(h.chat_id, h.chat_name),
             timestamp_start=h.timestamp_start,
             timestamp_end=h.timestamp_end,
             text=h.text,
@@ -136,6 +140,32 @@ def index_chat(
 
 
 # ── private helpers ──────────────────────────────────────────────────────────
+
+
+def _resolve_chat_names(request: Request, chat_ids: list[int]) -> dict[int, str]:
+    """Resolve display names from the live registry, overriding names baked into the index.
+
+    The index stores whatever name the indexer's registry resolved at build time;
+    direct chats whose name only comes from contacts.csv get the bare phone number.
+    The serve registry has those contacts, so re-resolving here keeps results in sync
+    with the rest of the UI without a reindex.
+    """
+    registry: SenderRegistry | None = getattr(request.app.state, "sender_registry", None)
+    if registry is None or not chat_ids:
+        return {}
+    unique_ids = list(set(chat_ids))
+    msgstore_path = request.app.state.msgstore_path
+    with sqlite3.connect(f"file:{msgstore_path}?mode=ro", uri=True) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = fetch_chat_names(conn=conn, chat_ids=unique_ids)
+    return {
+        row.chat_id: registry.resolve_chat_name(
+            chat_subject=row.chat_subject,
+            chat_server=row.chat_server or "",
+            chat_phone=row.chat_phone or "",
+        )
+        for row in rows
+    }
 
 
 def _retrieve(

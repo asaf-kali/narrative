@@ -6,6 +6,7 @@ import { CardSpinner } from '../components/Spinner'
 import CalendarHeatmap from '../components/CalendarHeatmap'
 import DayDetail from '../components/DayDetail'
 import DatetimeInput, { DATETIME_RE, formatDatetime } from '../components/DatetimeInput'
+import { formatDate } from '../utils/datetime'
 
 type Range = '1M' | '3M' | '6M' | '1Y' | 'ALL'
 
@@ -97,7 +98,7 @@ export default function HomePage() {
       <div className="grid grid-cols-3 gap-4">
         <StatCard label="Total Messages" value={totalMessages.toLocaleString()} icon="💬" />
         <StatCard label="Active Days" value={activeDays.toLocaleString()} icon="📅" />
-        <StatCard label="Busiest Day" value={peakDay.date} sub={`${peakDay.count.toLocaleString()} messages`} icon="🔥" />
+        <StatCard label="Busiest Day" value={formatDate(peakDay.date)} sub={`${peakDay.count.toLocaleString()} messages`} icon="🔥" />
       </div>
 
       <div className="bg-app-surface border border-app-border rounded-xl p-5">

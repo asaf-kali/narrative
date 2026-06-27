@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react'
 import type { FeedMessage } from '../api/types'
+import { formatDateTime } from '../utils/datetime'
 
 // ── palette ──────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ export function buildChatColorMap(chats: string[]): Map<string, string> {
 
 function formatTime(ts: string, dayOnly: boolean): string {
   if (dayOnly) return ts.slice(11, 16)
-  return ts.slice(0, 10) + ' ' + ts.slice(11, 16)
+  return formatDateTime(ts)
 }
 
 /** Split `text` on `term` (case-insensitive) and return spans with highlights. */

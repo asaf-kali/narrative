@@ -39,6 +39,15 @@ class RawChatRow(_RowBase):
     last_timestamp: int | None
 
 
+class RawChatNameRow(_RowBase):
+    """Minimal chat identity for display-name resolution (no message aggregation)."""
+
+    chat_id: int
+    chat_subject: str | None
+    chat_phone: str | None
+    chat_server: str | None
+
+
 class RawDayMessageRow(_RowBase):
     timestamp: int
     time: str

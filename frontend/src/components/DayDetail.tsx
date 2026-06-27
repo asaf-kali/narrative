@@ -8,6 +8,7 @@ import { CardSpinner } from './Spinner'
 import ChatsFilterCard from './messages/ChatsFilterCard'
 import SenderFilterCard from './messages/SenderFilterCard'
 import MessagesCard from './messages/MessagesCard'
+import { formatDate } from '../utils/datetime'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export default function DayDetail({ date, onClose }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-app-border">
         <div className="flex items-center gap-4">
-          <span className="text-sm font-semibold text-tx-primary">{date}</span>
+          <span className="text-sm font-semibold text-tx-primary">{formatDate(date)}</span>
           {data && (
             <>
               <StatPill label="messages" value={data.total_messages} />
