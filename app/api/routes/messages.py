@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import pandas as pd
-from db.loaders import build_messages_df, datetime_to_ms, open_connection
+from analysis.reactions import MessageReactions, reactions_by_message
+from analysis.replies import ReplyPreview, replies_by_message
+from db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
 from db.queries.messages import fetch_message_bounds, fetch_messages_metadata, fetch_messages_page, fetch_sender_counts
 from fastapi import APIRouter, Query, Request
 from models.message import MessageType
@@ -102,7 +104,13 @@ def get_global_messages(
             offset=offset,
         )
 
-    messages = _df_to_message_list(build_messages_df(raw_rows, registry), include_chat_id=True) if raw_rows else []
+    if not raw_rows:
+        return {"messages": []}
+    reactions_by_msg, replies_by_msg = _load_engagement_lookups(request, chat_id=None)
+    df = build_messages_df(raw_rows, registry)
+    messages = _df_to_message_list(
+        df, include_chat_id=True, reactions_by_msg=reactions_by_msg, replies_by_msg=replies_by_msg
+    )
     return {"messages": messages}
 
 
@@ -140,7 +148,13 @@ def get_senders(
     return result
 
 
-def _df_to_message_list(df: pd.DataFrame, *, include_chat_id: bool = False) -> list[dict[str, Any]]:
+def _df_to_message_list(
+    df: pd.DataFrame,
+    *,
+    include_chat_id: bool = False,
+    reactions_by_msg: dict[int, MessageReactions] | None = None,
+    replies_by_msg: dict[int, ReplyPreview] | None = None,
+) -> list[dict[str, Any]]:
     messages = []
     for _, row in df.iterrows():
         text = row.get("text_data")
@@ -149,7 +163,9 @@ def _df_to_message_list(df: pd.DataFrame, *, include_chat_id: bool = False) -> l
         phone = str(row.get("sender_phone", "") or "")
         from_me = int(row.get("from_me", 0))
         s_id = "me" if from_me else (phone or str(row["sender_name"]))
+        message_id = int(row["message_id"])
         entry: dict[str, Any] = {
+            "message_id": message_id,
             "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S%z"),
             "chat_name": str(row.get("chat_name", "")),
             "sender_name": str(row["sender_name"]),
@@ -159,5 +175,25 @@ def _df_to_message_list(df: pd.DataFrame, *, include_chat_id: bool = False) -> l
         }
         if include_chat_id:
             entry["chat_id"] = int(row["chat_row_id"])
+        if reactions_by_msg:
+            reactions = reactions_by_msg.get(message_id)
+            entry["reactions"] = reactions.model_dump() if reactions else None
+        if replies_by_msg:
+            reply = replies_by_msg.get(message_id)
+            entry["reply_to"] = reply.model_dump() if reply else None
         messages.append(entry)
     return messages
+
+
+def _load_engagement_lookups(
+    request: Request, chat_id: int | None
+) -> tuple[dict[int, MessageReactions], dict[int, ReplyPreview]]:
+    """Load reaction + reply lookups keyed by message id (chat-scoped or global)."""
+    msgstore: Path = request.app.state.msgstore_path
+    wadb: Path | None = request.app.state.wadb_path
+    registry: SenderRegistry = request.app.state.sender_registry
+    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+        loader = DataLoader(db, registry=registry)
+        reactions_df = loader.load_reactions(chat_id=chat_id)
+        replies_df = loader.load_replies(chat_id=chat_id)
+    return reactions_by_message(reactions_df), replies_by_message(replies_df)

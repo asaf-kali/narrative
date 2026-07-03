@@ -14,6 +14,7 @@ from db.queries.messages import (
     fetch_messages_for_chat,
 )
 from db.queries.reactions import fetch_reactions
+from db.queries.replies import fetch_replies
 from db.row_types import RawChatRow, RawMessageRow
 from models.chat import ChatSummary, ChatType
 from models.config import AnalysisConfig
@@ -60,6 +61,32 @@ COL_HOUR = "hour"
 COL_CHAT_NAME = "chat_name"
 COL_IS_GROUP = "is_group"
 
+# Reactions / replies DataFrame columns (raw SQL columns + resolved identity columns)
+_REACTION_COLUMNS = [
+    "reaction_id",
+    "parent_message_id",
+    "chat_row_id",
+    "from_me",
+    "emoji",
+    "reactor_phone",
+    "chat_phone",
+    "timestamp",
+    "reactor_id",
+    "reactor_name",
+]
+_REPLY_COLUMNS = [
+    "message_id",
+    "quoted_message_id",
+    "chat_row_id",
+    "quoted_from_me",
+    "quoted_type",
+    "quoted_text",
+    "quoted_phone",
+    "chat_phone",
+    "timestamp",
+    "quoted_sender_name",
+]
+
 # Use the system local timezone for timestamp display
 _LOCAL_TZ: datetime.tzinfo = datetime.datetime.now().astimezone().tzinfo or datetime.UTC
 
@@ -94,11 +121,19 @@ class DataLoader:
             return list(fetch_messages_for_chat(self._db.msgstore, chat_id=config.chat_id, **kwargs))
         return list(fetch_all_messages(self._db.msgstore, **kwargs))
 
-    def load_reactions(self) -> pd.DataFrame:
-        rows = list(fetch_reactions(self._db.msgstore))
+    def load_reactions(self, chat_id: int | None = None) -> pd.DataFrame:
+        rows = list(fetch_reactions(self._db.msgstore, chat_id=chat_id))
         if not rows:
-            return pd.DataFrame(columns=["reaction_message_id", "parent_message_id", "emoji", "sender_phone"])
-        return pd.DataFrame([r.model_dump() for r in rows])
+            return pd.DataFrame(columns=_REACTION_COLUMNS)
+        df = pd.DataFrame([r.model_dump() for r in rows])
+        return _resolve_reactor_names(df, self._registry)
+
+    def load_replies(self, chat_id: int | None = None) -> pd.DataFrame:
+        rows = list(fetch_replies(self._db.msgstore, chat_id=chat_id))
+        if not rows:
+            return pd.DataFrame(columns=_REPLY_COLUMNS)
+        df = pd.DataFrame([r.model_dump() for r in rows])
+        return _resolve_quoted_names(df, self._registry)
 
     def iter_chat_messages(
         self,
@@ -297,6 +332,32 @@ def build_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) -> pd
     df[COL_CHAT_NAME] = chat_name.where(chat_subject == "", chat_subject)  # subject beats everything
     df[COL_IS_GROUP] = is_grp
 
+    return df
+
+
+def _resolve_display_names(
+    phone: pd.Series, chat_phone: pd.Series, from_me: pd.Series, registry: SenderRegistry
+) -> pd.Series:
+    """Resolve a phone series to display names, with 1-on-1 chat-party fallback and me-name."""
+    contacts = registry.as_dict()
+    effective = phone.fillna("").astype(str)
+    effective = effective.where(effective != "", chat_phone.fillna("").astype(str))
+    names = effective.map(contacts).fillna(effective).replace("", "Unknown")
+    return names.where(from_me != 1, registry.me_name)
+
+
+def _resolve_reactor_names(df: pd.DataFrame, registry: SenderRegistry) -> pd.DataFrame:
+    effective = df["reactor_phone"].fillna("").astype(str)
+    effective = effective.where(effective != "", df["chat_phone"].fillna("").astype(str))
+    df["reactor_name"] = _resolve_display_names(df["reactor_phone"], df["chat_phone"], df["from_me"], registry)
+    df["reactor_id"] = effective.where(df["from_me"] != 1, "me").replace("", "unknown")
+    return df
+
+
+def _resolve_quoted_names(df: pd.DataFrame, registry: SenderRegistry) -> pd.DataFrame:
+    df["quoted_sender_name"] = _resolve_display_names(
+        df["quoted_phone"], df["chat_phone"], df["quoted_from_me"], registry
+    )
     return df
 
 

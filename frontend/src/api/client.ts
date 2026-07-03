@@ -5,6 +5,7 @@ import type {
   DayCount,
   DayDetail,
   EmojiItem,
+  EngagementData,
   GlobalMessagesResponse,
   HeatmapPoint,
   MediaData,
@@ -49,6 +50,7 @@ export const api = {
   words: (chatId: number): Promise<WordData> => get(`/api/chats/${chatId}/words`),
   emoji: (chatId: number): Promise<EmojiItem[]> => get(`/api/chats/${chatId}/emoji`),
   media: (chatId: number): Promise<MediaData> => get(`/api/chats/${chatId}/media`),
+  engagement: (chatId: number): Promise<EngagementData> => get(`/api/chats/${chatId}/engagement`),
   chatMessages: (
     chatId: number,
     limit = 2000,

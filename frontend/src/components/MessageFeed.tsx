@@ -1,6 +1,12 @@
 import { useMemo, useRef } from 'react'
-import type { FeedMessage } from '../api/types'
+import type { FeedMessage, MessageReactions, ReplyPreview } from '../api/types'
 import { formatDateTime } from '../utils/datetime'
+
+// Fallback labels for quoted messages whose text is empty (media/stickers/etc.)
+const QUOTED_TYPE_LABELS: Record<number, string> = {
+  1: '[Image]', 2: '[Audio]', 3: '[Video]', 4: '[Contact]',
+  5: '[Location]', 9: '[Document]', 13: '[Sticker]', 15: '[GIF]',
+}
 
 // ── palette ──────────────────────────────────────────────────────────────────
 
@@ -44,6 +50,36 @@ function Highlighted({ text, term }: { text: string; term: string }) {
   )
 }
 
+function quotedText(reply: ReplyPreview): string {
+  return reply.text ?? QUOTED_TYPE_LABELS[reply.message_type] ?? '[Message]'
+}
+
+function ReplyPreviewLine({ reply }: { reply: ReplyPreview }) {
+  return (
+    <div className="flex items-center gap-1 text-[11px] text-tx-muted border-l-2 border-app-border pl-2 min-w-0">
+      <span className="opacity-70 flex-shrink-0">↩</span>
+      <span className="font-medium text-tx-secondary flex-shrink-0">{reply.sender_name}</span>
+      <span className="italic truncate">{quotedText(reply)}</span>
+    </div>
+  )
+}
+
+function ReactionPills({ reactions }: { reactions: MessageReactions }) {
+  return (
+    <span className="flex items-center gap-1 flex-shrink-0" title={reactions.reactors.join(', ')}>
+      {reactions.emojis.map((e, i) => (
+        <span
+          key={i}
+          className="inline-flex items-center gap-0.5 text-[10px] bg-app-hover rounded-full px-1.5 py-0.5 leading-none"
+        >
+          <span>{e.emoji}</span>
+          {e.count > 1 && <span className="tabular-nums text-tx-muted">{e.count}</span>}
+        </span>
+      ))}
+    </span>
+  )
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 
 interface RowProps {
@@ -80,11 +116,17 @@ function MessageRow({ msg, chatColor, dayOnly, showChat, highlight, onChatClick,
       >
         {msg.sender_name}
       </span>
-      <span className={`text-xs min-w-0 truncate ${isMedia ? 'text-tx-muted italic' : 'text-tx-secondary'}`}>
-        {highlight && !isMedia
-          ? <Highlighted text={msg.text ?? ''} term={highlight} />
-          : (msg.text ?? '')}
-      </span>
+      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+        {msg.reply_to && <ReplyPreviewLine reply={msg.reply_to} />}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`text-xs min-w-0 truncate ${isMedia ? 'text-tx-muted italic' : 'text-tx-secondary'}`}>
+            {highlight && !isMedia
+              ? <Highlighted text={msg.text ?? ''} term={highlight} />
+              : (msg.text ?? '')}
+          </span>
+          {msg.reactions && msg.reactions.total > 0 && <ReactionPills reactions={msg.reactions} />}
+        </div>
+      </div>
     </div>
   )
 }

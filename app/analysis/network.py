@@ -95,8 +95,7 @@ def build_reaction_graph(df: pd.DataFrame, reactions_df: pd.DataFrame, _config: 
         .set_index("_sender_id")["sender_name"]
         .to_dict()
     )
-    merged["reactor_id"] = merged["sender_phone"].apply(lambda p: p or "me")
-
+    # reactor_id is resolved in the loader (me / phone / chat-party fallback).
     edge_counts = merged.groupby(["reactor_id", "author_id"]).size().reset_index(name="weight")
 
     id_to_msgs: dict[str, int] = {str(k): int(v) for k, v in sender_stats.set_index("id")["messages"].to_dict().items()}

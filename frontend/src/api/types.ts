@@ -70,7 +70,26 @@ export interface DayCount {
   count: number
 }
 
+export interface EmojiCount {
+  emoji: string
+  count: number
+}
+
+export interface MessageReactions {
+  emojis: EmojiCount[]
+  total: number
+  reactors: string[]   // display names of everyone who reacted
+}
+
+export interface ReplyPreview {
+  quoted_message_id: number | null   // resolved original message id (null if deleted)
+  sender_name: string
+  text: string | null
+  message_type: number
+}
+
 export interface FeedMessage {
+  message_id?: number
   timestamp: string    // "YYYY-MM-DDTHH:MM:SS"
   chat_id: number
   chat_name: string
@@ -78,6 +97,36 @@ export interface FeedMessage {
   sender_name: string
   text: string | null
   message_type: number
+  reactions?: MessageReactions | null
+  reply_to?: ReplyPreview | null
+}
+
+export interface ReactionStat {
+  sender_name: string
+  reactions_received: number
+  reactions_given: number
+}
+
+export interface ReplyStat {
+  sender_name: string
+  replies_received: number
+  replies_sent: number
+}
+
+export interface TopReactedMessage {
+  message_id: number
+  sender_name: string
+  text: string | null
+  message_type: number
+  emojis: string   // "😂 5 ❤️ 2"
+  total: number
+}
+
+export interface EngagementData {
+  emoji_breakdown: EmojiCount[]
+  reaction_leaderboard: ReactionStat[]
+  top_reacted: TopReactedMessage[]
+  reply_leaderboard: ReplyStat[]
 }
 
 export interface ChatMessagesResponse {
