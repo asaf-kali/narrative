@@ -11,9 +11,11 @@ from analysis.content import build_word_cloud_text, emoji_counts, word_frequenci
 from analysis.media import media_breakdown, media_over_time
 from analysis.network import NetworkGraph, build_coactivity_graph, build_global_graph, build_reaction_graph
 from analysis.participants import per_sender_stats
+from analysis.reactions import emoji_reaction_breakdown, reaction_leaderboard, top_reacted_messages
+from analysis.replies import reply_leaderboard
 from analysis.timeline import active_days_count, daily_timeline, hourly_heatmap, monthly_timeline
 from api.deps import get_df
-from api.routes.messages import _df_to_message_list
+from api.routes.messages import _df_to_message_list, _load_engagement_lookups
 from db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
 from db.queries.messages import fetch_messages_metadata, fetch_messages_page
 from fastapi import APIRouter, Request
@@ -240,8 +242,10 @@ def get_messages(
     if not raw_rows:
         return {"total": 0, "messages": []}
 
+    reactions_by_msg, replies_by_msg = _load_engagement_lookups(request, chat_id=chat_id)
     df = build_messages_df(raw_rows, registry)
-    return {"total": meta.total, "messages": _df_to_message_list(df)}
+    messages = _df_to_message_list(df, reactions_by_msg=reactions_by_msg, replies_by_msg=replies_by_msg)
+    return {"total": meta.total, "messages": messages}
 
 
 @router.get("/chats/{chat_id}/media")
@@ -259,6 +263,31 @@ def get_media(
     return {
         "breakdown": media_breakdown(df, config).to_dict("records"),
         "timeline": media_over_time(df, config).to_dict("records"),
+    }
+
+
+@router.get("/chats/{chat_id}/engagement")
+def get_engagement(
+    chat_id: int,
+    request: Request,
+    exclude_system: bool = True,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> dict[str, Any]:
+    config = _config(chat_id, exclude_system, date_from, date_to)
+    df = get_df(request, config)
+    msgstore: Path = request.app.state.msgstore_path
+    wadb: Path | None = request.app.state.wadb_path
+    registry: SenderRegistry = request.app.state.sender_registry
+    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+        loader = DataLoader(db, registry=registry)
+        reactions_df = loader.load_reactions(chat_id=chat_id)
+        replies_df = loader.load_replies(chat_id=chat_id)
+    return {
+        "emoji_breakdown": emoji_reaction_breakdown(reactions_df).to_dict("records"),
+        "reaction_leaderboard": reaction_leaderboard(df, reactions_df).to_dict("records"),
+        "top_reacted": top_reacted_messages(df, reactions_df).to_dict("records"),
+        "reply_leaderboard": reply_leaderboard(df, replies_df).to_dict("records"),
     }
 
 

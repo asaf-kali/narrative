@@ -13,6 +13,7 @@ const TimelinePage = lazy(() => import('./pages/TimelinePage'))
 const ParticipantsPage = lazy(() => import('./pages/ParticipantsPage'))
 const ContentPage = lazy(() => import('./pages/ContentPage'))
 const MediaPage = lazy(() => import('./pages/MediaPage'))
+const EngagementPage = lazy(() => import('./pages/EngagementPage'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
 const NetworkPage = lazy(() => import('./pages/NetworkPage'))
 const GlobalNetworkPage = lazy(() => import('./pages/GlobalNetworkPage'))
@@ -38,6 +39,7 @@ export default function App() {
                   <Route path="participants" element={<ParticipantsPage />} />
                   <Route path="content" element={<ContentPage />} />
                   <Route path="media" element={<MediaPage />} />
+                  <Route path="engagement" element={<EngagementPage />} />
                   <Route path="messages" element={<MessagesPage />} />
                   <Route path="network" element={<NetworkPage />} />
                 </Route>

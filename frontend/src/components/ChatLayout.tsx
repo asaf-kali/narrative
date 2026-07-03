@@ -10,6 +10,7 @@ const TABS = [
   { label: 'Participants', path: 'participants' },
   { label: 'Words & Emoji', path: 'content' },
   { label: 'Media', path: 'media' },
+  { label: 'Engagement', path: 'engagement' },
   { label: 'Messages', path: 'messages' },
   { label: 'Network', path: 'network' },
 ]

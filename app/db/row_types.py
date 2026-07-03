@@ -87,10 +87,25 @@ class RawSearchRow(_RowBase):
 
 
 class RawReactionRow(_RowBase):
-    reaction_message_id: int
+    reaction_id: int
     parent_message_id: int
+    chat_row_id: int
+    from_me: int
     emoji: str
-    sender_phone: str
+    reactor_phone: str
+    chat_phone: str
+    timestamp: int
+
+
+class RawReplyRow(_RowBase):
+    message_id: int
+    quoted_message_id: int | None
+    chat_row_id: int
+    quoted_from_me: int
+    quoted_type: int
+    quoted_text: str | None
+    quoted_phone: str
+    chat_phone: str
     timestamp: int
 
 
