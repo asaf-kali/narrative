@@ -1,9 +1,12 @@
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { api } from '../api/client'
 import { CardSpinner } from '../components/Spinner'
+import { formatDatetime } from '../components/DatetimeInput'
 import type { ReactionStat, ReplyStat, TopReactedMessage } from '../api/types'
+
+const CONTEXT_WINDOW_MS = 15 * 60 * 1000
 
 const TOOLTIP_STYLE = { background: '#0d0f17', border: '1px solid #1a1d2e', color: '#e2e8f0', borderRadius: 8, fontSize: 12 }
 const TICK_STYLE = { fill: '#64748b', fontSize: 10 }
@@ -54,16 +57,21 @@ function replyRows(data: ReplyStat[]): (string | number)[][] {
   return data.slice(0, 30).map((r) => [r.sender_name, r.replies_received, r.replies_sent])
 }
 
-function TopReacted({ rows }: { rows: TopReactedMessage[] }) {
+function TopReacted({ rows, onOpen }: { rows: TopReactedMessage[]; onOpen: (m: TopReactedMessage) => void }) {
   if (rows.length === 0) return <div className="text-tx-muted text-sm py-6 text-center">No reactions</div>
   return (
     <div className="space-y-1.5">
       {rows.map((m) => (
-        <div key={m.message_id} className="flex items-center gap-3 py-1.5 border-b border-app-border/50">
+        <button
+          key={m.message_id}
+          onClick={() => onOpen(m)}
+          title="Open in Messages (±15 min)"
+          className="w-full flex items-center gap-3 py-1.5 border-b border-app-border/50 text-left rounded hover:bg-app-hover transition-colors cursor-pointer"
+        >
           <span className="text-[11px] font-medium text-tx-secondary w-28 flex-shrink-0 truncate">{m.sender_name}</span>
           <span className="text-xs text-tx-secondary min-w-0 truncate flex-1">{m.text ?? '[Media]'}</span>
           <span className="text-xs flex-shrink-0">{m.emojis}</span>
-        </div>
+        </button>
       ))}
     </div>
   )
@@ -71,11 +79,20 @@ function TopReacted({ rows }: { rows: TopReactedMessage[] }) {
 
 export default function EngagementPage() {
   const { chatId } = useParams<{ chatId: string }>()
+  const navigate = useNavigate()
   const { data, isLoading } = useQuery({
     queryKey: ['engagement', chatId],
     queryFn: () => api.engagement(Number(chatId)),
     enabled: !!chatId,
   })
+
+  function openInMessages(m: TopReactedMessage) {
+    const ts = new Date(m.timestamp).getTime()
+    const from = formatDatetime(new Date(ts - CONTEXT_WINDOW_MS))
+    const to = formatDatetime(new Date(ts + CONTEXT_WINDOW_MS))
+    const params = new URLSearchParams({ from, to })
+    navigate(`/chat/${chatId}/messages?${params.toString()}`)
+  }
 
   if (isLoading || !data) return (
     <div className="bg-app-surface border border-app-border rounded-xl">
@@ -110,7 +127,7 @@ export default function EngagementPage() {
       </div>
 
       <Card title="Most Reacted Messages">
-        <TopReacted rows={data.top_reacted} />
+        <TopReacted rows={data.top_reacted} onOpen={openInMessages} />
       </Card>
     </div>
   )

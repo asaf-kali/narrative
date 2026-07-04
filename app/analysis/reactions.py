@@ -19,7 +19,7 @@ class MessageReactions(BaseModel):
 
 
 _LEADERBOARD_COLUMNS = ["sender_name", "reactions_received", "reactions_given"]
-_TOP_REACTED_COLUMNS = ["message_id", "sender_name", "text", "message_type", "emojis", "total"]
+_TOP_REACTED_COLUMNS = ["message_id", "sender_name", "text", "message_type", "emojis", "total", "timestamp"]
 
 
 def reaction_leaderboard(messages_df: pd.DataFrame, reactions_df: pd.DataFrame) -> pd.DataFrame:
@@ -104,4 +104,5 @@ def _top_reacted_row(message_id: int, reactions: MessageReactions, indexed: pd.D
         "message_type": int(message["message_type"]),
         "emojis": emoji_summary,
         "total": reactions.total,
+        "timestamp": message["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),
     }
