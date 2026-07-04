@@ -10,6 +10,10 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
 
+function pad3(n: number): string {
+  return String(n).padStart(3, '0')
+}
+
 // Parse into a local-time Date. Date-only and timezone-less datetime strings are
 // treated as local (no UTC shift); ISO strings with an offset/Z are honoured.
 function toLocalDate(input: string | number | Date): Date {
@@ -44,4 +48,25 @@ export function formatDateTime(input: string | number | Date | null | undefined)
   const d = toLocalDate(input)
   if (Number.isNaN(d.getTime())) return typeof input === 'string' ? input : '—'
   return `${formatDate(d)}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+const EXACT_RE = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?/
+
+// Exact wall-clock timestamp with sub-second precision: "07 Jun, 2025, 14:30:52.123".
+// Reads the stored local-time components straight from the string (backend already
+// localised) so no timezone re-interpretation can shift or blur the value.
+export function formatExact(input: string | number | Date | null | undefined): string {
+  if (input == null || input === '' || input === '—') return '—'
+  if (typeof input === 'string') {
+    const m = EXACT_RE.exec(input.trim())
+    if (m) {
+      const [, y, mo, d, h, min, sec, frac = ''] = m
+      const ms = (frac + '000').slice(0, 3)
+      return `${d} ${MONTHS[Number(mo) - 1]}, ${y}, ${h}:${min}:${sec}.${ms}`
+    }
+  }
+  const dt = toLocalDate(input)
+  if (Number.isNaN(dt.getTime())) return typeof input === 'string' ? input : '—'
+  const clock = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}:${pad2(dt.getSeconds())}.${pad3(dt.getMilliseconds())}`
+  return `${formatDate(dt)}, ${clock}`
 }

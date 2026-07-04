@@ -166,7 +166,8 @@ def _df_to_message_list(
         message_id = int(row["message_id"])
         entry: dict[str, Any] = {
             "message_id": message_id,
-            "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S%z"),
+            # millisecond precision so the UI can show an exact (sub-second) timestamp
+            "timestamp": row["timestamp"].strftime("%Y-%m-%dT%H:%M:%S.%f%z"),
             "chat_name": str(row.get("chat_name", "")),
             "sender_name": str(row["sender_name"]),
             "sender_id": s_id,
