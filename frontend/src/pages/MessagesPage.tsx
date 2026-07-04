@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { CardSpinner } from '../components/Spinner'
@@ -13,9 +13,10 @@ import { useDebounce } from '../hooks/useDebounce'
 
 const PAGE_SIZE = 2000
 
-type Preset = '7d' | '30d' | '90d' | '1y' | 'all'
+type Preset = '1d' | '7d' | '30d' | '90d' | '1y' | 'all'
 
 const PRESETS: { label: string; value: Preset }[] = [
+  { label: '1d', value: '1d' },
   { label: '7d', value: '7d' },
   { label: '30d', value: '30d' },
   { label: '3m', value: '90d' },
@@ -26,7 +27,7 @@ const PRESETS: { label: string; value: Preset }[] = [
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function presetDates(preset: Exclude<Preset, 'all'>): { from: string; to: string } {
-  const days = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 }[preset]
+  const days = { '1d': 1, '7d': 7, '30d': 30, '90d': 90, '1y': 365 }[preset]
   const from = new Date()
   from.setDate(from.getDate() - days)
   from.setHours(0, 0, 0, 0)
@@ -52,8 +53,10 @@ function ceilToHour(ms: number): string {
 
 export default function MessagesPage() {
   const { chatId } = useParams<{ chatId: string }>()
-  const [dateFrom, setDateFrom] = useState(() => presetDates('30d').from)
-  const [dateTo, setDateTo] = useState('')
+  const [searchParams] = useSearchParams()
+  // Deep-link support: ?from=&to= (display format "YYYY-MM-DD HH:MM") seed the range once on mount
+  const [dateFrom, setDateFrom] = useState(() => searchParams.get('from') || presetDates('30d').from)
+  const [dateTo, setDateTo] = useState(() => searchParams.get('to') || '')
   const [searchInput, setSearchInput] = useState('')
   const [offset, setOffset] = useState(0)
   // Single-select sender (server-side filter): at most one active at a time

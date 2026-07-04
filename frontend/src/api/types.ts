@@ -120,6 +120,7 @@ export interface TopReactedMessage {
   message_type: number
   emojis: string   // "😂 5 ❤️ 2"
   total: number
+  timestamp: string   // "YYYY-MM-DDTHH:MM:SS" local time
 }
 
 export interface EngagementData {
