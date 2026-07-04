@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 _NON_DIGIT = re.compile(r"\D")
 _MIN_PHONE_DIGITS = 7
 _MAX_PHONE_DIGITS = 15
+# Google Contacts joins multiple values of one field (e.g. two phone numbers) with " ::: ".
+_MULTI_VALUE_SEP = ":::"
 
 
 def build_sender_registry(
@@ -81,9 +83,10 @@ def _row_phones(row: dict[str, str], local_code: str | None) -> set[str]:
     for value in row.values():
         if not value:
             continue
-        phone = _parse_phone(value, local_code=local_code)
-        if phone:
-            phones.add(phone)
+        for part in value.split(_MULTI_VALUE_SEP):
+            phone = _parse_phone(part, local_code=local_code)
+            if phone:
+                phones.add(phone)
     return phones
 
 
