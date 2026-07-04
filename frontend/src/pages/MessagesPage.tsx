@@ -274,6 +274,7 @@ export default function MessagesPage() {
           total={data.total}
           showChat={false}
           dayOnly={false}
+          bubbles
           height="calc(100vh - 340px)"
           highlight={searchTerm}
           header={pagination}

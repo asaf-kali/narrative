@@ -32,7 +32,7 @@ function formatTime(ts: string, dayOnly: boolean): string {
 }
 
 /** Split `text` on `term` (case-insensitive) and return spans with highlights. */
-function Highlighted({ text, term }: { text: string; term: string }) {
+export function Highlighted({ text, term }: { text: string; term: string }) {
   if (!term) return <>{text}</>
   const parts = text.split(new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'))
   return (
@@ -50,7 +50,7 @@ function Highlighted({ text, term }: { text: string; term: string }) {
   )
 }
 
-function quotedText(reply: ReplyPreview): string {
+export function quotedText(reply: ReplyPreview): string {
   return reply.text ?? QUOTED_TYPE_LABELS[reply.message_type] ?? '[Message]'
 }
 

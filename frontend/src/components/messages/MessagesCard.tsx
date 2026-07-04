@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { FeedMessage } from '../../api/types'
 import MessageFeed from '../MessageFeed'
+import ChatBubbleFeed from '../ChatBubbleFeed'
 
 // ── component ─────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,8 @@ interface Props {
   dayOnly?: boolean
   height?: string
   highlight?: string
+  /** Render WhatsApp-style chat bubbles instead of the compact table feed. */
+  bubbles?: boolean
   /** Optional content rendered in a header bar above the feed (e.g. pagination). */
   header?: ReactNode
   onChatClick?: (chatId: string) => void
@@ -24,6 +27,7 @@ export default function MessagesCard({
   dayOnly,
   height,
   highlight,
+  bubbles = false,
   header,
   onChatClick,
   onSenderClick,
@@ -36,16 +40,20 @@ export default function MessagesCard({
         </div>
       )}
       <div className="p-4">
-        <MessageFeed
-          messages={messages}
-          total={total}
-          showChat={showChat}
-          dayOnly={dayOnly}
-          height={height}
-          highlight={highlight}
-          onChatClick={onChatClick}
-          onSenderClick={onSenderClick}
-        />
+        {bubbles ? (
+          <ChatBubbleFeed messages={messages} total={total} height={height} highlight={highlight} />
+        ) : (
+          <MessageFeed
+            messages={messages}
+            total={total}
+            showChat={showChat}
+            dayOnly={dayOnly}
+            height={height}
+            highlight={highlight}
+            onChatClick={onChatClick}
+            onSenderClick={onSenderClick}
+          />
+        )}
       </div>
     </div>
   )
