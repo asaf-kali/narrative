@@ -70,6 +70,9 @@ check-ruff:
 check-mypy:
     {{ RUN }} dmypy run .
 
+check-ty:
+    {{ RUN }} ty check .
+
 lint: format
     {{ RUN }} ruff check --fix --unsafe-fixes
     {{ RUN }} pre-commit run --all-files

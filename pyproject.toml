@@ -31,6 +31,7 @@ lint = [
     "ruff >= 0.14",
     "mypy >= 1.19",
     "pandas-stubs ~= 2.2",
+    "ty>=0.0.1,<0.1",
 ]
 dev = [
     "pre-commit >= 2.17",
@@ -130,6 +131,17 @@ ignore = [
     "INP001",  # Implicit namespace package (no __init__.py needed under tests/)
     "PT019",   # Fixture without value injected as parameter — underscore-prefixed mock fixtures follow project's private-name convention
 ]
+
+[tool.ty.environment]
+# PYTHONPATH=app at runtime; mirror it so ty resolves `from db...`, `from models...` etc.
+extra-paths = [ "app" ]
+
+[tool.ty.terminal]
+error-on-warning = true
+
+[tool.ty.rules]
+unused-ignore-comment = "ignore"
+unused-type-ignore-comment = "ignore"
 
 [tool.mypy]
 strict = true
