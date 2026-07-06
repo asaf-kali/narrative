@@ -128,6 +128,7 @@ ignore = [
     "PLR2004", # Magic value comparison — literal fixture values read fine inline
     "SLF001",  # Private member access — tests exercise private helpers directly per project convention
     "INP001",  # Implicit namespace package (no __init__.py needed under tests/)
+    "PT019",   # Fixture without value injected as parameter — underscore-prefixed mock fixtures follow project's private-name convention
 ]
 
 [tool.mypy]
