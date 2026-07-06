@@ -64,21 +64,21 @@ build-backend = "hatchling.build"
 # Test
 
 [tool.pytest.ini_options]
-pythonpath = [ "app", "tests" ]
+pythonpath = [ ".", "tests" ]
 testpaths = [ "tests" ]
 # importlib mode lets nested packages reuse basenames (e.g. api/test_chats.py and
 # db/queries/test_chats.py) without needing __init__.py files under tests/.
 addopts = "-ra --import-mode=importlib"
 
 [tool.coverage.run]
-source = [ "app" ]
+source = [ "narrative" ]
 omit = [
-    "app/semantic_search/embedder.py",
-    "app/semantic_search/vector_store.py",
-    "app/semantic_search/reranker.py",
-    "app/semantic_search/indexer.py",
-    "app/api/routes/semantic_search.py",
-    "app/api/asgi.py",
+    "narrative/semantic_search/embedder.py",
+    "narrative/semantic_search/vector_store.py",
+    "narrative/semantic_search/reranker.py",
+    "narrative/semantic_search/indexer.py",
+    "narrative/api/routes/semantic_search.py",
+    "narrative/api/asgi.py",
 ]
 
 [tool.coverage.report]
@@ -135,8 +135,8 @@ ignore = [
 ]
 
 [tool.ty.environment]
-# PYTHONPATH=app at runtime; mirror it so ty resolves `from db...`, `from models...` etc.
-extra-paths = [ "app" ]
+# `narrative` is the root package (resolved from repo root); `tests` holds shared test helpers (seed_data).
+extra-paths = [ ".", "tests" ]
 
 [tool.ty.terminal]
 error-on-warning = true

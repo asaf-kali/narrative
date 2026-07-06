@@ -1,6 +1,6 @@
 import sqlite3
 
-from db.queries.search import _escape_like, search_messages
+from narrative.db.queries.search import _escape_like, search_messages
 
 
 def test_escape_like_escapes_percent_underscore_backslash() -> None:

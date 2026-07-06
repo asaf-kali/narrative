@@ -1,5 +1,6 @@
 import pandas as pd
-from cache import clear_cache, get_cached, set_cached
+
+from narrative.cache import clear_cache, get_cached, set_cached
 
 # Note: the autouse `_clean_module_cache` fixture in conftest.py already isolates
 # this singleton between tests; these tests exercise `clear_cache` itself too.

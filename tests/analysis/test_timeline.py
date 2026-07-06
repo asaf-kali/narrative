@@ -1,6 +1,7 @@
 import pandas as pd
-from analysis.timeline import active_days_count, daily_timeline, hourly_heatmap, monthly_timeline
-from models.config import AnalysisConfig
+
+from narrative.analysis.timeline import active_days_count, daily_timeline, hourly_heatmap, monthly_timeline
+from narrative.models.config import AnalysisConfig
 
 _CONFIG = AnalysisConfig()
 

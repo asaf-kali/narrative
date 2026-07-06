@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-from db.contacts import (
+from narrative.db.contacts import (
     _display_name,
     _parse_phone,
     _resolve_lids,

@@ -1,8 +1,9 @@
 import sqlite3
 from pathlib import Path
 
-from db.queries.reactions import fetch_reactions
 from seed_data import CHAT_GROUP, MSG_BOB_GROUP_HELLO, MSG_CAROL_GROUP_HELLO
+
+from narrative.db.queries.reactions import fetch_reactions
 
 
 def test_fetch_reactions_all(msgstore_conn: sqlite3.Connection) -> None:

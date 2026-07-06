@@ -3,18 +3,6 @@ import sqlite3
 from pathlib import Path
 
 import pandas as pd
-from db.connection import DBConnection
-from db.loaders import (
-    DataLoader,
-    IndexMessage,
-    _to_index_message,
-    build_messages_df,
-    datetime_to_ms,
-    open_connection,
-)
-from db.row_types import RawMessageRow
-from models.config import AnalysisConfig
-from models.sender import SenderRegistry
 from seed_data import (
     ALICE_NAME,
     BOB_NAME,
@@ -25,6 +13,19 @@ from seed_data import (
     MSG_BOB_GROUP_HELLO,
     MSG_ME_GROUP,
 )
+
+from narrative.db.connection import DBConnection
+from narrative.db.loaders import (
+    DataLoader,
+    IndexMessage,
+    _to_index_message,
+    build_messages_df,
+    datetime_to_ms,
+    open_connection,
+)
+from narrative.db.row_types import RawMessageRow
+from narrative.models.config import AnalysisConfig
+from narrative.models.sender import SenderRegistry
 
 
 def test_load_chats_returns_all_chat_types(data_loader: DataLoader) -> None:

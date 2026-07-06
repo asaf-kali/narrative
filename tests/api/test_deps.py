@@ -1,8 +1,9 @@
 from unittest import mock
 
-from db.loaders import DataLoader
 from fastapi.testclient import TestClient
 from seed_data import CHAT_DIRECT
+
+from narrative.db.loaders import DataLoader
 
 
 def test_get_df_caches_across_calls(api_client: TestClient) -> None:

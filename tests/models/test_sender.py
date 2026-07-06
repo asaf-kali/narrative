@@ -1,4 +1,4 @@
-from models.sender import BROADCAST_SERVER, GROUP_SERVER, SenderRegistry
+from narrative.models.sender import BROADCAST_SERVER, GROUP_SERVER, SenderRegistry
 
 
 def test_resolve_sender_from_me_returns_me() -> None:

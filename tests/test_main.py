@@ -4,23 +4,25 @@ from collections.abc import Iterator
 from pathlib import Path
 from unittest import mock
 
-import main
 import pytest
+import uvicorn
 from seed_data import SCHEMA_SQL, seed_msgstore
 from typer.testing import CliRunner
+
+from narrative import main
 
 runner = CliRunner()
 
 
 @pytest.fixture
 def _mock_uvicorn_run() -> Iterator[mock.MagicMock]:
-    with mock.patch.object(main.uvicorn, "run") as mocked:
+    with mock.patch.object(uvicorn, "run") as mocked:
         yield mocked
 
 
 @pytest.fixture
 def _mock_create_api() -> Iterator[mock.MagicMock]:
-    with mock.patch("api.server.create_api") as mocked:
+    with mock.patch("narrative.api.server.create_api") as mocked:
         yield mocked
 
 
@@ -109,7 +111,7 @@ def test_serve_reload_mode_uses_import_string_and_env_vars(tmp_path: Path, _mock
     result = runner.invoke(main.cli, ["serve", "--data-dir", str(tmp_path), "--reload"])
     assert result.exit_code == 0
     args, kwargs = _mock_uvicorn_run.call_args
-    assert args[0] == "api.asgi:app"
+    assert args[0] == "narrative.api.asgi:app"
     assert kwargs["reload"] is True
     assert os.environ["WHATSAPP_MSGSTORE"] == str(msgstore)
 

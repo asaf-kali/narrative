@@ -1,7 +1,8 @@
 import pandas as pd
-from analysis.base import analysis, get_registered, list_for_page
-from analysis.content import word_frequencies
-from models.config import AnalysisConfig
+
+from narrative.analysis.base import analysis, get_registered, list_for_page
+from narrative.analysis.content import word_frequencies
+from narrative.models.config import AnalysisConfig
 
 
 def test_analysis_decorator_registers_metadata() -> None:

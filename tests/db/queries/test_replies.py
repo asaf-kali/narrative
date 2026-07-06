@@ -1,8 +1,9 @@
 import sqlite3
 from pathlib import Path
 
-from db.queries.replies import fetch_replies
 from seed_data import CHAT_GROUP, MSG_BOB_GROUP_HELLO, MSG_ME_GROUP
+
+from narrative.db.queries.replies import fetch_replies
 
 
 def test_fetch_replies_resolves_quoted_parent(msgstore_conn: sqlite3.Connection) -> None:

@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from models.config import AnalysisConfig
+from narrative.models.config import AnalysisConfig
 
 
 def test_cache_key_includes_all_filter_fields() -> None:

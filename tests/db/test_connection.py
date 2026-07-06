@@ -2,8 +2,9 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-from db.connection import DBConnection
 from seed_data import SCHEMA_SQL, seed_msgstore
+
+from narrative.db.connection import DBConnection
 
 
 def test_msgstore_property_raises_before_open(tmp_path: Path) -> None:
