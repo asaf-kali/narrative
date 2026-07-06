@@ -58,9 +58,11 @@ def test_resolve_data_dir_finds_optional_files(tmp_path: Path) -> None:
     assert resolved.contacts == tmp_path / "contacts.csv"
 
 
-def test_resolve_data_dir_explicit_paths_take_priority_over_data_dir(tmp_path: Path) -> None:
+def test_resolve_data_dir_explicit_msgstore_takes_priority_over_data_dir(tmp_path: Path) -> None:
+    # An explicit msgstore must win even when data_dir is also set (its CLI default is "data").
     explicit = tmp_path / "explicit_msgstore.db"
-    resolved = main._resolve_data_dir(data_dir=None, msgstore=explicit, wadb=None, contacts=None)
+    resolved = main._resolve_data_dir(data_dir=Path("data"), msgstore=explicit, wadb=None, contacts=None)
+    assert resolved is not None
     assert resolved.msgstore == explicit
 
 
@@ -68,8 +70,8 @@ def test_resolve_data_dir_none_when_nothing_given() -> None:
     assert main._resolve_data_dir(data_dir=None, msgstore=None, wadb=None, contacts=None) is None
 
 
-# NOTE: the CLI's --data-dir has a default of "data", so it always wins over --msgstore.
-# Tests drive via --data-dir <tmp> to isolate from the repo's real ./data directory.
+# CLI tests drive via --data-dir <tmp> to isolate from the repo's real ./data directory,
+# except where the explicit --msgstore priority is under test.
 
 
 def test_serve_exits_1_when_msgstore_file_missing(tmp_path: Path) -> None:
@@ -86,6 +88,18 @@ def test_serve_starts_uvicorn_without_reload(
     _mock_uvicorn_run.assert_called_once()
     call_kwargs = _mock_uvicorn_run.call_args.kwargs
     assert call_kwargs["port"] == 9999
+
+
+def test_serve_explicit_msgstore_wins_over_default_data_dir(
+    tmp_path: Path, _mock_uvicorn_run: mock.MagicMock, _mock_create_api: mock.MagicMock
+) -> None:
+    # --msgstore is honoured even though --data-dir defaults to "data" (regression guard).
+    msgstore = tmp_path / "custom.db"
+    _write_msgstore(msgstore)
+    result = runner.invoke(main.cli, ["serve", "--msgstore", str(msgstore)])
+    assert result.exit_code == 0
+    _mock_create_api.assert_called_once()
+    assert _mock_create_api.call_args.kwargs["msgstore_path"] == msgstore
 
 
 def test_serve_reload_mode_uses_import_string_and_env_vars(tmp_path: Path, _mock_uvicorn_run: mock.MagicMock) -> None:
