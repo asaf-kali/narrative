@@ -1,10 +1,10 @@
-from models.chat import ChatSummary, ChatType
+from narrative.models.chat import ChatSummary, ChatType
 
 
 def test_chat_type_values() -> None:
-    assert ChatType.DIRECT == "direct"
-    assert ChatType.GROUP == "group"
-    assert ChatType.BROADCAST == "broadcast"
+    assert ChatType.DIRECT.value == "direct"
+    assert ChatType.GROUP.value == "group"
+    assert ChatType.BROADCAST.value == "broadcast"
 
 
 def test_chat_summary_allows_optional_fields_none() -> None:

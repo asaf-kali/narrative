@@ -1,7 +1,8 @@
 import sqlite3
 
-from db.queries.day import fetch_day_messages
 from seed_data import T0, local_date
+
+from narrative.db.queries.day import fetch_day_messages
 
 
 def test_fetch_day_messages_returns_non_system_messages_for_date(msgstore_conn: sqlite3.Connection) -> None:

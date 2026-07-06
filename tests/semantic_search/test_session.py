@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from semantic_search.session import Session, SessionMeta, SessionRecord
+from narrative.semantic_search.session import Session, SessionMeta, SessionRecord
 
 
 def test_session_roundtrip() -> None:

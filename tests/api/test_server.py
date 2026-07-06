@@ -1,6 +1,7 @@
-from api.server import create_api
 from fastapi.testclient import TestClient
 from seed_data import ALICE_NAME, SeededPaths
+
+from narrative.api.server import create_api
 
 
 def test_create_api_lifespan_builds_sender_registry(seeded_db_paths: SeededPaths) -> None:

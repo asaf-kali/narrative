@@ -1,8 +1,8 @@
 import hashlib
 
-from db.loaders import IndexMessage
-from models.message import MessageType
-from semantic_search.chunker import iterate_sessions
+from narrative.db.loaders import IndexMessage
+from narrative.models.message import MessageType
+from narrative.semantic_search.chunker import iterate_sessions
 
 _TEXT = int(MessageType.TEXT)
 _IMAGE = int(MessageType.IMAGE)

@@ -1,5 +1,6 @@
 import pandas as pd
-from analysis.replies import replies_by_message, reply_leaderboard
+
+from narrative.analysis.replies import replies_by_message, reply_leaderboard
 
 
 def _messages_df() -> pd.DataFrame:

@@ -1,7 +1,8 @@
 import sqlite3
 
-from db.queries.stats import fetch_daily_counts
 from seed_data import T0, local_date
+
+from narrative.db.queries.stats import fetch_daily_counts
 
 
 def test_fetch_daily_counts_excludes_system(msgstore_conn: sqlite3.Connection) -> None:

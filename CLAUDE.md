@@ -16,15 +16,15 @@ mypy runs via `uv run dmypy run .` (daemon).
 
 ## Architecture
 
-4 strict layers. `PYTHONPATH=app` so imports are e.g. `from db.loaders import DataLoader`.
+4 strict layers. `narrative` is the root package (repo root on `sys.path`), so imports are e.g. `from narrative.db.loaders import DataLoader`.
 
-**`app/db/`** — Read-only SQLite access. `DBConnection` is a context manager opening `msgstore.db` (required) and `wa.db` (optional). `DataLoader` resolves contact names, normalizes timestamps to local tz, and returns `pd.DataFrame`.
+**`narrative/db/`** — Read-only SQLite access. `DBConnection` is a context manager opening `msgstore.db` (required) and `wa.db` (optional). `DataLoader` resolves contact names, normalizes timestamps to local tz, and returns `pd.DataFrame`.
 
-**`app/models/`** — Pydantic used for config and summaries only (never per-row). `AnalysisConfig.cache_key()` is the LRU cache key.
+**`narrative/models/`** — Pydantic used for config and summaries only (never per-row). `AnalysisConfig.cache_key()` is the LRU cache key.
 
-**`app/analysis/`** — Pure functions `(pd.DataFrame, AnalysisConfig) → pd.DataFrame`. Register with `@analysis(...)` decorator.
+**`narrative/analysis/`** — Pure functions `(pd.DataFrame, AnalysisConfig) → pd.DataFrame`. Register with `@analysis(...)` decorator.
 
-**`app/api/`** — FastAPI backend. `server.py` creates the app with lifespan (stores db paths in `app.state`). Routes in `routes/chats.py`, `routes/analysis.py`, and `routes/messages.py`. `deps.py` provides `get_df()` with LRU cache. In production, serves the built frontend from `frontend/dist/`. CORS allows `localhost:5173` for development.
+**`narrative/api/`** — FastAPI backend. `server.py` creates the app with lifespan (stores db paths in `app.state`). Routes in `routes/chats.py`, `routes/analysis.py`, and `routes/messages.py`. `deps.py` provides `get_df()` with LRU cache. In production, serves the built frontend from `frontend/dist/`. CORS allows `localhost:5173` for development.
 
 **`frontend/`** — React 18 + TypeScript + Vite + Tailwind CSS + Recharts + TanStack Query + React Router v6. API client in `src/api/client.ts`. Top-level pages: Summary (`/`), Messages (`/messages`), Network (`/network`). Chat pages under `/chat/:chatId`: Overview, Timeline, Participants, Content (words/emoji), Media, Messages, Network.
 
@@ -44,7 +44,7 @@ The Playwright plugin is available for browser-based UI verification. Use it to 
 
 ## WhatsApp DB Schema Notes
 
-The real schema varies by WhatsApp version. Queries in `app/db/queries/` are written defensively. Key `message_type` values:
+The real schema varies by WhatsApp version. Queries in `narrative/db/queries/` are written defensively. Key `message_type` values:
 
 | Value | Type |
 |-------|------|

@@ -1,8 +1,9 @@
 import sqlite3
 from pathlib import Path
 
-from db.queries.calls import fetch_calls
 from seed_data import ALICE_PHONE
+
+from narrative.db.queries.calls import fetch_calls
 
 
 def test_fetch_calls_returns_row(msgstore_conn: sqlite3.Connection) -> None:

@@ -1,6 +1,16 @@
 import sqlite3
 
-from db.queries.messages import (
+from seed_data import (
+    ALICE_PHONE,
+    CHAT_BROADCAST,
+    CHAT_DIRECT,
+    CHAT_GROUP,
+    MSG_BOB_GROUP_HELLO,
+    MSG_CAROL_GROUP_HELLO,
+    T0,
+)
+
+from narrative.db.queries.messages import (
     count_filtered_messages,
     count_messages,
     count_messages_for_chat,
@@ -15,15 +25,6 @@ from db.queries.messages import (
     fetch_messages_page,
     fetch_sender_counts,
     get_max_message_id_for_chat,
-)
-from seed_data import (
-    ALICE_PHONE,
-    CHAT_BROADCAST,
-    CHAT_DIRECT,
-    CHAT_GROUP,
-    MSG_BOB_GROUP_HELLO,
-    MSG_CAROL_GROUP_HELLO,
-    T0,
 )
 
 

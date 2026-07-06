@@ -1,5 +1,6 @@
 import pandas as pd
-from analysis.reactions import (
+
+from narrative.analysis.reactions import (
     emoji_reaction_breakdown,
     merge_reactions,
     reaction_leaderboard,

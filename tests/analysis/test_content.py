@@ -1,6 +1,7 @@
 import pandas as pd
-from analysis.content import build_word_cloud_text, emoji_counts, word_frequencies
-from models.config import AnalysisConfig
+
+from narrative.analysis.content import build_word_cloud_text, emoji_counts, word_frequencies
+from narrative.models.config import AnalysisConfig
 
 _CONFIG = AnalysisConfig()
 

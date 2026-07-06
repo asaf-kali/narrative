@@ -1,7 +1,8 @@
 import sqlite3
 
-from db.queries.chats import fetch_chat_names, fetch_chats
 from seed_data import ALICE_PHONE, CHAT_DIRECT, CHAT_GROUP, GROUP_SUBJECT
+
+from narrative.db.queries.chats import fetch_chat_names, fetch_chats
 
 
 def test_fetch_chats_returns_all_three(msgstore_conn: sqlite3.Connection) -> None:

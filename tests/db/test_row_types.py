@@ -1,4 +1,4 @@
-from db.row_types import MessagesMetadata, RawMessageRow
+from narrative.db.row_types import MessagesMetadata, RawMessageRow
 
 
 def test_raw_message_row_ignores_extra_columns() -> None:

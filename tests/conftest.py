@@ -5,17 +5,18 @@ import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
 
-import cache
 import pandas as pd
 import pytest
-from api.server import create_api
-from db.connection import DBConnection
-from db.contacts import build_sender_registry
-from db.loaders import DataLoader
 from fastapi.testclient import TestClient
-from models.config import AnalysisConfig
-from models.sender import SenderRegistry
 from seed_data import SeededPaths, build_schema, build_wa_schema, seed_msgstore, seed_wa_contacts
+
+from narrative import cache
+from narrative.api.server import create_api
+from narrative.db.connection import DBConnection
+from narrative.db.contacts import build_sender_registry
+from narrative.db.loaders import DataLoader
+from narrative.models.config import AnalysisConfig
+from narrative.models.sender import SenderRegistry
 
 
 @pytest.fixture(autouse=True)

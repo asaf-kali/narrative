@@ -1,7 +1,8 @@
 import pandas as pd
-from analysis.media import media_breakdown, media_over_time
-from models.config import AnalysisConfig
-from models.message import MessageType
+
+from narrative.analysis.media import media_breakdown, media_over_time
+from narrative.models.config import AnalysisConfig
+from narrative.models.message import MessageType
 
 _CONFIG = AnalysisConfig()
 

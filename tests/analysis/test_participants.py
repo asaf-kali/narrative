@@ -1,6 +1,7 @@
 import pandas as pd
-from analysis.participants import per_sender_stats
-from models.config import AnalysisConfig
+
+from narrative.analysis.participants import per_sender_stats
+from narrative.models.config import AnalysisConfig
 
 
 def _df() -> pd.DataFrame:

@@ -1,4 +1,4 @@
-from semantic_search import params
+from narrative.semantic_search import params
 
 
 def test_defaults_are_positive_integers() -> None:

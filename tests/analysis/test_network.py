@@ -1,6 +1,13 @@
 import pandas as pd
-from analysis.network import NetworkGraph, NetworkNode, build_coactivity_graph, build_global_graph, build_reaction_graph
-from models.config import AnalysisConfig
+
+from narrative.analysis.network import (
+    NetworkGraph,
+    NetworkNode,
+    build_coactivity_graph,
+    build_global_graph,
+    build_reaction_graph,
+)
+from narrative.models.config import AnalysisConfig
 
 _CONFIG = AnalysisConfig()
 

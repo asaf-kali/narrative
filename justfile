@@ -45,7 +45,7 @@ frontend-dev:
 # Backend
 
 backend *args:
-    PYTHONPATH=app {{ RUN }} python app/main.py serve {{ args }}
+    {{ RUN }} python -m narrative.main serve {{ args }}
 
 backend-dev *args:
     just backend {{ args }} --reload
@@ -83,15 +83,15 @@ install-test:
     uv sync --group test
 
 test *args:
-    PYTHONPATH=app {{ RUN }} pytest {{ args }}
+    {{ RUN }} pytest {{ args }}
 
 cover *args:
-    PYTHONPATH=app {{ RUN }} pytest --cov=app --cov-report=term-missing --cov-fail-under=90 {{ args }}
+    {{ RUN }} pytest --cov=narrative --cov-report=term-missing --cov-fail-under=90 {{ args }}
 
 # Misc
 
 index *args:
-    PYTHONPATH=app {{ RUN }} python app/main.py index {{ args }}
+    {{ RUN }} python -m narrative.main index {{ args }}
 
 decrypt key:
     cd data && wadecrypt {{ key }} msgstore.db.crypt15 msgstore.db

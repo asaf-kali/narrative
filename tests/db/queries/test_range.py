@@ -1,8 +1,9 @@
 import sqlite3
 from datetime import UTC, datetime
 
-from db.queries.range import fetch_range_messages
 from seed_data import T0
+
+from narrative.db.queries.range import fetch_range_messages
 
 
 def test_fetch_range_messages_inclusive_bounds(msgstore_conn: sqlite3.Connection) -> None:

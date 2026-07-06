@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from semantic_search.session import Session
-from semantic_search.state import StateDB
+from narrative.semantic_search.session import Session
+from narrative.semantic_search.state import StateDB
 
 
 def _session(session_id: str, chat_id: int, min_id: int, max_id: int) -> Session:
