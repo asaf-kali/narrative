@@ -40,10 +40,10 @@ def test_get_marks_key_as_recently_used_protecting_it_from_eviction() -> None:
     assert get_cached("key1") is None
 
 
-def test_set_existing_key_refreshes_recency_without_growing_store() -> None:
+def test_set_existing_key_replaces_value_and_refreshes_recency_without_growing_store() -> None:
     for i in range(20):
         set_cached(f"key{i}", pd.DataFrame({"a": [i]}))
-    # _LRUCache.set on an existing key only bumps recency — it does not replace the stored value.
+    # Re-setting an existing key replaces the stored value and bumps recency; store stays at 20.
     set_cached("key0", pd.DataFrame({"a": [999]}))
-    assert get_cached("key0")["a"].iloc[0] == 0
+    assert get_cached("key0")["a"].iloc[0] == 999
     assert get_cached("key1") is not None

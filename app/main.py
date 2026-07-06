@@ -55,26 +55,30 @@ def _resolve_data_dir(
     wadb: Path | None,
     contacts: Path | None,
 ) -> ResolvedPaths | None:
-    """Return resolved paths, or None if msgstore cannot be determined."""
-    if data_dir is not None:
-        logger.info(f"Auto-detecting files in {data_dir}")
-        resolved_msgstore = data_dir / "msgstore.db"
-        resolved_wadb = data_dir / "wa.db"
-        resolved_contacts = data_dir / "contacts.csv"
-        logger.info(f"  msgstore : {resolved_msgstore} ({'found' if resolved_msgstore.exists() else 'NOT FOUND'})")
-        wadb_result = resolved_wadb if resolved_wadb.exists() else None
-        logger.info(f"  wa.db    : {resolved_wadb} ({'found' if wadb_result else 'not found'})")
-        contacts_result = resolved_contacts if resolved_contacts.exists() else None
-        logger.info(f"  contacts : {resolved_contacts} ({'found' if contacts_result else 'not found'})")
-        return ResolvedPaths(msgstore=resolved_msgstore, wadb=wadb_result, contacts=contacts_result)
-    if msgstore is None:
+    """Return resolved paths, or None if msgstore cannot be determined.
+
+    An explicit --msgstore takes priority over --data-dir auto-detection, so the
+    flag is honoured even though --data-dir carries a default of "data".
+    """
+    if msgstore is not None:
+        logger.info(f"  msgstore : {msgstore}")
+        if wadb:
+            logger.info(f"  wa.db    : {wadb}")
+        if contacts:
+            logger.info(f"  contacts : {contacts}")
+        return ResolvedPaths(msgstore=msgstore, wadb=wadb, contacts=contacts)
+    if data_dir is None:
         return None
-    logger.info(f"  msgstore : {msgstore}")
-    if wadb:
-        logger.info(f"  wa.db    : {wadb}")
-    if contacts:
-        logger.info(f"  contacts : {contacts}")
-    return ResolvedPaths(msgstore=msgstore, wadb=wadb, contacts=contacts)
+    logger.info(f"Auto-detecting files in {data_dir}")
+    resolved_msgstore = data_dir / "msgstore.db"
+    resolved_wadb = data_dir / "wa.db"
+    resolved_contacts = data_dir / "contacts.csv"
+    logger.info(f"  msgstore : {resolved_msgstore} ({'found' if resolved_msgstore.exists() else 'NOT FOUND'})")
+    wadb_result = resolved_wadb if resolved_wadb.exists() else None
+    logger.info(f"  wa.db    : {resolved_wadb} ({'found' if wadb_result else 'not found'})")
+    contacts_result = resolved_contacts if resolved_contacts.exists() else None
+    logger.info(f"  contacts : {resolved_contacts} ({'found' if contacts_result else 'not found'})")
+    return ResolvedPaths(msgstore=resolved_msgstore, wadb=wadb_result, contacts=contacts_result)
 
 
 @cli.command()

@@ -20,13 +20,11 @@ class _LRUCache:
         return self._store[key]
 
     def set(self, key: str, df: pd.DataFrame) -> None:
-        if key in self._store:
-            self._store.move_to_end(key)
-        else:
-            self._store[key] = df
-            if len(self._store) > self._max_size:
-                evicted = self._store.popitem(last=False)
-                logger.debug(f"Cache evicted key: {evicted[0]}")
+        self._store[key] = df
+        self._store.move_to_end(key)
+        if len(self._store) > self._max_size:
+            evicted = self._store.popitem(last=False)
+            logger.debug(f"Cache evicted key: {evicted[0]}")
 
     def clear(self) -> None:
         self._store.clear()
