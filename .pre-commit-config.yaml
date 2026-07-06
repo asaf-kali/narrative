@@ -25,3 +25,8 @@ repos:
         entry: "just check-mypy"
         language: system
         pass_filenames: false
+      - id: check-ty
+        name: check ty typing
+        entry: "just check-ty"
+        language: system
+        pass_filenames: false
