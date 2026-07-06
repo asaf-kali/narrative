@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from db.loaders import IndexMessage
 from models.message import MessageType
 from semantic_search.session import Session
 
+
+@dataclass(frozen=True, slots=True)
+class _SessionLine:
+    sender: str
+    text: str
+
+
 _TEXT_TYPE = int(MessageType.TEXT)
 
 
 def iterate_sessions(
-    messages: Iterator[IndexMessage],
+    messages: Iterable[IndexMessage],
     chat_id: int,
     chat_name: str,
     gap_seconds: int,
@@ -71,11 +79,11 @@ def _build_session(
     chat_name: str,
     rows: list[IndexMessage],
 ) -> Session | None:
-    text_rows = [r for r in rows if r.message_type == _TEXT_TYPE and r.text_data and r.text_data.strip()]
-    if not text_rows:
+    lines = _extract_lines(rows)
+    if not lines:
         return None
-    embed_text = "\n".join(r.text_data.strip() for r in text_rows)
-    display_text = "\n".join(f"{r.sender_name}: {r.text_data.strip()}" for r in text_rows)
+    embed_text = "\n".join(line.text for line in lines)
+    display_text = "\n".join(f"{line.sender}: {line.text}" for line in lines)
     min_id = rows[0].message_id
     session_id = hashlib.sha256(f"{chat_id}:{min_id}".encode()).hexdigest()[:16]
     return Session(
@@ -90,3 +98,15 @@ def _build_session(
         embed_text=embed_text,
         display_text=display_text,
     )
+
+
+def _extract_lines(rows: list[IndexMessage]) -> list[_SessionLine]:
+    lines: list[_SessionLine] = []
+    for r in rows:
+        if r.message_type != _TEXT_TYPE or not r.text_data:
+            continue
+        text = r.text_data.strip()
+        if not text:
+            continue
+        lines.append(_SessionLine(sender=r.sender_name, text=text))
+    return lines

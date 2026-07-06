@@ -54,6 +54,7 @@ def test_resolve_data_dir_finds_optional_files(tmp_path: Path) -> None:
     (tmp_path / "wa.db").touch()
     (tmp_path / "contacts.csv").touch()
     resolved = main._resolve_data_dir(data_dir=tmp_path, msgstore=None, wadb=None, contacts=None)
+    assert resolved is not None
     assert resolved.wadb == tmp_path / "wa.db"
     assert resolved.contacts == tmp_path / "contacts.csv"
 

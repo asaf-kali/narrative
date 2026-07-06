@@ -1,5 +1,6 @@
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
@@ -18,12 +19,15 @@ from semantic_search.params import (
 _LOG_CONFIG_DICT = configure_logging()
 logger = logging.getLogger(__name__)
 
+_run_index: Callable[..., None] | None = None
+_run_chat: Callable[..., None] | None = None
 try:
-    from semantic_search.indexer import run as _run_index
-    from semantic_search.indexer import run_chat as _run_chat
+    from semantic_search.indexer import run, run_chat
+
+    _run_index = run
+    _run_chat = run_chat
 except ImportError:
-    _run_index = None
-    _run_chat = None
+    pass
 
 
 @dataclass

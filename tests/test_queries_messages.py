@@ -54,7 +54,9 @@ def test_fetch_messages_page_pagination(msgstore_conn: sqlite3.Connection) -> No
 def test_fetch_messages_page_search_filters_text(msgstore_conn: sqlite3.Connection) -> None:
     rows = fetch_messages_page(msgstore_conn, search="carol")
     assert len(rows) == 1
-    assert "carol" in rows[0].text_data.lower()
+    text = rows[0].text_data
+    assert text is not None
+    assert "carol" in text.lower()
 
 
 def test_fetch_messages_page_date_range_filters(msgstore_conn: sqlite3.Connection) -> None:

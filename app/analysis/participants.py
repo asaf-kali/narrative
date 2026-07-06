@@ -18,7 +18,7 @@ def per_sender_stats(df: pd.DataFrame, config: AnalysisConfig) -> pd.DataFrame:
     text_mask = df["text_data"].notna()
 
     stats: pd.DataFrame = (
-        df.groupby("sender_name")  # type: ignore[call-overload]
+        df.groupby("sender_name")  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]
         .apply(
             lambda g: pd.Series(
                 {

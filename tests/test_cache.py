@@ -13,6 +13,7 @@ def test_set_then_get_roundtrip() -> None:
     df = pd.DataFrame({"a": [1, 2]})
     set_cached("key1", df)
     result = get_cached("key1")
+    assert result is not None
     pd.testing.assert_frame_equal(result, df)
 
 
@@ -45,5 +46,7 @@ def test_set_existing_key_replaces_value_and_refreshes_recency_without_growing_s
         set_cached(f"key{i}", pd.DataFrame({"a": [i]}))
     # Re-setting an existing key replaces the stored value and bumps recency; store stays at 20.
     set_cached("key0", pd.DataFrame({"a": [999]}))
-    assert get_cached("key0")["a"].iloc[0] == 999
+    updated = get_cached("key0")
+    assert updated is not None
+    assert updated["a"].iloc[0] == 999
     assert get_cached("key1") is not None
