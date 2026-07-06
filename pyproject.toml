@@ -64,9 +64,11 @@ build-backend = "hatchling.build"
 # Test
 
 [tool.pytest.ini_options]
-pythonpath = [ "app" ]
+pythonpath = [ "app", "tests" ]
 testpaths = [ "tests" ]
-addopts = "-ra"
+# importlib mode lets nested packages reuse basenames (e.g. api/test_chats.py and
+# db/queries/test_chats.py) without needing __init__.py files under tests/.
+addopts = "-ra --import-mode=importlib"
 
 [tool.coverage.run]
 source = [ "app" ]
@@ -146,6 +148,11 @@ unused-type-ignore-comment = "ignore"
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
+# Tests are namespace packages (no __init__.py); derive qualified module names
+# from paths so nested packages can reuse basenames (tests/api/test_chats.py vs
+# tests/db/queries/test_chats.py) without colliding.
+namespace_packages = true
+explicit_package_bases = true
 # The @analysis registry uses a TypeVar-bound decorator pattern that is
 # semantically correct but mypy cannot verify through nested closures.
 disallow_untyped_decorators = false
