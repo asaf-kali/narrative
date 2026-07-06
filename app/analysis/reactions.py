@@ -101,7 +101,7 @@ def _top_reacted_row(message_id: int, reactions: MessageReactions, indexed: pd.D
         "message_id": message_id,
         "sender_name": str(message["sender_name"]),
         "text": str(text) if pd.notna(text) else None,
-        "message_type": int(message["message_type"]),
+        "message_type": int(message["message_type"]),  # ty: ignore[invalid-argument-type]
         "emojis": emoji_summary,
         "total": reactions.total,
         "timestamp": message["timestamp"].strftime("%Y-%m-%dT%H:%M:%S"),

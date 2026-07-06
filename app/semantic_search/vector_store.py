@@ -117,7 +117,7 @@ class VectorStore:
         limit: int = 10,
         chat_id_filter: int | None = None,
     ) -> list[SearchHit]:
-        query = self._table.search(query_vec, vector_column_name="vector").metric("cosine").limit(limit)
+        query = self._table.search(query_vec, vector_column_name="vector").metric("cosine").limit(limit)  # ty: ignore[unresolved-attribute]
         if self._has_index(column="vector"):
             query = query.nprobes(_NPROBES).refine_factor(_REFINE_FACTOR)
         if chat_id_filter is not None:

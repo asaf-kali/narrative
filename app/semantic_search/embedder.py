@@ -44,4 +44,4 @@ class Embedder:
                 return_sparse=False,
                 return_colbert_vecs=False,
             )
-        return [vec.tolist() for vec in output["dense_vecs"]]
+        return [vec.tolist() for vec in output["dense_vecs"]]  # ty: ignore[unresolved-attribute]

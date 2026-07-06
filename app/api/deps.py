@@ -1,7 +1,6 @@
 import logging
 import threading
 from pathlib import Path
-from typing import cast
 
 import cache
 import pandas as pd
@@ -26,22 +25,24 @@ def _get_key_lock(key: str) -> threading.Lock:
 
 def get_df(request: Request, config: AnalysisConfig) -> pd.DataFrame:
     key = config.cache_key()
-    cached = cache.get_cached(key)
+    # Annotate cache/loader results: mypy sees these modules as Any (ignore_missing_imports),
+    # so the annotation both documents intent and avoids `no-any-return`.
+    cached: pd.DataFrame | None = cache.get_cached(key)
     if cached is not None:
-        return cast("pd.DataFrame", cached)
+        return cached
 
     with _get_key_lock(key):
         # Re-check after acquiring the lock — another thread may have loaded it.
         cached = cache.get_cached(key)
         if cached is not None:
-            return cast("pd.DataFrame", cached)
+            return cached
 
         msgstore: Path = request.app.state.msgstore_path
         wadb: Path | None = request.app.state.wadb_path
         registry: SenderRegistry = request.app.state.sender_registry
         logger.info(f"Loading messages for chat_id [{config.chat_id}]")
         with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-            df = DataLoader(db, registry=registry).load_messages(config)
+            df: pd.DataFrame = DataLoader(db, registry=registry).load_messages(config)
         logger.info(f"Loaded {len(df)} messages")
         cache.set_cached(key, df)
-        return cast("pd.DataFrame", df)
+        return df

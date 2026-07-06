@@ -6,7 +6,7 @@ from pathlib import Path
 from api.routes import analysis, chats, day, messages, range_detail, search, stats
 from db.connection import DBConnection
 from db.contacts import build_sender_registry
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,14 +16,17 @@ logger = logging.getLogger(__name__)
 _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 # Semantic search route and store are only wired up when lancedb/pyarrow are installed.
+_semantic_router: APIRouter | None = None
 try:
-    from api.routes.semantic_search import router as _semantic_router
+    from api.routes.semantic_search import router
     from semantic_search.embedder import Embedder
     from semantic_search.reranker import Reranker
     from semantic_search.state import StateDB
     from semantic_search.vector_store import VectorStore
+
+    _semantic_router = router
 except ImportError:
-    _semantic_router = None
+    pass
 
 
 def create_api(
