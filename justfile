@@ -74,6 +74,17 @@ lint: format
     {{ RUN }} ruff check --fix --unsafe-fixes
     {{ RUN }} pre-commit run --all-files
 
+# Test
+
+install-test:
+    uv sync --group test
+
+test *args:
+    PYTHONPATH=app {{ RUN }} pytest {{ args }}
+
+cover *args:
+    PYTHONPATH=app {{ RUN }} pytest --cov=app --cov-report=term-missing --cov-fail-under=90 {{ args }}
+
 # Misc
 
 index *args:
