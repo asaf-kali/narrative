@@ -86,6 +86,18 @@ CREATE TABLE message_vcard (
     vcard TEXT
 );
 
+CREATE TABLE message_location (
+    message_row_id INTEGER,
+    chat_row_id INTEGER,
+    latitude REAL,
+    longitude REAL,
+    place_name TEXT,
+    place_address TEXT,
+    live_location_share_duration INTEGER,
+    live_location_final_latitude REAL,
+    live_location_final_longitude REAL
+);
+
 CREATE TABLE call_log (
     _id INTEGER PRIMARY KEY,
     timestamp INTEGER,
@@ -141,6 +153,8 @@ MSG_BOB_GROUP_AUDIO = 8
 MSG_BROADCAST = 9
 MSG_ALICE_CONTACT = 10  # single shared contact (message_type 4)
 MSG_ME_CONTACTS = 11  # multi-contact message (message_type 14) with two vCards
+MSG_ALICE_LOCATION = 12  # static pin with a place name (message_type 5)
+MSG_ME_LIVE_LOCATION = 13  # live location share that moved (message_type 16)
 
 CAROL_GROUP_TEXT = "group hello from carol \U0001f600"  # includes 😀 for emoji tests
 SYSTEM_TEXT = "Messages are end-to-end encrypted"
@@ -160,6 +174,12 @@ ERIN_VCARD = (
     f"TEL;type=CELL:{ERIN_PHONES[0]}\nTEL;type=WORK:{ERIN_PHONES[1]}\nEND:VCARD"
 )
 FRANK_VCARD = f"BEGIN:VCARD\nVERSION:3.0\nFN:{FRANK_NAME}\nEND:VCARD"
+
+PLACE_NAME = "Blue Bottle Coffee"
+PLACE_ADDRESS = "1 Ferry Building, San Francisco"
+PLACE_LAT, PLACE_LON = 37.7955, -122.3937
+LIVE_START_LAT, LIVE_START_LON = 32.0853, 34.7818
+LIVE_FINAL_LAT, LIVE_FINAL_LON = 32.1093, 34.8555
 
 REACTION_ON_BOB_MSG = "\U0001f44d"  # 👍, given by me
 REACTION_ON_CAROL_MSG = "❤️"  # ❤️, given by Bob
@@ -237,8 +257,11 @@ def seed_msgstore(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def seed_contact_cards(conn: sqlite3.Connection) -> None:
-    """Opt-in extra: shared contact messages + their vCards (kept out of the base seed so counts stay stable)."""
+def seed_attachment_messages(conn: sqlite3.Connection) -> None:
+    """Opt-in extra: contact, location, ... messages + their side-table rows.
+
+    Kept out of the base seed so the message counts other tests assert on stay stable.
+    """
     conn.executemany(
         "INSERT INTO message "
         "(_id, chat_row_id, from_me, timestamp, received_timestamp, message_type, text_data, starred, "
@@ -246,6 +269,28 @@ def seed_contact_cards(conn: sqlite3.Connection) -> None:
         [
             (MSG_ALICE_CONTACT, CHAT_DIRECT, 0, T0 + 240_000, 0, 4, DAVE_NAME, 0, None, "k10"),
             (MSG_ME_CONTACTS, CHAT_DIRECT, 1, T0 + 300_000, 0, 14, MULTI_CONTACT_TEXT, 0, None, "k11"),
+            (MSG_ALICE_LOCATION, CHAT_DIRECT, 0, T0 + 360_000, 0, 5, None, 0, None, "k12"),
+            (MSG_ME_LIVE_LOCATION, CHAT_DIRECT, 1, T0 + 420_000, 0, 16, None, 0, None, "k13"),
+        ],
+    )
+    conn.executemany(
+        "INSERT INTO message_location "
+        "(message_row_id, chat_row_id, latitude, longitude, place_name, place_address, "
+        "live_location_share_duration, live_location_final_latitude, live_location_final_longitude) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (MSG_ALICE_LOCATION, CHAT_DIRECT, PLACE_LAT, PLACE_LON, PLACE_NAME, PLACE_ADDRESS, None, None, None),
+            (
+                MSG_ME_LIVE_LOCATION,
+                CHAT_DIRECT,
+                LIVE_START_LAT,
+                LIVE_START_LON,
+                None,
+                None,
+                900,
+                LIVE_FINAL_LAT,
+                LIVE_FINAL_LON,
+            ),
         ],
     )
     conn.executemany(

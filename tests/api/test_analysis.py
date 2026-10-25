@@ -130,19 +130,19 @@ def test_words_wordcloud_generation_failure_returns_empty_string(api_client: Tes
     assert resp.json()["wordcloud_png"] == ""
 
 
-def test_chat_messages_endpoint_attaches_contact_cards(contacts_api_client: TestClient) -> None:
-    resp = contacts_api_client.get(f"/api/chats/{CHAT_DIRECT}/messages")
+def test_chat_messages_endpoint_attaches_contact_cards(attachments_api_client: TestClient) -> None:
+    resp = attachments_api_client.get(f"/api/chats/{CHAT_DIRECT}/messages")
     multi = next(m for m in resp.json()["messages"] if m["message_id"] == MSG_ME_CONTACTS)
     assert [c["name"] for c in multi["contacts"]] == [ERIN_NAME, FRANK_NAME]
 
 
-def test_words_excludes_contact_card_names(contacts_api_client: TestClient) -> None:
-    resp = contacts_api_client.get(f"/api/chats/{CHAT_DIRECT}/words")
+def test_words_excludes_contact_card_names(attachments_api_client: TestClient) -> None:
+    resp = attachments_api_client.get(f"/api/chats/{CHAT_DIRECT}/words")
     words = {w["word"] for w in resp.json()["frequencies"]}
     assert not words & set(DAVE_NAME.lower().split())
 
 
-def test_media_breakdown_counts_both_contact_types(contacts_api_client: TestClient) -> None:
-    resp = contacts_api_client.get(f"/api/chats/{CHAT_DIRECT}/media")
+def test_media_breakdown_counts_both_contact_types(attachments_api_client: TestClient) -> None:
+    resp = attachments_api_client.get(f"/api/chats/{CHAT_DIRECT}/media")
     breakdown = {b["type_label"]: b["count"] for b in resp.json()["breakdown"]}
     assert breakdown["Contact"] == 2

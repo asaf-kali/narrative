@@ -39,8 +39,8 @@ def test_parse_vcard_without_name_or_phone_falls_back() -> None:
     assert card == ContactCard(name="Unknown contact", phones=[])
 
 
-def test_load_contact_cards_groups_by_message(contacts_msgstore_conn: sqlite3.Connection) -> None:
-    cards = load_contact_cards(contacts_msgstore_conn, message_ids={MSG_ALICE_CONTACT, MSG_ME_CONTACTS})
+def test_load_contact_cards_groups_by_message(attachments_msgstore_conn: sqlite3.Connection) -> None:
+    cards = load_contact_cards(attachments_msgstore_conn, message_ids={MSG_ALICE_CONTACT, MSG_ME_CONTACTS})
     assert cards == {
         MSG_ALICE_CONTACT: [ContactCard(name=DAVE_NAME, phones=[DAVE_PHONE])],
         MSG_ME_CONTACTS: [
@@ -50,5 +50,5 @@ def test_load_contact_cards_groups_by_message(contacts_msgstore_conn: sqlite3.Co
     }
 
 
-def test_load_contact_cards_no_ids_returns_empty(contacts_msgstore_conn: sqlite3.Connection) -> None:
-    assert load_contact_cards(contacts_msgstore_conn, message_ids=set()) == {}
+def test_load_contact_cards_no_ids_returns_empty(attachments_msgstore_conn: sqlite3.Connection) -> None:
+    assert load_contact_cards(attachments_msgstore_conn, message_ids=set()) == {}

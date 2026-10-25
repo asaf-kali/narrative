@@ -8,9 +8,12 @@ from seed_data import (
     FRANK_NAME,
     MSG_ALICE_CONTACT,
     MSG_ALICE_HELLO,
+    MSG_ALICE_LOCATION,
     MSG_BOB_GROUP_HELLO,
     MSG_ME_CONTACTS,
+    MSG_ME_LIVE_LOCATION,
     MULTI_CONTACT_TEXT,
+    PLACE_NAME,
 )
 
 
@@ -69,8 +72,8 @@ def test_get_senders_filters_by_sender_ids(api_client: TestClient) -> None:
     assert body[0]["sender_id"] == "me"
 
 
-def test_get_global_messages_attaches_contact_cards(contacts_api_client: TestClient) -> None:
-    resp = contacts_api_client.get("/api/messages", params={"chat_ids": [CHAT_DIRECT]})
+def test_get_global_messages_attaches_contact_cards(attachments_api_client: TestClient) -> None:
+    resp = attachments_api_client.get("/api/messages", params={"chat_ids": [CHAT_DIRECT]})
     by_id = {m["message_id"]: m for m in resp.json()["messages"]}
     single = by_id[MSG_ALICE_CONTACT]
     assert single["text"] == f"[Contact] {DAVE_NAME}"
@@ -79,3 +82,13 @@ def test_get_global_messages_attaches_contact_cards(contacts_api_client: TestCli
     assert multi["text"] == f"[Contacts] {MULTI_CONTACT_TEXT}"
     assert [c["name"] for c in multi["contacts"]] == [ERIN_NAME, FRANK_NAME]
     assert by_id[MSG_ALICE_HELLO]["contacts"] is None
+
+
+def test_get_global_messages_attaches_location(attachments_api_client: TestClient) -> None:
+    resp = attachments_api_client.get("/api/messages", params={"chat_ids": [CHAT_DIRECT]})
+    by_id = {m["message_id"]: m for m in resp.json()["messages"]}
+    pin = by_id[MSG_ALICE_LOCATION]
+    assert pin["text"] == "[Location]"
+    assert pin["location"]["name"] == PLACE_NAME
+    assert by_id[MSG_ME_LIVE_LOCATION]["location"]["live"] is True
+    assert by_id[MSG_ALICE_HELLO]["location"] is None

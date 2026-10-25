@@ -51,6 +51,8 @@ AUDIO_TYPES: frozenset[MessageType] = frozenset({MessageType.AUDIO, MessageType.
 
 CONTACT_TYPES: frozenset[MessageType] = frozenset({MessageType.CONTACT, MessageType.MULTI_CONTACT})
 
+LOCATION_TYPES: frozenset[MessageType] = frozenset({MessageType.LOCATION, MessageType.LIVE_LOCATION})
+
 # Types whose `text_data` is a title (contact name, poll question, event name) rather than a
 # plain message body, so the placeholder label is kept in front of it.
 _LABEL_PREFIXED_TYPES: frozenset[MessageType] = CONTACT_TYPES | {MessageType.POLL, MessageType.EVENT}
@@ -89,6 +91,16 @@ class ContactCard(BaseModel):
 
     name: str
     phones: list[str]
+
+
+class Location(BaseModel):
+    """A shared pin or live location (for live shares: the last known position)."""
+
+    latitude: float
+    longitude: float
+    name: str | None
+    address: str | None
+    live: bool
 
 
 class MessageStats(BaseModel):

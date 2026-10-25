@@ -12,7 +12,7 @@ from seed_data import (
     SeededPaths,
     build_schema,
     build_wa_schema,
-    seed_contact_cards,
+    seed_attachment_messages,
     seed_msgstore,
     seed_wa_contacts,
 )
@@ -52,9 +52,9 @@ def msgstore_conn() -> Iterator[sqlite3.Connection]:
 
 
 @pytest.fixture
-def contacts_msgstore_conn(msgstore_conn: sqlite3.Connection) -> sqlite3.Connection:
-    """`msgstore_conn` plus shared contact-card messages and their vCards."""
-    seed_contact_cards(msgstore_conn)
+def attachments_msgstore_conn(msgstore_conn: sqlite3.Connection) -> sqlite3.Connection:
+    """`msgstore_conn` plus contact/location/... messages and their side-table rows."""
+    seed_attachment_messages(msgstore_conn)
     return msgstore_conn
 
 
@@ -108,10 +108,10 @@ def api_client(seeded_db_paths: SeededPaths) -> Iterator[TestClient]:
 
 
 @pytest.fixture
-def contacts_api_client(seeded_db_paths: SeededPaths) -> Iterator[TestClient]:
-    """`api_client` over a DB that also holds shared contact-card messages."""
+def attachments_api_client(seeded_db_paths: SeededPaths) -> Iterator[TestClient]:
+    """`api_client` over a DB that also holds contact/location/... messages."""
     conn = sqlite3.connect(seeded_db_paths.msgstore)
-    seed_contact_cards(conn)
+    seed_attachment_messages(conn)
     conn.close()
     yield from _api_client(paths=seeded_db_paths)
 

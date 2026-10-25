@@ -93,6 +93,14 @@ export interface ContactCard {
   phones: string[]
 }
 
+export interface Location {
+  latitude: number
+  longitude: number
+  name: string | null
+  address: string | null
+  live: boolean        // live share: coordinates are the last known position
+}
+
 export interface FeedMessage {
   message_id?: number
   timestamp: string    // "YYYY-MM-DDTHH:MM:SS"
@@ -105,6 +113,7 @@ export interface FeedMessage {
   reactions?: MessageReactions | null
   reply_to?: ReplyPreview | null
   contacts?: ContactCard[] | null   // shared vCards (message_type 4 / 14)
+  location?: Location | null        // pin or live location (message_type 5 / 16)
 }
 
 export interface ReactionStat {

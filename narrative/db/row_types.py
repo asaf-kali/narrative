@@ -135,3 +135,14 @@ class MessagesMetadata(BaseModel):
 class RawVcardRow(_RowBase):
     message_id: int
     vcard: str | None
+
+
+class RawLocationRow(_RowBase):
+    message_id: int
+    latitude: float
+    longitude: float
+    place_name: str | None
+    place_address: str | None
+    live_share_duration: int | None
+    final_latitude: float | None
+    final_longitude: float | None
