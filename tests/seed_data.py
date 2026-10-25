@@ -110,6 +110,11 @@ CREATE TABLE message_poll_option (
     vote_total INTEGER
 );
 
+CREATE TABLE message_call_log (
+    message_row_id INTEGER,
+    call_log_row_id INTEGER
+);
+
 CREATE TABLE call_log (
     _id INTEGER PRIMARY KEY,
     timestamp INTEGER,
@@ -168,6 +173,12 @@ MSG_ME_CONTACTS = 11  # multi-contact message (message_type 14) with two vCards
 MSG_ALICE_LOCATION = 12  # static pin with a place name (message_type 5)
 MSG_ME_LIVE_LOCATION = 13  # live location share that moved (message_type 16)
 MSG_ALICE_POLL = 14  # single-choice poll (message_type 66)
+MSG_ME_CALL = 15  # in-chat event for the base seed's completed voice call (message_type 90)
+MSG_ALICE_MISSED_CALL = 16  # in-chat event for a missed video call (message_type 90)
+
+CALL_COMPLETED_ID = 1  # the base seed's call_log row
+CALL_COMPLETED_DURATION = 120
+CALL_MISSED_ID = 2
 
 CAROL_GROUP_TEXT = "group hello from carol \U0001f600"  # includes 😀 for emoji tests
 SYSTEM_TEXT = "Messages are end-to-end encrypted"
@@ -268,13 +279,13 @@ def seed_msgstore(conn: sqlite3.Connection) -> None:
     conn.execute(
         "INSERT INTO call_log (_id, timestamp, call_result, duration, video_call, from_me, jid_row_id) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (1, T0 + 50_000, 5, 120, 0, 1, JID_ALICE),
+        (CALL_COMPLETED_ID, T0 + 50_000, 5, CALL_COMPLETED_DURATION, 0, 1, JID_ALICE),
     )
     conn.commit()
 
 
 def seed_attachment_messages(conn: sqlite3.Connection) -> None:
-    """Opt-in extra: contact, location, poll, ... messages + their side-table rows.
+    """Opt-in extra: contact, location, poll and call messages + their side-table rows.
 
     Kept out of the base seed so the message counts other tests assert on stay stable.
     """
@@ -288,7 +299,18 @@ def seed_attachment_messages(conn: sqlite3.Connection) -> None:
             (MSG_ALICE_LOCATION, CHAT_DIRECT, 0, T0 + 360_000, 0, 5, None, 0, None, "k12"),
             (MSG_ME_LIVE_LOCATION, CHAT_DIRECT, 1, T0 + 420_000, 0, 16, None, 0, None, "k13"),
             (MSG_ALICE_POLL, CHAT_DIRECT, 0, T0 + 480_000, 0, 66, POLL_QUESTION, 0, None, "k14"),
+            (MSG_ME_CALL, CHAT_DIRECT, 1, T0 + 50_000, 0, 90, None, 0, None, "k15"),
+            (MSG_ALICE_MISSED_CALL, CHAT_DIRECT, 0, T0 + 540_000, 0, 90, None, 0, None, "k16"),
         ],
+    )
+    conn.execute(
+        "INSERT INTO call_log (_id, timestamp, call_result, duration, video_call, from_me, jid_row_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (CALL_MISSED_ID, T0 + 540_000, 2, 0, 1, 0, JID_ALICE),
+    )
+    conn.executemany(
+        "INSERT INTO message_call_log (message_row_id, call_log_row_id) VALUES (?, ?)",
+        [(MSG_ME_CALL, CALL_COMPLETED_ID), (MSG_ALICE_MISSED_CALL, CALL_MISSED_ID)],
     )
     conn.execute(
         "INSERT INTO message_poll (message_row_id, selectable_options_count) VALUES (?, ?)", (MSG_ALICE_POLL, 1)

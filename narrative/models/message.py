@@ -1,9 +1,12 @@
 import logging
 from enum import IntEnum
+from typing import Literal
 
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+CallOutcome = Literal["completed", "missed", "busy", "declined", "unknown"]
 
 
 class MessageType(IntEnum):
@@ -113,6 +116,14 @@ class Poll(BaseModel):
 
     options: list[PollOption]
     multiple_choice: bool
+
+
+class CallInfo(BaseModel):
+    """A voice/video call logged inside a chat (message_type 90)."""
+
+    video: bool
+    duration_seconds: int
+    outcome: CallOutcome
 
 
 class MessageStats(BaseModel):

@@ -1,4 +1,4 @@
-import type { ContactCard, FeedMessage, Location, Poll } from '../api/types'
+import type { CallInfo, ContactCard, FeedMessage, Location, Poll } from '../api/types'
 
 // Type-specific details shown under a message (contact cards, locations, ...).
 
@@ -10,6 +10,24 @@ function mapUrl(loc: Location): string {
 
 function coords(loc: Location): string {
   return `${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`
+}
+
+function duration(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = String(seconds % 60).padStart(2, '0')
+  return m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}:${s}` : `${m}:${s}`
+}
+
+/** "Video call · 3:25" for completed calls, "Missed voice call" otherwise. */
+function callSummary(call: CallInfo): string {
+  const kind = call.video ? 'video call' : 'voice call'
+  if (call.outcome === 'completed') return `${capitalize(kind)} · ${duration(call.duration_seconds)}`
+  if (call.outcome === 'unknown') return capitalize(kind)
+  return `${capitalize(call.outcome)} ${kind}`
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 function ContactCards({ contacts }: { contacts: ContactCard[] }) {
@@ -69,12 +87,13 @@ function PollCard({ poll }: { poll: Poll }) {
 /** Detail cards rendered inside a chat bubble; nothing when the message has none. */
 export function AttachmentCards({ msg }: { msg: FeedMessage }) {
   const hasContacts = !!msg.contacts?.length
-  if (!hasContacts && !msg.location && !msg.poll) return null
+  if (!hasContacts && !msg.location && !msg.poll && !msg.call) return null
   return (
     <div className="mt-1 flex flex-col gap-1">
       {hasContacts && <ContactCards contacts={msg.contacts!} />}
       {msg.location && <LocationCard location={msg.location} />}
       {msg.poll && <PollCard poll={msg.poll} />}
+      {msg.call && <div className={`${CARD_CLASS} text-[12px] text-tx-primary`}>{callSummary(msg.call)}</div>}
     </div>
   )
 }
@@ -88,5 +107,6 @@ export function attachmentTooltip(msg: FeedMessage): string | undefined {
     lines.push(label ? `${label} (${coords(msg.location)})` : coords(msg.location))
   }
   for (const o of msg.poll?.options ?? []) lines.push(`${o.name}: ${o.votes}`)
+  if (msg.call) lines.push(callSummary(msg.call))
   return lines.length ? lines.join('\n') : undefined
 }

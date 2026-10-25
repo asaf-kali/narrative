@@ -9,6 +9,7 @@ from seed_data import (
     MSG_ALICE_CONTACT,
     MSG_ALICE_HELLO,
     MSG_ALICE_LOCATION,
+    MSG_ALICE_MISSED_CALL,
     MSG_ALICE_POLL,
     MSG_BOB_GROUP_HELLO,
     MSG_ME_CONTACTS,
@@ -104,3 +105,10 @@ def test_get_global_messages_attaches_poll(attachments_api_client: TestClient) -
         "options": [{"name": "Pizza", "votes": 2}, {"name": "Sushi", "votes": 0}],
         "multiple_choice": False,
     }
+
+
+def test_get_global_messages_attaches_call(attachments_api_client: TestClient) -> None:
+    resp = attachments_api_client.get("/api/messages", params={"chat_ids": [CHAT_DIRECT]})
+    call_msg = next(m for m in resp.json()["messages"] if m["message_id"] == MSG_ALICE_MISSED_CALL)
+    assert call_msg["text"] == "[Call]"
+    assert call_msg["call"] == {"video": True, "duration_seconds": 0, "outcome": "missed"}

@@ -1,4 +1,4 @@
-"""Type-specific details (contact cards, locations, polls, ...) attached to a page of messages.
+"""Type-specific details (contact cards, locations, polls, calls) attached to a page of messages.
 
 Each kind is loaded with one query over just the message ids of the matching
 types, so a page of plain text messages costs no extra queries.
@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from narrative.db.calls import CallsByMessage, load_message_calls
 from narrative.db.locations import LocationsByMessage, load_locations
 from narrative.db.polls import PollsByMessage, load_polls
 from narrative.db.row_types import RawMessageRow
@@ -19,22 +20,26 @@ from narrative.models.message import CONTACT_TYPES, LOCATION_TYPES, MessageType
 logger = logging.getLogger(__name__)
 
 _POLL_TYPES: frozenset[MessageType] = frozenset({MessageType.POLL})
+_CALL_TYPES: frozenset[MessageType] = frozenset({MessageType.CALL})
 
 
 class MessageAttachments(BaseModel):
     contacts: ContactCardsByMessage = Field(default_factory=dict)
     locations: LocationsByMessage = Field(default_factory=dict)
     polls: PollsByMessage = Field(default_factory=dict)
+    calls: CallsByMessage = Field(default_factory=dict)
 
     def fields_for(self, message_id: int) -> dict[str, Any]:
         """Return API fields for one message; each is `None` when the message lacks that detail."""
         cards = self.contacts.get(message_id)
         location = self.locations.get(message_id)
         poll = self.polls.get(message_id)
+        call = self.calls.get(message_id)
         return {
             "contacts": [c.model_dump() for c in cards] if cards else None,
             "location": location.model_dump() if location else None,
             "poll": poll.model_dump() if poll else None,
+            "call": call.model_dump() if call else None,
         }
 
 
@@ -45,7 +50,9 @@ def load_message_attachments(conn: sqlite3.Connection, rows: list[RawMessageRow]
     locations = load_locations(conn, message_ids=location_ids)
     poll_ids = _ids_of_types(rows=rows, types=_POLL_TYPES)
     polls = load_polls(conn, message_ids=poll_ids)
-    return MessageAttachments(contacts=contacts, locations=locations, polls=polls)
+    call_ids = _ids_of_types(rows=rows, types=_CALL_TYPES)
+    calls = load_message_calls(conn, message_ids=call_ids)
+    return MessageAttachments(contacts=contacts, locations=locations, polls=polls, calls=calls)
 
 
 def _ids_of_types(rows: list[RawMessageRow], types: frozenset[MessageType]) -> set[int]:

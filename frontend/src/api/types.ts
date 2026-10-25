@@ -111,6 +111,12 @@ export interface Poll {
   multiple_choice: boolean
 }
 
+export interface CallInfo {
+  video: boolean
+  duration_seconds: number
+  outcome: 'completed' | 'missed' | 'busy' | 'declined' | 'unknown'
+}
+
 export interface FeedMessage {
   message_id?: number
   timestamp: string    // "YYYY-MM-DDTHH:MM:SS"
@@ -125,6 +131,7 @@ export interface FeedMessage {
   contacts?: ContactCard[] | null   // shared vCards (message_type 4 / 14)
   location?: Location | null        // pin or live location (message_type 5 / 16)
   poll?: Poll | null                // options + vote totals; question is `text` (message_type 66)
+  call?: CallInfo | null            // in-chat call event (message_type 90)
 }
 
 export interface ReactionStat {

@@ -153,3 +153,10 @@ class RawPollOptionRow(_RowBase):
     option_name: str | None
     vote_total: int | None
     selectable_options_count: int | None
+
+
+class RawMessageCallRow(_RowBase):
+    message_id: int
+    call_result: int | None
+    duration: int | None
+    is_video: int | None
