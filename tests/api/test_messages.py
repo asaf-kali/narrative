@@ -9,11 +9,13 @@ from seed_data import (
     MSG_ALICE_CONTACT,
     MSG_ALICE_HELLO,
     MSG_ALICE_LOCATION,
+    MSG_ALICE_POLL,
     MSG_BOB_GROUP_HELLO,
     MSG_ME_CONTACTS,
     MSG_ME_LIVE_LOCATION,
     MULTI_CONTACT_TEXT,
     PLACE_NAME,
+    POLL_QUESTION,
 )
 
 
@@ -92,3 +94,13 @@ def test_get_global_messages_attaches_location(attachments_api_client: TestClien
     assert pin["location"]["name"] == PLACE_NAME
     assert by_id[MSG_ME_LIVE_LOCATION]["location"]["live"] is True
     assert by_id[MSG_ALICE_HELLO]["location"] is None
+
+
+def test_get_global_messages_attaches_poll(attachments_api_client: TestClient) -> None:
+    resp = attachments_api_client.get("/api/messages", params={"chat_ids": [CHAT_DIRECT]})
+    poll_msg = next(m for m in resp.json()["messages"] if m["message_id"] == MSG_ALICE_POLL)
+    assert poll_msg["text"] == f"[Poll] {POLL_QUESTION}"
+    assert poll_msg["poll"] == {
+        "options": [{"name": "Pizza", "votes": 2}, {"name": "Sushi", "votes": 0}],
+        "multiple_choice": False,
+    }

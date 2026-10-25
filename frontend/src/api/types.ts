@@ -101,6 +101,16 @@ export interface Location {
   live: boolean        // live share: coordinates are the last known position
 }
 
+export interface PollOption {
+  name: string
+  votes: number
+}
+
+export interface Poll {
+  options: PollOption[]
+  multiple_choice: boolean
+}
+
 export interface FeedMessage {
   message_id?: number
   timestamp: string    // "YYYY-MM-DDTHH:MM:SS"
@@ -114,6 +124,7 @@ export interface FeedMessage {
   reply_to?: ReplyPreview | null
   contacts?: ContactCard[] | null   // shared vCards (message_type 4 / 14)
   location?: Location | null        // pin or live location (message_type 5 / 16)
+  poll?: Poll | null                // options + vote totals; question is `text` (message_type 66)
 }
 
 export interface ReactionStat {

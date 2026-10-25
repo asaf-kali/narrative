@@ -98,6 +98,18 @@ CREATE TABLE message_location (
     live_location_final_longitude REAL
 );
 
+CREATE TABLE message_poll (
+    message_row_id INTEGER,
+    selectable_options_count INTEGER
+);
+
+CREATE TABLE message_poll_option (
+    _id INTEGER PRIMARY KEY,
+    message_row_id INTEGER,
+    option_name TEXT,
+    vote_total INTEGER
+);
+
 CREATE TABLE call_log (
     _id INTEGER PRIMARY KEY,
     timestamp INTEGER,
@@ -155,6 +167,7 @@ MSG_ALICE_CONTACT = 10  # single shared contact (message_type 4)
 MSG_ME_CONTACTS = 11  # multi-contact message (message_type 14) with two vCards
 MSG_ALICE_LOCATION = 12  # static pin with a place name (message_type 5)
 MSG_ME_LIVE_LOCATION = 13  # live location share that moved (message_type 16)
+MSG_ALICE_POLL = 14  # single-choice poll (message_type 66)
 
 CAROL_GROUP_TEXT = "group hello from carol \U0001f600"  # includes 😀 for emoji tests
 SYSTEM_TEXT = "Messages are end-to-end encrypted"
@@ -180,6 +193,9 @@ PLACE_ADDRESS = "1 Ferry Building, San Francisco"
 PLACE_LAT, PLACE_LON = 37.7955, -122.3937
 LIVE_START_LAT, LIVE_START_LON = 32.0853, 34.7818
 LIVE_FINAL_LAT, LIVE_FINAL_LON = 32.1093, 34.8555
+
+POLL_QUESTION = "Lunch where?"
+POLL_OPTIONS = (("Pizza", 2), ("Sushi", 0))
 
 REACTION_ON_BOB_MSG = "\U0001f44d"  # 👍, given by me
 REACTION_ON_CAROL_MSG = "❤️"  # ❤️, given by Bob
@@ -258,7 +274,7 @@ def seed_msgstore(conn: sqlite3.Connection) -> None:
 
 
 def seed_attachment_messages(conn: sqlite3.Connection) -> None:
-    """Opt-in extra: contact, location, ... messages + their side-table rows.
+    """Opt-in extra: contact, location, poll, ... messages + their side-table rows.
 
     Kept out of the base seed so the message counts other tests assert on stay stable.
     """
@@ -271,7 +287,15 @@ def seed_attachment_messages(conn: sqlite3.Connection) -> None:
             (MSG_ME_CONTACTS, CHAT_DIRECT, 1, T0 + 300_000, 0, 14, MULTI_CONTACT_TEXT, 0, None, "k11"),
             (MSG_ALICE_LOCATION, CHAT_DIRECT, 0, T0 + 360_000, 0, 5, None, 0, None, "k12"),
             (MSG_ME_LIVE_LOCATION, CHAT_DIRECT, 1, T0 + 420_000, 0, 16, None, 0, None, "k13"),
+            (MSG_ALICE_POLL, CHAT_DIRECT, 0, T0 + 480_000, 0, 66, POLL_QUESTION, 0, None, "k14"),
         ],
+    )
+    conn.execute(
+        "INSERT INTO message_poll (message_row_id, selectable_options_count) VALUES (?, ?)", (MSG_ALICE_POLL, 1)
+    )
+    conn.executemany(
+        "INSERT INTO message_poll_option (message_row_id, option_name, vote_total) VALUES (?, ?, ?)",
+        [(MSG_ALICE_POLL, name, votes) for name, votes in POLL_OPTIONS],
     )
     conn.executemany(
         "INSERT INTO message_location "

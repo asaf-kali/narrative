@@ -146,3 +146,10 @@ class RawLocationRow(_RowBase):
     live_share_duration: int | None
     final_latitude: float | None
     final_longitude: float | None
+
+
+class RawPollOptionRow(_RowBase):
+    message_id: int
+    option_name: str | None
+    vote_total: int | None
+    selectable_options_count: int | None

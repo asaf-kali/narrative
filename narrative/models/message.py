@@ -103,6 +103,18 @@ class Location(BaseModel):
     live: bool
 
 
+class PollOption(BaseModel):
+    name: str
+    votes: int
+
+
+class Poll(BaseModel):
+    """Options and current vote totals of a poll; the question is the message text."""
+
+    options: list[PollOption]
+    multiple_choice: bool
+
+
 class MessageStats(BaseModel):
     total: int
     text: int
