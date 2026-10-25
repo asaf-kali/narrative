@@ -15,10 +15,11 @@ class MessageType(IntEnum):
     LOCATION = 5
     SYSTEM = 7
     DOCUMENT = 9
-    STICKER = 13
+    GIF = 13
     MULTI_CONTACT = 14
-    GIF = 15
-    LIVE_LOCATION = 20
+    REVOKED = 15  # deleted for everyone; row details live in message_revoked
+    LIVE_LOCATION = 16
+    STICKER = 20
 
 
 MEDIA_TYPES: frozenset[MessageType] = frozenset(
@@ -40,6 +41,8 @@ PLACEHOLDER_LABELS: dict[int, str] = {
     MessageType.DOCUMENT: "[Document]",
     MessageType.STICKER: "[Sticker]",
     MessageType.GIF: "[GIF]",
+    MessageType.REVOKED: "[Deleted]",
+    MessageType.LIVE_LOCATION: "[Live location]",
 }
 
 

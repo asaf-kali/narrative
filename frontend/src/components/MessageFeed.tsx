@@ -5,7 +5,8 @@ import { formatDateTime } from '../utils/datetime'
 // Fallback labels for quoted messages whose text is empty (media/stickers/etc.)
 const QUOTED_TYPE_LABELS: Record<number, string> = {
   1: '[Image]', 2: '[Audio]', 3: '[Video]', 4: '[Contact]',
-  5: '[Location]', 9: '[Document]', 13: '[Sticker]', 14: '[Contacts]', 15: '[GIF]',
+  5: '[Location]', 9: '[Document]', 13: '[GIF]', 14: '[Contacts]', 15: '[Deleted]',
+  16: '[Live location]', 20: '[Sticker]',
 }
 
 // ── palette ──────────────────────────────────────────────────────────────────

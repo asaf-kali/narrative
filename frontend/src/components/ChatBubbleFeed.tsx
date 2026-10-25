@@ -9,7 +9,8 @@ import { CHAT_COLORS, Highlighted, quotedText } from './MessageFeed'
 const GROUP_GAP_MS = 5 * 60 * 1000
 
 const MEDIA_ICONS: Record<number, string> = {
-  1: '📷', 2: '🎤', 3: '🎬', 4: '👤', 5: '📍', 9: '📄', 13: '🩹', 14: '👥', 15: '🎞️',
+  1: '📷', 2: '🎤', 3: '🎬', 4: '👤', 5: '📍', 9: '📄', 13: '🎞️', 14: '👥', 15: '🚫',
+  16: '📡', 20: '🩹',
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

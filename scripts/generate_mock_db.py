@@ -44,7 +44,7 @@ MESSAGE_TYPE_WEIGHTS = [
     (2, 5),  # audio
     (3, 3),  # video
     (9, 3),  # document
-    (13, 1),  # sticker
+    (20, 1),  # sticker
 ]
 _MSG_TYPE_POPULATION = [t for t, w in MESSAGE_TYPE_WEIGHTS for _ in range(w)]
 

@@ -52,9 +52,15 @@ The real schema varies by WhatsApp version. Queries in `narrative/db/queries/` a
 | 1 | Image |
 | 2 | Audio / Voice note |
 | 3 | Video |
+| 4 | Contact card (vCard in `message_vcard`) |
+| 5 | Location (`message_location`) |
 | 7 | System notification (filtered by default) |
 | 9 | Document |
-| 13 | Sticker |
+| 13 | GIF (`video/mp4`) |
+| 14 | Multiple contact cards |
+| 15 | Deleted for everyone (`message_revoked`) |
+| 16 | Live location (`message_location`) |
+| 20 | Sticker (`image/webp`) |
 
 - `text_data` is inline on the `message` row
 - `timestamp` is milliseconds Unix; `message_type=7` = system (filtered by default)
