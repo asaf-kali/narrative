@@ -61,6 +61,14 @@ The real schema varies by WhatsApp version. Queries in `narrative/db/queries/` a
 | 15 | Deleted for everyone (`message_revoked`) |
 | 16 | Live location (`message_location`) |
 | 20 | Sticker (`image/webp`) |
+| 24 | Group invite (`message_group_invite`) |
+| 25–28 | Business template: image / document / text / video (`message_template`) |
+| 42 / 43 / 82 | View-once image / video / audio (`message_view_once_media`) |
+| 64 | Deleted by group admin (`message_revoked`) |
+| 66 | Poll; `text_data` = question (`message_poll`) |
+| 90 | Call event inside a chat (`message_call_log`) |
+| 92 | Event; `text_data` = name (`message_event`) |
+| 99 | Album header grouping media messages (`message_album`) |
 
 - `text_data` is inline on the `message` row
 - `timestamp` is milliseconds Unix; `message_type=7` = system (filtered by default)

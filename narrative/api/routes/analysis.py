@@ -72,7 +72,7 @@ def get_overview(
     sparkline = [{"date": str(r["date"]), "count": int(r["count"])} for _, r in sparkline_df.iterrows()]
 
     # Type breakdown
-    type_labels = {t.value: t.name.capitalize() for t in MessageType}
+    type_labels = {t.value: t.name.replace("_", " ").capitalize() for t in MessageType}
     type_counts = df["message_type"].value_counts().reset_index()
     type_counts.columns = pd.Index(["type", "count"])
     type_breakdown = [

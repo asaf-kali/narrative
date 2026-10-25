@@ -20,15 +20,40 @@ class MessageType(IntEnum):
     REVOKED = 15  # deleted for everyone; row details live in message_revoked
     LIVE_LOCATION = 16
     STICKER = 20
+    GROUP_INVITE = 24
+    TEMPLATE_IMAGE = 25  # business template messages (message_template)
+    TEMPLATE_DOCUMENT = 26
+    TEMPLATE_TEXT = 27
+    TEMPLATE_VIDEO = 28
+    VIEW_ONCE_IMAGE = 42
+    VIEW_ONCE_VIDEO = 43
+    ADMIN_REVOKED = 64  # deleted by a group admin; also in message_revoked
+    POLL = 66
+    VIEW_ONCE_AUDIO = 82
+    CALL = 90  # call event inside a chat (message_call_log)
+    EVENT = 92
+    ALBUM = 99  # header row grouping the media messages of an album
 
 
 MEDIA_TYPES: frozenset[MessageType] = frozenset(
-    {MessageType.IMAGE, MessageType.VIDEO, MessageType.DOCUMENT, MessageType.STICKER, MessageType.GIF}
+    {
+        MessageType.IMAGE,
+        MessageType.VIDEO,
+        MessageType.DOCUMENT,
+        MessageType.STICKER,
+        MessageType.GIF,
+        MessageType.VIEW_ONCE_IMAGE,
+        MessageType.VIEW_ONCE_VIDEO,
+    }
 )
 
-AUDIO_TYPES: frozenset[MessageType] = frozenset({MessageType.AUDIO})
+AUDIO_TYPES: frozenset[MessageType] = frozenset({MessageType.AUDIO, MessageType.VIEW_ONCE_AUDIO})
 
 CONTACT_TYPES: frozenset[MessageType] = frozenset({MessageType.CONTACT, MessageType.MULTI_CONTACT})
+
+# Types whose `text_data` is a title (contact name, poll question, event name) rather than a
+# plain message body, so the placeholder label is kept in front of it.
+_LABEL_PREFIXED_TYPES: frozenset[MessageType] = CONTACT_TYPES | {MessageType.POLL, MessageType.EVENT}
 
 # Bracketed placeholders shown in place of (or before) a message's text for non-text types.
 PLACEHOLDER_LABELS: dict[int, str] = {
@@ -42,7 +67,20 @@ PLACEHOLDER_LABELS: dict[int, str] = {
     MessageType.STICKER: "[Sticker]",
     MessageType.GIF: "[GIF]",
     MessageType.REVOKED: "[Deleted]",
+    MessageType.ADMIN_REVOKED: "[Deleted by admin]",
     MessageType.LIVE_LOCATION: "[Live location]",
+    MessageType.GROUP_INVITE: "[Group invite]",
+    MessageType.TEMPLATE_IMAGE: "[Image]",
+    MessageType.TEMPLATE_DOCUMENT: "[Document]",
+    MessageType.TEMPLATE_TEXT: "[Business message]",
+    MessageType.TEMPLATE_VIDEO: "[Video]",
+    MessageType.VIEW_ONCE_IMAGE: "[View-once image]",
+    MessageType.VIEW_ONCE_VIDEO: "[View-once video]",
+    MessageType.VIEW_ONCE_AUDIO: "[View-once audio]",
+    MessageType.POLL: "[Poll]",
+    MessageType.CALL: "[Call]",
+    MessageType.EVENT: "[Event]",
+    MessageType.ALBUM: "[Album]",
 }
 
 
@@ -64,13 +102,13 @@ class MessageStats(BaseModel):
 
 
 def message_display_text(*, text_data: str | None, message_type: int) -> str | None:
-    """Text to show for a message: its own text, a type placeholder, or both for contact cards.
+    """Text to show for a message: its own text, a type placeholder, or both for titled types.
 
-    Contact messages store the shared contact's display name in `text_data`, so the
-    placeholder is prefixed to mark it as a card rather than something the sender typed.
+    Contact, poll and event messages store a title in `text_data` (contact name, question,
+    event name), so the placeholder is prefixed to mark it as such rather than plain text.
     """
     label = PLACEHOLDER_LABELS.get(message_type)
-    if label is None or (text_data and message_type not in CONTACT_TYPES):
+    if label is None or (text_data and message_type not in _LABEL_PREFIXED_TYPES):
         return text_data
     if not text_data:
         return label

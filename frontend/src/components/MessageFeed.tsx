@@ -6,7 +6,9 @@ import { formatDateTime } from '../utils/datetime'
 const QUOTED_TYPE_LABELS: Record<number, string> = {
   1: '[Image]', 2: '[Audio]', 3: '[Video]', 4: '[Contact]',
   5: '[Location]', 9: '[Document]', 13: '[GIF]', 14: '[Contacts]', 15: '[Deleted]',
-  16: '[Live location]', 20: '[Sticker]',
+  16: '[Live location]', 20: '[Sticker]', 24: '[Group invite]', 25: '[Image]', 26: '[Document]',
+  27: '[Business message]', 28: '[Video]', 42: '[View-once image]', 43: '[View-once video]',
+  64: '[Deleted by admin]', 66: '[Poll]', 82: '[View-once audio]', 90: '[Call]', 92: '[Event]', 99: '[Album]',
 }
 
 // ── palette ──────────────────────────────────────────────────────────────────

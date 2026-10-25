@@ -27,10 +27,16 @@ def test_media_types_excludes_audio_and_text() -> None:
 
 def test_media_types_excludes_deleted_messages() -> None:
     assert MessageType.REVOKED not in MEDIA_TYPES
+    assert MessageType.ADMIN_REVOKED not in MEDIA_TYPES
 
 
-def test_audio_types_contains_only_audio() -> None:
-    assert {MessageType.AUDIO} == AUDIO_TYPES
+def test_view_once_media_counts_as_media_or_audio() -> None:
+    assert {MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO} <= MEDIA_TYPES
+    assert MessageType.VIEW_ONCE_AUDIO in AUDIO_TYPES
+
+
+def test_audio_types_contains_voice_notes() -> None:
+    assert {MessageType.AUDIO, MessageType.VIEW_ONCE_AUDIO} == AUDIO_TYPES
 
 
 def test_contact_types() -> None:
@@ -47,6 +53,12 @@ def test_contact_types() -> None:
         ("a caption", MessageType.IMAGE, "a caption"),
         (None, MessageType.IMAGE, "[Image]"),
         (None, MessageType.REVOKED, "[Deleted]"),
+        (None, MessageType.ADMIN_REVOKED, "[Deleted by admin]"),
+        (None, MessageType.CALL, "[Call]"),
+        (None, MessageType.ALBUM, "[Album]"),
+        ("Lunch?", MessageType.POLL, "[Poll] Lunch?"),
+        ("Party", MessageType.EVENT, "[Event] Party"),
+        ("Your order shipped", MessageType.TEMPLATE_TEXT, "Your order shipped"),
         ("Dave", MessageType.CONTACT, "[Contact] Dave"),
         (None, MessageType.CONTACT, "[Contact]"),
         ("2 contacts", MessageType.MULTI_CONTACT, "[Contacts] 2 contacts"),
