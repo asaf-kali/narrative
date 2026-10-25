@@ -1,5 +1,4 @@
 import logging
-import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -9,6 +8,7 @@ from fastapi import APIRouter, Query, Request
 
 from narrative.analysis.reactions import MessageReactions, reactions_by_message
 from narrative.analysis.replies import ReplyPreview, replies_by_message
+from narrative.db.attachments import MessageAttachments, load_message_attachments
 from narrative.db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
 from narrative.db.queries.messages import (
     fetch_message_bounds,
@@ -16,9 +16,7 @@ from narrative.db.queries.messages import (
     fetch_messages_page,
     fetch_sender_counts,
 )
-from narrative.db.row_types import RawMessageRow
-from narrative.db.vcards import ContactCardsByMessage, load_contact_cards
-from narrative.models.message import CONTACT_TYPES, message_display_text
+from narrative.models.message import message_display_text
 from narrative.models.sender import SenderRegistry
 
 logger = logging.getLogger(__name__)
@@ -101,7 +99,7 @@ def get_global_messages(
             limit=limit,
             offset=offset,
         )
-        contact_cards_by_msg = _load_contact_cards(db.msgstore, raw_rows=raw_rows)
+        attachments = load_message_attachments(db.msgstore, rows=raw_rows)
 
     if not raw_rows:
         return {"messages": []}
@@ -112,7 +110,7 @@ def get_global_messages(
         include_chat_id=True,
         reactions_by_msg=reactions_by_msg,
         replies_by_msg=replies_by_msg,
-        contact_cards_by_msg=contact_cards_by_msg,
+        attachments=attachments,
     )
     return {"messages": messages}
 
@@ -157,7 +155,7 @@ def _df_to_message_list(
     include_chat_id: bool = False,
     reactions_by_msg: dict[int, MessageReactions] | None = None,
     replies_by_msg: dict[int, ReplyPreview] | None = None,
-    contact_cards_by_msg: ContactCardsByMessage | None = None,
+    attachments: MessageAttachments | None = None,
 ) -> list[dict[str, Any]]:
     messages = []
     for _, row in df.iterrows():
@@ -185,9 +183,8 @@ def _df_to_message_list(
         if replies_by_msg:
             reply = replies_by_msg.get(message_id)
             entry["reply_to"] = reply.model_dump() if reply else None
-        if contact_cards_by_msg:
-            cards = contact_cards_by_msg.get(message_id)
-            entry["contacts"] = [c.model_dump() for c in cards] if cards else None
+        if attachments:
+            entry.update(attachments.fields_for(message_id))
         messages.append(entry)
     return messages
 
@@ -204,9 +201,3 @@ def _load_engagement_lookups(
         reactions_df = loader.load_reactions(chat_id=chat_id)
         replies_df = loader.load_replies(chat_id=chat_id)
     return reactions_by_message(reactions_df), replies_by_message(replies_df)
-
-
-def _load_contact_cards(conn: sqlite3.Connection, raw_rows: list[RawMessageRow]) -> ContactCardsByMessage:
-    """Load parsed vCards for the contact messages in this page, keyed by message id."""
-    contact_ids = {r.message_id for r in raw_rows if r.message_type in CONTACT_TYPES}
-    return load_contact_cards(conn, message_ids=contact_ids)
