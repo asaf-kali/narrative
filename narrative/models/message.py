@@ -16,6 +16,7 @@ class MessageType(IntEnum):
     SYSTEM = 7
     DOCUMENT = 9
     STICKER = 13
+    MULTI_CONTACT = 14
     GIF = 15
     LIVE_LOCATION = 20
 
@@ -26,6 +27,28 @@ MEDIA_TYPES: frozenset[MessageType] = frozenset(
 
 AUDIO_TYPES: frozenset[MessageType] = frozenset({MessageType.AUDIO})
 
+CONTACT_TYPES: frozenset[MessageType] = frozenset({MessageType.CONTACT, MessageType.MULTI_CONTACT})
+
+# Bracketed placeholders shown in place of (or before) a message's text for non-text types.
+PLACEHOLDER_LABELS: dict[int, str] = {
+    MessageType.IMAGE: "[Image]",
+    MessageType.AUDIO: "[Audio]",
+    MessageType.VIDEO: "[Video]",
+    MessageType.CONTACT: "[Contact]",
+    MessageType.MULTI_CONTACT: "[Contacts]",
+    MessageType.LOCATION: "[Location]",
+    MessageType.DOCUMENT: "[Document]",
+    MessageType.STICKER: "[Sticker]",
+    MessageType.GIF: "[GIF]",
+}
+
+
+class ContactCard(BaseModel):
+    """A contact (vCard) shared in a chat."""
+
+    name: str
+    phones: list[str]
+
 
 class MessageStats(BaseModel):
     total: int
@@ -35,3 +58,17 @@ class MessageStats(BaseModel):
     system: int
     revoked: int
     links: int
+
+
+def message_display_text(*, text_data: str | None, message_type: int) -> str | None:
+    """Text to show for a message: its own text, a type placeholder, or both for contact cards.
+
+    Contact messages store the shared contact's display name in `text_data`, so the
+    placeholder is prefixed to mark it as a card rather than something the sender typed.
+    """
+    label = PLACEHOLDER_LABELS.get(message_type)
+    if label is None or (text_data and message_type not in CONTACT_TYPES):
+        return text_data
+    if not text_data:
+        return label
+    return f"{label} {text_data}"

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import type { FeedMessage, MessageReactions, ReplyPreview } from '../api/types'
+import type { ContactCard, FeedMessage, MessageReactions, ReplyPreview } from '../api/types'
 import { formatDate, formatExact } from '../utils/datetime'
 import { CHAT_COLORS, Highlighted, quotedText } from './MessageFeed'
 
@@ -9,7 +9,7 @@ import { CHAT_COLORS, Highlighted, quotedText } from './MessageFeed'
 const GROUP_GAP_MS = 5 * 60 * 1000
 
 const MEDIA_ICONS: Record<number, string> = {
-  1: '📷', 2: '🎤', 3: '🎬', 4: '👤', 5: '📍', 9: '📄', 13: '🩹', 15: '🎞️',
+  1: '📷', 2: '🎤', 3: '🎬', 4: '👤', 5: '📍', 9: '📄', 13: '🩹', 14: '👥', 15: '🎞️',
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -85,6 +85,21 @@ function Reactions({ reactions }: { reactions: MessageReactions }) {
   )
 }
 
+function ContactCards({ contacts }: { contacts: ContactCard[] }) {
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      {contacts.map((c, i) => (
+        <div key={i} className="rounded-lg bg-app-hover px-2 py-1 min-w-0">
+          <div className="text-[12px] font-medium text-tx-primary truncate">{c.name}</div>
+          {c.phones.map((p) => (
+            <div key={p} className="text-[11px] text-tx-muted tabular-nums truncate">{p}</div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 interface BubbleProps {
   msg: FeedMessage
   showName: boolean
@@ -131,6 +146,7 @@ function Bubble({ msg, showName, color, highlight, onJump }: BubbleProps) {
             {clockTime(msg.timestamp)}
           </span>
         </div>
+        {msg.contacts && msg.contacts.length > 0 && <ContactCards contacts={msg.contacts} />}
         {hasReactions && msg.reactions && <Reactions reactions={msg.reactions} />}
       </div>
     </div>

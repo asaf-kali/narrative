@@ -7,24 +7,13 @@ from pydantic import BaseModel
 
 from narrative.db.loaders import open_connection
 from narrative.db.queries.range import fetch_range_messages
-from narrative.models.message import MessageType
+from narrative.models.message import message_display_text
 from narrative.models.sender import GROUP_SERVER, SenderRegistry
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 NUM_BUCKETS = 30
-
-_TYPE_LABELS: dict[int, str] = {
-    MessageType.IMAGE: "[Image]",
-    MessageType.AUDIO: "[Audio]",
-    MessageType.VIDEO: "[Video]",
-    MessageType.CONTACT: "[Contact]",
-    MessageType.LOCATION: "[Location]",
-    MessageType.DOCUMENT: "[Document]",
-    MessageType.STICKER: "[Sticker]",
-    MessageType.GIF: "[GIF]",
-}
 
 
 class RangeMessage(BaseModel):
@@ -103,7 +92,7 @@ def get_range_detail(
             chat_phone=r.chat_phone or "",
             is_group=is_group,
         )
-        text = r.text_data or _TYPE_LABELS.get(r.message_type)
+        text = message_display_text(text_data=r.text_data, message_type=r.message_type)
 
         chat_name_set.add(chat_name)
         sender_freq[sender.display_name] = sender_freq.get(sender.display_name, 0) + 1

@@ -130,3 +130,8 @@ class MessagesMetadata(BaseModel):
     total: int
     available_sender_ids: list[str]
     available_chat_ids: list[int]
+
+
+class RawVcardRow(_RowBase):
+    message_id: int
+    vcard: str | None

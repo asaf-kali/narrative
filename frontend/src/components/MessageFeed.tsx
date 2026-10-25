@@ -1,11 +1,11 @@
 import { useMemo, useRef } from 'react'
-import type { FeedMessage, MessageReactions, ReplyPreview } from '../api/types'
+import type { ContactCard, FeedMessage, MessageReactions, ReplyPreview } from '../api/types'
 import { formatDateTime } from '../utils/datetime'
 
 // Fallback labels for quoted messages whose text is empty (media/stickers/etc.)
 const QUOTED_TYPE_LABELS: Record<number, string> = {
   1: '[Image]', 2: '[Audio]', 3: '[Video]', 4: '[Contact]',
-  5: '[Location]', 9: '[Document]', 13: '[Sticker]', 15: '[GIF]',
+  5: '[Location]', 9: '[Document]', 13: '[Sticker]', 14: '[Contacts]', 15: '[GIF]',
 }
 
 // ── palette ──────────────────────────────────────────────────────────────────
@@ -92,6 +92,12 @@ interface RowProps {
   onSenderClick?: (senderId: string) => void
 }
 
+/** One line per shared contact: "Name (phone, phone)" — used as a hover tooltip. */
+function contactsTooltip(contacts: ContactCard[] | null | undefined): string | undefined {
+  if (!contacts?.length) return undefined
+  return contacts.map((c) => (c.phones.length ? `${c.name} (${c.phones.join(', ')})` : c.name)).join('\n')
+}
+
 function MessageRow({ msg, chatColor, dayOnly, showChat, highlight, onChatClick, onSenderClick }: RowProps) {
   const isMedia = msg.text?.startsWith('[') ?? false
   return (
@@ -119,7 +125,10 @@ function MessageRow({ msg, chatColor, dayOnly, showChat, highlight, onChatClick,
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
         {msg.reply_to && <ReplyPreviewLine reply={msg.reply_to} />}
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`text-xs min-w-0 truncate ${isMedia ? 'text-tx-muted italic' : 'text-tx-secondary'}`}>
+          <span
+            className={`text-xs min-w-0 truncate ${isMedia ? 'text-tx-muted italic' : 'text-tx-secondary'}`}
+            title={contactsTooltip(msg.contacts)}
+          >
             {highlight && !isMedia
               ? <Highlighted text={msg.text ?? ''} term={highlight} />
               : (msg.text ?? '')}

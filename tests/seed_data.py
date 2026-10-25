@@ -80,6 +80,12 @@ CREATE TABLE message_quoted (
     timestamp INTEGER
 );
 
+CREATE TABLE message_vcard (
+    _id INTEGER PRIMARY KEY,
+    message_row_id INTEGER,
+    vcard TEXT
+);
+
 CREATE TABLE call_log (
     _id INTEGER PRIMARY KEY,
     timestamp INTEGER,
@@ -133,9 +139,27 @@ MSG_CAROL_GROUP_HELLO = 6
 MSG_ME_GROUP = 7
 MSG_BOB_GROUP_AUDIO = 8
 MSG_BROADCAST = 9
+MSG_ALICE_CONTACT = 10  # single shared contact (message_type 4)
+MSG_ME_CONTACTS = 11  # multi-contact message (message_type 14) with two vCards
 
 CAROL_GROUP_TEXT = "group hello from carol \U0001f600"  # includes 😀 for emoji tests
 SYSTEM_TEXT = "Messages are end-to-end encrypted"
+
+DAVE_NAME = "Dave Grohl"
+DAVE_PHONE = "+1 555-0100"
+ERIN_NAME = "Erin Brockovich"
+ERIN_PHONES = ("+1 555-0200", "+1 555-0201")
+FRANK_NAME = "Frank Ocean"
+MULTI_CONTACT_TEXT = "2 contacts"
+
+DAVE_VCARD = (
+    f"BEGIN:VCARD\nVERSION:3.0\nN:Grohl;Dave;;;\nFN:{DAVE_NAME}\nitem1.TEL;waid=15550100:{DAVE_PHONE}\nEND:VCARD"
+)
+ERIN_VCARD = (
+    f"BEGIN:VCARD\nVERSION:3.0\nFN:{ERIN_NAME}\n"
+    f"TEL;type=CELL:{ERIN_PHONES[0]}\nTEL;type=WORK:{ERIN_PHONES[1]}\nEND:VCARD"
+)
+FRANK_VCARD = f"BEGIN:VCARD\nVERSION:3.0\nFN:{FRANK_NAME}\nEND:VCARD"
 
 REACTION_ON_BOB_MSG = "\U0001f44d"  # 👍, given by me
 REACTION_ON_CAROL_MSG = "❤️"  # ❤️, given by Bob
@@ -209,6 +233,28 @@ def seed_msgstore(conn: sqlite3.Connection) -> None:
         "INSERT INTO call_log (_id, timestamp, call_result, duration, video_call, from_me, jid_row_id) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (1, T0 + 50_000, 5, 120, 0, 1, JID_ALICE),
+    )
+    conn.commit()
+
+
+def seed_contact_cards(conn: sqlite3.Connection) -> None:
+    """Opt-in extra: shared contact messages + their vCards (kept out of the base seed so counts stay stable)."""
+    conn.executemany(
+        "INSERT INTO message "
+        "(_id, chat_row_id, from_me, timestamp, received_timestamp, message_type, text_data, starred, "
+        "sender_jid_row_id, key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (MSG_ALICE_CONTACT, CHAT_DIRECT, 0, T0 + 240_000, 0, 4, DAVE_NAME, 0, None, "k10"),
+            (MSG_ME_CONTACTS, CHAT_DIRECT, 1, T0 + 300_000, 0, 14, MULTI_CONTACT_TEXT, 0, None, "k11"),
+        ],
+    )
+    conn.executemany(
+        "INSERT INTO message_vcard (_id, message_row_id, vcard) VALUES (?, ?, ?)",
+        [
+            (1, MSG_ALICE_CONTACT, DAVE_VCARD),
+            (2, MSG_ME_CONTACTS, ERIN_VCARD),
+            (3, MSG_ME_CONTACTS, FRANK_VCARD),
+        ],
     )
     conn.commit()
 

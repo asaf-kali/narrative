@@ -8,7 +8,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
-from seed_data import SeededPaths, build_schema, build_wa_schema, seed_msgstore, seed_wa_contacts
+from seed_data import (
+    SeededPaths,
+    build_schema,
+    build_wa_schema,
+    seed_contact_cards,
+    seed_msgstore,
+    seed_wa_contacts,
+)
 
 from narrative import cache
 from narrative.api.server import create_api
@@ -42,6 +49,13 @@ def msgstore_conn() -> Iterator[sqlite3.Connection]:
     seed_msgstore(conn)
     yield conn
     conn.close()
+
+
+@pytest.fixture
+def contacts_msgstore_conn(msgstore_conn: sqlite3.Connection) -> sqlite3.Connection:
+    """`msgstore_conn` plus shared contact-card messages and their vCards."""
+    seed_contact_cards(msgstore_conn)
+    return msgstore_conn
 
 
 @pytest.fixture
@@ -90,9 +104,22 @@ def all_messages_df(data_loader: DataLoader) -> pd.DataFrame:
 
 @pytest.fixture
 def api_client(seeded_db_paths: SeededPaths) -> Iterator[TestClient]:
+    yield from _api_client(paths=seeded_db_paths)
+
+
+@pytest.fixture
+def contacts_api_client(seeded_db_paths: SeededPaths) -> Iterator[TestClient]:
+    """`api_client` over a DB that also holds shared contact-card messages."""
+    conn = sqlite3.connect(seeded_db_paths.msgstore)
+    seed_contact_cards(conn)
+    conn.close()
+    yield from _api_client(paths=seeded_db_paths)
+
+
+def _api_client(paths: SeededPaths) -> Iterator[TestClient]:
     api = create_api(
-        msgstore_path=seeded_db_paths.msgstore,
-        wadb_path=seeded_db_paths.wadb,
+        msgstore_path=paths.msgstore,
+        wadb_path=paths.wadb,
         contacts_path=None,
         local_code=None,
         search_dir=None,

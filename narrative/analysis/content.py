@@ -8,6 +8,7 @@ import pandas as pd
 
 from narrative.analysis.base import analysis
 from narrative.models.config import AnalysisConfig
+from narrative.models.message import CONTACT_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +40,12 @@ _WHATSAPP_SYSTEM_PHRASES: frozenset[str] = frozenset(
 )
 
 
+_CONTACT_TYPE_VALUES: frozenset[int] = frozenset(t.value for t in CONTACT_TYPES)
+
+
 @analysis(name="word_frequencies", label="Word Frequencies", page="content")
 def word_frequencies(df: pd.DataFrame, _config: AnalysisConfig) -> pd.DataFrame:
-    texts = df["text_data"].dropna().astype(str)
+    texts = _message_texts(df)
     if texts.empty:
         return pd.DataFrame(columns=["word", "count"])
 
@@ -60,7 +64,7 @@ def word_frequencies(df: pd.DataFrame, _config: AnalysisConfig) -> pd.DataFrame:
 
 @analysis(name="emoji_counts", label="Emoji Usage", page="content")
 def emoji_counts(df: pd.DataFrame, _config: AnalysisConfig) -> pd.DataFrame:
-    texts = df["text_data"].dropna().astype(str)
+    texts = _message_texts(df)
     if texts.empty:
         return pd.DataFrame(columns=["emoji", "count"])
 
@@ -74,7 +78,7 @@ def emoji_counts(df: pd.DataFrame, _config: AnalysisConfig) -> pd.DataFrame:
 
 
 def build_word_cloud_text(df: pd.DataFrame) -> str:
-    texts = df["text_data"].dropna().astype(str)
+    texts = _message_texts(df)
     words: list[str] = []
     for raw in texts:
         if raw.lower() in _WHATSAPP_SYSTEM_PHRASES:
@@ -82,3 +86,9 @@ def build_word_cloud_text(df: pd.DataFrame) -> str:
         cleaned = _NON_ALPHA.sub(" ", _URL_PATTERN.sub("", raw))
         words.extend(w for w in cleaned.lower().split() if len(w) > 1 and w not in _STOPWORDS)
     return " ".join(words)
+
+
+def _message_texts(df: pd.DataFrame) -> pd.Series:
+    """Non-empty message texts, excluding contact cards (whose text is the shared contact's name)."""
+    authored = df[~df["message_type"].isin(_CONTACT_TYPE_VALUES)]
+    return authored["text_data"].dropna().astype(str)

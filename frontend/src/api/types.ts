@@ -88,6 +88,11 @@ export interface ReplyPreview {
   message_type: number
 }
 
+export interface ContactCard {
+  name: string
+  phones: string[]
+}
+
 export interface FeedMessage {
   message_id?: number
   timestamp: string    // "YYYY-MM-DDTHH:MM:SS"
@@ -99,6 +104,7 @@ export interface FeedMessage {
   message_type: number
   reactions?: MessageReactions | null
   reply_to?: ReplyPreview | null
+  contacts?: ContactCard[] | null   // shared vCards (message_type 4 / 14)
 }
 
 export interface ReactionStat {

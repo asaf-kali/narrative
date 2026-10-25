@@ -1,7 +1,7 @@
 from unittest import mock
 
 from fastapi.testclient import TestClient
-from seed_data import CHAT_DIRECT, CHAT_GROUP, MSG_ME_GROUP
+from seed_data import CHAT_DIRECT, CHAT_GROUP, DAVE_NAME, ERIN_NAME, FRANK_NAME, MSG_ME_CONTACTS, MSG_ME_GROUP
 
 
 def test_overview_returns_totals_and_breakdown(api_client: TestClient) -> None:
@@ -128,3 +128,21 @@ def test_words_wordcloud_generation_failure_returns_empty_string(api_client: Tes
         resp = api_client.get(f"/api/chats/{CHAT_DIRECT}/words")
     assert resp.status_code == 200
     assert resp.json()["wordcloud_png"] == ""
+
+
+def test_chat_messages_endpoint_attaches_contact_cards(contacts_api_client: TestClient) -> None:
+    resp = contacts_api_client.get(f"/api/chats/{CHAT_DIRECT}/messages")
+    multi = next(m for m in resp.json()["messages"] if m["message_id"] == MSG_ME_CONTACTS)
+    assert [c["name"] for c in multi["contacts"]] == [ERIN_NAME, FRANK_NAME]
+
+
+def test_words_excludes_contact_card_names(contacts_api_client: TestClient) -> None:
+    resp = contacts_api_client.get(f"/api/chats/{CHAT_DIRECT}/words")
+    words = {w["word"] for w in resp.json()["frequencies"]}
+    assert not words & set(DAVE_NAME.lower().split())
+
+
+def test_media_breakdown_counts_both_contact_types(contacts_api_client: TestClient) -> None:
+    resp = contacts_api_client.get(f"/api/chats/{CHAT_DIRECT}/media")
+    breakdown = {b["type_label"]: b["count"] for b in resp.json()["breakdown"]}
+    assert breakdown["Contact"] == 2

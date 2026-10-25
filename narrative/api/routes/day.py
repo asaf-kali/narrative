@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from narrative.db.loaders import open_connection
 from narrative.db.queries.day import fetch_day_messages
-from narrative.models.message import MessageType
+from narrative.models.message import message_display_text
 from narrative.models.sender import GROUP_SERVER, SenderRegistry
 
 logger = logging.getLogger(__name__)
@@ -18,18 +18,6 @@ router = APIRouter()
 class _BucketKey:
     bucket: str
     chat_name: str
-
-
-_TYPE_LABELS: dict[int, str] = {
-    MessageType.IMAGE: "[Image]",
-    MessageType.AUDIO: "[Audio]",
-    MessageType.VIDEO: "[Video]",
-    MessageType.CONTACT: "[Contact]",
-    MessageType.LOCATION: "[Location]",
-    MessageType.DOCUMENT: "[Document]",
-    MessageType.STICKER: "[Sticker]",
-    MessageType.GIF: "[GIF]",
-}
 
 
 class DayMessage(BaseModel):
@@ -86,7 +74,7 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
             chat_phone=r.chat_phone or "",
             is_group=is_group,
         )
-        text = _message_text(r.text_data, r.message_type)
+        text = message_display_text(text_data=r.text_data, message_type=r.message_type)
 
         chat_name_set.add(chat_name)
         sender_freq[sender.display_name] = sender_freq.get(sender.display_name, 0) + 1
@@ -120,12 +108,3 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
         timeline=timeline,
         messages=messages,
     )
-
-
-# ── private helpers ───────────────────────────────────────────────────────────
-
-
-def _message_text(text_data: str | None, message_type: int) -> str | None:
-    if text_data:
-        return text_data
-    return _TYPE_LABELS.get(message_type)

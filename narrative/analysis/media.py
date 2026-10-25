@@ -16,6 +16,7 @@ _TYPE_LABELS: dict[int, str] = {
     MessageType.STICKER.value: "Sticker",
     MessageType.GIF.value: "GIF",
     MessageType.CONTACT.value: "Contact",
+    MessageType.MULTI_CONTACT.value: "Contact",
     MessageType.LOCATION.value: "Location",
 }
 

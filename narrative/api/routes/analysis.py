@@ -17,7 +17,7 @@ from narrative.analysis.reactions import emoji_reaction_breakdown, reaction_lead
 from narrative.analysis.replies import reply_leaderboard
 from narrative.analysis.timeline import active_days_count, daily_timeline, hourly_heatmap, monthly_timeline
 from narrative.api.deps import get_df
-from narrative.api.routes.messages import _df_to_message_list, _load_engagement_lookups
+from narrative.api.routes.messages import _df_to_message_list, _load_contact_cards, _load_engagement_lookups
 from narrative.db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
 from narrative.db.queries.messages import fetch_messages_metadata, fetch_messages_page
 from narrative.models.config import AnalysisConfig
@@ -239,13 +239,19 @@ def get_messages(
             limit=limit,
             offset=offset,
         )
+        contact_cards_by_msg = _load_contact_cards(db.msgstore, raw_rows=raw_rows)
 
     if not raw_rows:
         return {"total": 0, "messages": []}
 
     reactions_by_msg, replies_by_msg = _load_engagement_lookups(request, chat_id=chat_id)
     df = build_messages_df(raw_rows, registry)
-    messages = _df_to_message_list(df, reactions_by_msg=reactions_by_msg, replies_by_msg=replies_by_msg)
+    messages = _df_to_message_list(
+        df,
+        reactions_by_msg=reactions_by_msg,
+        replies_by_msg=replies_by_msg,
+        contact_cards_by_msg=contact_cards_by_msg,
+    )
     return {"total": meta.total, "messages": messages}
 
 

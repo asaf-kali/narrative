@@ -1,13 +1,15 @@
 import pandas as pd
+import pytest
 
 from narrative.analysis.content import build_word_cloud_text, emoji_counts, word_frequencies
 from narrative.models.config import AnalysisConfig
+from narrative.models.message import MessageType
 
 _CONFIG = AnalysisConfig()
 
 
-def _df(texts: list[str | None]) -> pd.DataFrame:
-    return pd.DataFrame({"text_data": texts})
+def _df(texts: list[str | None], message_type: int = MessageType.TEXT) -> pd.DataFrame:
+    return pd.DataFrame({"text_data": texts, "message_type": [message_type] * len(texts)})
 
 
 def test_word_frequencies_counts_and_excludes_stopwords() -> None:
@@ -65,3 +67,15 @@ def test_build_word_cloud_text_joins_cleaned_words() -> None:
 
 def test_build_word_cloud_text_empty_when_no_valid_text() -> None:
     assert build_word_cloud_text(_df([None])) == ""
+
+
+@pytest.mark.parametrize("message_type", [MessageType.CONTACT, MessageType.MULTI_CONTACT])
+def test_word_frequencies_excludes_contact_card_names(message_type: MessageType) -> None:
+    df = pd.concat([_df(["pizza night"]), _df(["Dave Grohl \U0001f600"], message_type=message_type)])
+    words = set(word_frequencies(df, _CONFIG)["word"])
+    assert words == {"pizza", "night"}
+
+
+def test_emoji_counts_excludes_contact_card_names() -> None:
+    df = _df(["Dave \U0001f600"], message_type=MessageType.CONTACT)
+    assert emoji_counts(df, _CONFIG).empty
