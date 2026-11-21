@@ -23,6 +23,11 @@ def test_day_detail_invalid_date_returns_400(api_client: TestClient) -> None:
     assert resp.status_code == 400
 
 
+def test_day_detail_impossible_calendar_date_returns_400(api_client: TestClient) -> None:
+    resp = api_client.get("/api/day/2024-13-45")
+    assert resp.status_code == 400
+
+
 def test_day_detail_media_message_uses_type_label(api_client: TestClient) -> None:
     resp = api_client.get(f"/api/day/{local_date(T0)}")
     body = resp.json()
