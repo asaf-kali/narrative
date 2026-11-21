@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { CardSpinner } from '../components/Spinner'
@@ -8,6 +8,7 @@ import SenderFilterCard from '../components/messages/SenderFilterCard'
 import MessagesCard from '../components/messages/MessagesCard'
 import ExportButton from '../components/ExportButton'
 import { useDebounce } from '../hooks/useDebounce'
+import { intParam, stringParam, useUrlState } from '../hooks/useUrlState'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -49,20 +50,23 @@ function ceilToHour(ms: number): string {
   return formatDatetime(d)
 }
 
+// Module-level so the hook sees stable references; the default range is the 30 days before page load.
+// `from`/`to` use the display format "YYYY-MM-DD HH:MM", so other pages can deep-link a range.
+const URL_DEFAULTS = { from: presetDates('30d').from, to: '', q: '', sender: '', offset: 0 }
+const URL_CODECS = { from: stringParam, to: stringParam, q: stringParam, sender: stringParam, offset: intParam }
+
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export default function MessagesPage() {
   const { chatId } = useParams<{ chatId: string }>()
-  const [searchParams] = useSearchParams()
-  // Deep-link support: ?from=&to= (display format "YYYY-MM-DD HH:MM") seed the range once on mount
-  const [dateFrom, setDateFrom] = useState(() => searchParams.get('from') || presetDates('30d').from)
-  const [dateTo, setDateTo] = useState(() => searchParams.get('to') || '')
-  const [searchInput, setSearchInput] = useState('')
-  const [offset, setOffset] = useState(0)
-  // Single-select sender (server-side filter): at most one active at a time
-  const [activeSenders, setActiveSenders] = useState<Set<string>>(new Set())
-
+  // Every filter lives in the URL so a refresh restores the same view; the search box keeps a local draft.
+  const [url, setUrlState] = useUrlState(URL_DEFAULTS, URL_CODECS)
+  const { from: dateFrom, to: dateTo, offset, sender: senderId } = url
+  const [searchInput, setSearchInput] = useState(url.q)
   const searchTerm = useDebounce(searchInput, 300)
+  useEffect(() => {
+    if (searchTerm !== url.q) setUrlState({ q: searchTerm, offset: 0 })
+  }, [searchTerm, url.q, setUrlState])
 
   const fromValid = !dateFrom || DATETIME_RE.test(dateFrom)
   const toValid = !dateTo || DATETIME_RE.test(dateTo)
@@ -84,15 +88,16 @@ export default function MessagesPage() {
     enabled: !!chatId,
   })
 
-  // Map sender name → sender_id for server-side filter param
+  // The URL holds the stable sender_id; the filter card works with names.
   const senderNameToId = useMemo(
     () => new Map(participants.map((p) => [p.sender_name, p.sender_id])),
     [participants],
   )
-
-  const senderId = activeSenders.size > 0
-    ? (senderNameToId.get([...activeSenders][0]) ?? '')
-    : ''
+  // Single-select sender (server-side filter): at most one active at a time
+  const activeSenders = useMemo(() => {
+    const active = participants.find((p) => p.sender_id === senderId)
+    return new Set(active ? [active.sender_name] : [])
+  }, [participants, senderId])
 
   const senderNames = useMemo(() => participants.map((p) => p.sender_name), [participants])
 
@@ -114,28 +119,24 @@ export default function MessagesPage() {
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
   const currentPage = Math.floor(offset / PAGE_SIZE)
 
+  function setOffset(next: number) { setUrlState({ offset: next }) }
+
   function applyPreset(p: Preset) {
     if (p === 'all') {
-      setDateFrom(bounds?.first_ts ? floorToHour(bounds.first_ts) : '')
-      setDateTo(bounds?.last_ts ? ceilToHour(bounds.last_ts) : '')
+      setUrlState({
+        from: bounds?.first_ts ? floorToHour(bounds.first_ts) : '',
+        to: bounds?.last_ts ? ceilToHour(bounds.last_ts) : '',
+        offset: 0,
+      })
     } else {
-      const { from, to } = presetDates(p)
-      setDateFrom(from)
-      setDateTo(to)
+      setUrlState({ ...presetDates(p), offset: 0 })
     }
-    setOffset(0)
   }
-
-  function reset() { setOffset(0) }
 
   // Single-select toggle: clicking an active sender deselects; clicking inactive clears others and selects
   function toggleSender(name: string) {
-    setActiveSenders((prev) => {
-      const next = new Set<string>()
-      if (!prev.has(name)) next.add(name)
-      return next
-    })
-    reset()
+    const next = activeSenders.has(name) ? '' : (senderNameToId.get(name) ?? '')
+    setUrlState({ sender: next, offset: 0 })
   }
 
   const pagination = totalPages > 1 ? (
@@ -173,7 +174,7 @@ export default function MessagesPage() {
               type="text"
               placeholder="Search…"
               value={searchInput}
-              onChange={(e) => { setSearchInput(e.target.value); reset() }}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="bg-app-surface-2 border border-app-border rounded-lg pl-7 pr-7 py-1.5 text-xs text-tx-secondary placeholder-tx-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 w-40"
             />
             {searchInput && (
@@ -190,13 +191,13 @@ export default function MessagesPage() {
           <div className="flex items-center gap-2 text-xs">
             <DatetimeInput
               value={dateFrom}
-              onChange={(v) => { setDateFrom(v); reset() }}
+              onChange={(v) => setUrlState({ from: v, offset: 0 })}
               isInvalid={(!!dateFrom && !fromValid) || rangeInvalid}
             />
             <span className={rangeInvalid ? 'text-red-400' : 'text-tx-muted'}>→</span>
             <DatetimeInput
               value={dateTo}
-              onChange={(v) => { setDateTo(v); reset() }}
+              onChange={(v) => setUrlState({ to: v, offset: 0 })}
               isInvalid={(!!dateTo && !toValid) || rangeInvalid}
             />
             {(rangeInvalid || (dateFrom && !fromValid) || (dateTo && !toValid)) && (
@@ -255,7 +256,7 @@ export default function MessagesPage() {
         senders={senderNames}
         activeSenders={activeSenders}
         onToggle={toggleSender}
-        onClear={() => { setActiveSenders(new Set()); reset() }}
+        onClear={() => setUrlState({ sender: '', offset: 0 })}
         isLoading={isParticipantsLoading}
       />
 
