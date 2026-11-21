@@ -62,6 +62,7 @@ interface GraphLink extends LinkObject {
 type Selection =
   | { type: 'node'; id: string }
   | { type: 'edge'; edge: NetworkEdge }
+  | { type: 'group'; name: string }
   | null
 
 function clusterColor(cluster: number): string {
@@ -164,13 +165,28 @@ export function Toggle({ checked, onChange, label, title }: {
   )
 }
 
-function GroupList({ groups }: { groups: string[] }) {
+function GroupList({ groups, onSelect }: { groups: string[]; onSelect: (group: string) => void }) {
   return (
     <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
       {groups.map((g) => (
-        <div key={g} className="text-[11px] text-tx-secondary bg-app-surface-2 rounded px-2 py-0.5 truncate">{g}</div>
+        <button
+          key={g}
+          onClick={() => onSelect(g)}
+          title="Highlight this group's members"
+          className="block w-full text-left text-[11px] text-tx-secondary bg-app-surface-2 hover:text-tx-primary hover:bg-app-border rounded px-2 py-0.5 truncate transition-colors"
+        >
+          {g}
+        </button>
       ))}
     </div>
+  )
+}
+
+function PersonName({ id, node, onSelect }: { id: string; node: NetworkNode | undefined; onSelect: (id: string) => void }) {
+  return (
+    <button onClick={() => onSelect(id)} className="font-semibold text-tx-primary hover:text-accent hover:underline transition-colors">
+      {node?.label ?? id}
+    </button>
   )
 }
 
@@ -220,8 +236,13 @@ function BreakdownBar({ label, value, max, display }: { label: string; value: nu
   )
 }
 
-function EdgePanel({ edge, nodes, showGroups, onClose }: {
-  edge: NetworkEdge; nodes: Map<string, NetworkNode>; showGroups: boolean; onClose: () => void
+function EdgePanel({ edge, nodes, showGroups, onSelectNode, onSelectGroup, onClose }: {
+  edge: NetworkEdge
+  nodes: Map<string, NetworkNode>
+  showGroups: boolean
+  onSelectNode: (id: string) => void
+  onSelectGroup: (group: string) => void
+  onClose: () => void
 }) {
   const a = nodes.get(edge.source)
   const b = nodes.get(edge.target)
@@ -238,9 +259,9 @@ function EdgePanel({ edge, nodes, showGroups, onClose }: {
     <Card>
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="text-xs leading-snug">
-          <span className="font-semibold text-tx-primary">{a?.label ?? edge.source}</span>
+          <PersonName id={edge.source} node={a} onSelect={onSelectNode} />
           <span className="text-tx-muted"> & </span>
-          <span className="font-semibold text-tx-primary">{b?.label ?? edge.target}</span>
+          <PersonName id={edge.target} node={b} onSelect={onSelectNode} />
         </div>
         <CloseButton onClick={onClose} />
       </div>
@@ -257,18 +278,19 @@ function EdgePanel({ edge, nodes, showGroups, onClose }: {
       {showGroups && common.length > 0 && (
         <div className="mt-3">
           <div className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-2">Common groups</div>
-          <GroupList groups={common} />
+          <GroupList groups={common} onSelect={onSelectGroup} />
         </div>
       )}
     </Card>
   )
 }
 
-function NodePanel({ node, edges, nodes, onSelectEdge, onClose }: {
+function NodePanel({ node, edges, nodes, onSelectEdge, onSelectGroup, onClose }: {
   node: NetworkNode
   edges: NetworkEdge[]
   nodes: Map<string, NetworkNode>
   onSelectEdge: (edge: NetworkEdge) => void
+  onSelectGroup: (group: string) => void
   onClose: () => void
 }) {
   const ties = edges.filter((e) => touches(e, node.id)).sort((x, y) => y.weight - x.weight).slice(0, LIST_SIZE)
@@ -305,9 +327,33 @@ function NodePanel({ node, edges, nodes, onSelectEdge, onClose }: {
           <div className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-2">
             Groups ({node.groups.length})
           </div>
-          <GroupList groups={node.groups} />
+          <GroupList groups={node.groups} onSelect={onSelectGroup} />
         </div>
       )}
+    </Card>
+  )
+}
+
+function GroupPanel({ name, members, onSelectNode, onClose }: {
+  name: string
+  members: NetworkNode[]  // most active first
+  onSelectNode: (id: string) => void
+  onClose: () => void
+}) {
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-tx-primary leading-tight truncate" title={name}>{name}</div>
+          <div className="text-[10px] text-tx-muted mt-0.5">{members.length} people in this network</div>
+        </div>
+        <CloseButton onClick={onClose} />
+      </div>
+      <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
+        {members.map((n) => (
+          <PersonRow key={n.id} node={n} value={n.messages.toLocaleString()} onClick={() => onSelectNode(n.id)} />
+        ))}
+      </div>
     </Card>
   )
 }
@@ -409,19 +455,26 @@ export default function NetworkView({
 
   const selectedId = selection?.type === 'node' ? selection.id : null
   const selectedEdge = selection?.type === 'edge' ? selection.edge : null
+  const selectedGroup = selection?.type === 'group' ? selection.name : null
+  const groupMembers = useMemo(
+    () => (selectedGroup ? (data?.nodes ?? []).filter((n) => n.groups.includes(selectedGroup)).sort((a, b) => b.messages - a.messages) : []),
+    [data, selectedGroup],
+  )
   // Nodes kept at full strength; the rest are dimmed. A person brings everyone they're tied to,
-  // a tie only its two people.
+  // a tie only its two people, a group its members.
   const focusIds = useMemo(() => {
     if (selectedEdge) return new Set([selectedEdge.source, selectedEdge.target])
+    if (selectedGroup) return new Set(groupMembers.map((n) => n.id))
     if (!selectedId) return null
     return new Set([selectedId, ...edges.filter((e) => touches(e, selectedId)).map((e) => other(e, selectedId))])
-  }, [edges, selectedId, selectedEdge])
+  }, [edges, selectedId, selectedEdge, selectedGroup, groupMembers])
 
   const isHighlighted = useCallback((edge: NetworkEdge) => {
     if (selectedId) return touches(edge, selectedId)
     if (selectedEdge) return edge === selectedEdge
+    if (selectedGroup) return focusIds !== null && focusIds.has(edge.source) && focusIds.has(edge.target)
     return false
-  }, [selectedId, selectedEdge])
+  }, [selectedId, selectedEdge, selectedGroup, focusIds])
 
   const linkColor = useCallback((l: LinkObject) => {
     const edge = (l as GraphLink).edge
@@ -435,13 +488,22 @@ export default function NetworkView({
     if (next.length > 0) onSignalsChange(next)
   }
 
+  // Focusing zooms the view, so stop the settle-time auto-fit from undoing it.
   const focusNode = (id: string) => {
+    stopAutoFit()
     setSelection({ type: 'node', id })
     const n = graphData.nodes.find((g) => g.id === id)
     if (n?.x !== undefined && n.y !== undefined) {
       fgRef.current?.centerAt(n.x, n.y, 500)
       fgRef.current?.zoom(2.5, 500)
     }
+  }
+
+  const focusGroup = (name: string) => {
+    stopAutoFit()
+    setSelection({ type: 'group', name })
+    const members = new Set((data?.nodes ?? []).filter((n) => n.groups.includes(name)).map((n) => n.id))
+    if (members.size > 0) fgRef.current?.zoomToFit(500, FIT_PADDING * 2, (n) => members.has((n as GraphNode).id))
   }
 
   const selectedNode = selectedId ? nodeById.get(selectedId) : undefined
@@ -553,7 +615,14 @@ export default function NetworkView({
         </Card>
 
         {selectedEdge && (
-          <EdgePanel edge={selectedEdge} nodes={nodeById} showGroups={showGroups} onClose={() => setSelection(null)} />
+          <EdgePanel
+            edge={selectedEdge}
+            nodes={nodeById}
+            showGroups={showGroups}
+            onSelectNode={focusNode}
+            onSelectGroup={focusGroup}
+            onClose={() => setSelection(null)}
+          />
         )}
         {selectedNode && (
           <NodePanel
@@ -561,8 +630,12 @@ export default function NetworkView({
             edges={edges}
             nodes={nodeById}
             onSelectEdge={(edge) => setSelection({ type: 'edge', edge })}
+            onSelectGroup={focusGroup}
             onClose={() => setSelection(null)}
           />
+        )}
+        {selectedGroup && (
+          <GroupPanel name={selectedGroup} members={groupMembers} onSelectNode={focusNode} onClose={() => setSelection(null)} />
         )}
 
         {!selection && (
