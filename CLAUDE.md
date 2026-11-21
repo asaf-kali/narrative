@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 just lint                 # format + ruff fix + pre-commit
 just run --msgstore data/msgstore.db --wadb data/wa.db   # start backend (serves built frontend)
-just run-dev ...          # start backend with --reload
-just frontend-dev         # start Vite dev server (localhost:5173, proxies /api to :8050)
+just run-dev ...          # backend (--reload, :8051) + Vite (:8050)
+just frontend-dev         # start Vite dev server (:8050, proxies /api to :8051)
 just frontend-build       # build React app into frontend/dist/
 ```
 
@@ -24,14 +24,13 @@ mypy runs via `uv run dmypy run .` (daemon).
 
 **`narrative/analysis/`** — Pure functions `(pd.DataFrame, AnalysisConfig) → pd.DataFrame`. Register with `@analysis(...)` decorator.
 
-**`narrative/api/`** — FastAPI backend. `server.py` creates the app with lifespan (stores db paths in `app.state`). Routes in `routes/chats.py`, `routes/analysis.py`, and `routes/messages.py`. `deps.py` provides `get_df()` with LRU cache. In production, serves the built frontend from `frontend/dist/`. CORS allows `localhost:5173` for development.
+**`narrative/api/`** — FastAPI backend. `server.py` creates the app with lifespan (stores db paths in `app.state`). Routes in `routes/chats.py`, `routes/analysis.py`, and `routes/messages.py`. `deps.py` provides `get_df()` with LRU cache. In production, serves the built frontend from `frontend/dist/`. CORS allows `localhost:8050`. `TracingMiddleware` (`narrative/tracing.py`) logs every `/api` request and sets a `Server-Timing` header; wrap slow steps in `span("name")`. On startup `ensure_indexes()` (`narrative/db/indexes.py`) adds secondary indexes that crypt15 backups strip. Whole-DB aggregates are memoized in `narrative/db/cached.py` (DB is read-only).
 
 **`frontend/`** — React 18 + TypeScript + Vite + Tailwind CSS + Recharts + TanStack Query + React Router v6. API client in `src/api/client.ts`. Top-level pages: Summary (`/`), Messages (`/messages`), Network (`/network`). Chat pages under `/chat/:chatId`: Overview, Timeline, Participants, Content (words/emoji), Media, Messages, Network.
 
 ## Dev workflow
 
-1. `just run-dev --msgstore data/msgstore.db` — backend on :8050
-2. In another terminal: `just frontend-dev` — Vite on :5173 (proxies /api to :8050)
+`just run-dev --msgstore data/msgstore.db` — backend on :8051 (reload) + Vite on :8050 (proxies /api to :8051). The UI is on :8050 in both dev and prod.
 
 For production: `just frontend-build` then `just run --msgstore data/msgstore.db`
 
@@ -40,7 +39,7 @@ For production: `just frontend-build` then `just run --msgstore data/msgstore.db
 The Playwright plugin is available for browser-based UI verification. Use it to screenshot pages and confirm visual correctness after frontend changes.
 
 - Requires `/opt/google/chrome/chrome` — symlinked to the Chromium binary at `~/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome`
-- Dev server must be running on `localhost:5173` before navigating
+- Dev server must be running on port 8050 before navigating (Vite binds the Tailscale IP in `just run-dev`)
 
 ## WhatsApp DB Schema Notes
 

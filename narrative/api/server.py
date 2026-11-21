@@ -71,7 +71,7 @@ def create_api(
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],
+        allow_origins=["http://localhost:8050"],
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )

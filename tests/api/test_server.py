@@ -20,11 +20,11 @@ def test_create_api_cors_allows_dev_frontend_origin(api_client: TestClient) -> N
     resp = api_client.options(
         "/api/chats",
         headers={
-            "Origin": "http://localhost:5173",
+            "Origin": "http://localhost:8050",
             "Access-Control-Request-Method": "GET",
         },
     )
-    assert resp.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:8050"
 
 
 def test_create_api_without_search_dir_has_no_semantic_state(seeded_db_paths: SeededPaths) -> None:
