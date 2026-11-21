@@ -1,11 +1,14 @@
-import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { NetworkSignal } from '../api/types'
 import NetworkView, { ContactsOnlyToggle } from '../components/NetworkView'
+import { boolParam, listParam, useUrlState } from '../hooks/useUrlState'
 
 const CHAT_SIGNALS: NetworkSignal[] = ['replies', 'reactions', 'mentions', 'adjacency']
+
+const URL_DEFAULTS = { signals: CHAT_SIGNALS, contacts: true, backbone: false }
+const URL_CODECS = { signals: listParam(CHAT_SIGNALS), contacts: boolParam, backbone: boolParam }
 
 export default function NetworkPage() {
   const { chatId } = useParams<{ chatId: string }>()
@@ -15,8 +18,7 @@ export default function NetworkPage() {
     enabled: !!chatId,
   })
 
-  const [signals, setSignals] = useState<NetworkSignal[]>(CHAT_SIGNALS)
-  const [contactsOnly, setContactsOnly] = useState(true)
+  const [{ signals, contacts: contactsOnly, backbone }, setUrlState] = useUrlState(URL_DEFAULTS, URL_CODECS)
   const isGroup = chat?.chat_type === 'group'
 
   const { data, isLoading } = useQuery({
@@ -42,8 +44,10 @@ export default function NetworkPage() {
       isLoading={isLoading || !chat}
       availableSignals={CHAT_SIGNALS}
       signals={signals}
-      onSignalsChange={setSignals}
-      controls={<ContactsOnlyToggle checked={contactsOnly} onChange={setContactsOnly} />}
+      onSignalsChange={(next) => setUrlState({ signals: next })}
+      backboneOnly={backbone}
+      onBackboneOnlyChange={(next) => setUrlState({ backbone: next })}
+      controls={<ContactsOnlyToggle checked={contactsOnly} onChange={(next) => setUrlState({ contacts: next })} />}
     />
   )
 }

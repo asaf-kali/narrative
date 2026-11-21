@@ -1,10 +1,11 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { NetworkSignal } from '../api/types'
 import NetworkView, { ContactsOnlyToggle } from '../components/NetworkView'
+import { boolParam, enumParam, intParam, listParam, stringParam, useUrlState } from '../hooks/useUrlState'
 
-type TimeRange = '7d' | '30d' | '90d' | '180d' | '1y' | '2y' | '5y' | 'all' | 'custom'
+const TIME_RANGES = ['7d', '30d', '90d', '180d', '1y', '2y', '5y', 'all', 'custom'] as const
+type TimeRange = (typeof TIME_RANGES)[number]
 
 interface DateSpan {
   from?: string
@@ -33,6 +34,28 @@ function daysAgo(days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+// Module-level so the hook sees stable references; custom dates default to the 90 days before page load.
+const URL_DEFAULTS = {
+  signals: GLOBAL_SIGNALS,
+  contacts: true,
+  me: true,
+  nodes: 150,
+  range: '90d' as TimeRange,
+  from: daysAgo(90),
+  to: daysAgo(0),
+  backbone: false,
+}
+const URL_CODECS = {
+  signals: listParam(GLOBAL_SIGNALS),
+  contacts: boolParam,
+  me: boolParam,
+  nodes: intParam,
+  range: enumParam(TIME_RANGES),
+  from: stringParam,
+  to: stringParam,
+  backbone: boolParam,
+}
+
 function presetSpan(range: TimeRange): DateSpan {
   const days = TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.days
   return days === undefined ? {} : { from: daysAgo(days) }
@@ -44,12 +67,9 @@ function customSpan(custom: DateSpan): DateSpan {
 }
 
 export default function GlobalNetworkPage() {
-  const [signals, setSignals] = useState<NetworkSignal[]>(GLOBAL_SIGNALS)
-  const [contactsOnly, setContactsOnly] = useState(true)
-  const [includeMe, setIncludeMe] = useState(true)
-  const [maxNodes, setMaxNodes] = useState(150)
-  const [timeRange, setTimeRange] = useState<TimeRange>('90d')
-  const [custom, setCustom] = useState<DateSpan>({ from: daysAgo(90), to: daysAgo(0) })
+  const [url, setUrlState] = useUrlState(URL_DEFAULTS, URL_CODECS)
+  const { signals, contacts: contactsOnly, me: includeMe, nodes: maxNodes, range: timeRange, backbone } = url
+  const custom: DateSpan = { from: url.from, to: url.to }
 
   const span = timeRange === 'custom' ? customSpan(custom) : presetSpan(timeRange)
   const { data, isLoading } = useQuery({
@@ -61,7 +81,7 @@ export default function GlobalNetworkPage() {
     <>
       <select
         value={timeRange}
-        onChange={(e) => setTimeRange(e.target.value as TimeRange)}
+        onChange={(e) => setUrlState({ range: e.target.value as TimeRange })}
         className="bg-app-surface-2 border border-app-border rounded-full px-2.5 py-1 text-xs text-tx-secondary"
       >
         {TIME_RANGE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -72,7 +92,7 @@ export default function GlobalNetworkPage() {
             type="date"
             value={custom.from ?? ''}
             max={custom.to}
-            onChange={(e) => setCustom({ ...custom, from: e.target.value })}
+            onChange={(e) => setUrlState({ from: e.target.value })}
             className={DATE_INPUT_CLASS}
             aria-label="From date"
           />
@@ -81,7 +101,7 @@ export default function GlobalNetworkPage() {
             type="date"
             value={custom.to ?? ''}
             min={custom.from}
-            onChange={(e) => setCustom({ ...custom, to: e.target.value })}
+            onChange={(e) => setUrlState({ to: e.target.value })}
             className={DATE_INPUT_CLASS}
             aria-label="To date"
           />
@@ -89,15 +109,15 @@ export default function GlobalNetworkPage() {
       )}
       <select
         value={maxNodes}
-        onChange={(e) => setMaxNodes(Number(e.target.value))}
+        onChange={(e) => setUrlState({ nodes: Number(e.target.value) })}
         title="Keep the people with the strongest ties"
         className="bg-app-surface-2 border border-app-border rounded-full px-2.5 py-1 text-xs text-tx-secondary"
       >
         {NODE_LIMITS.map((n) => <option key={n} value={n}>Top {n} people</option>)}
       </select>
-      <ContactsOnlyToggle checked={contactsOnly} onChange={setContactsOnly} />
+      <ContactsOnlyToggle checked={contactsOnly} onChange={(next) => setUrlState({ contacts: next })} />
       <label className="flex items-center gap-1.5 cursor-pointer select-none">
-        <input type="checkbox" checked={includeMe} onChange={(e) => setIncludeMe(e.target.checked)} className="w-3 h-3 accent-accent" />
+        <input type="checkbox" checked={includeMe} onChange={(e) => setUrlState({ me: e.target.checked })} className="w-3 h-3 accent-accent" />
         <span className="text-xs text-tx-secondary">Include me</span>
       </label>
     </>
@@ -109,7 +129,9 @@ export default function GlobalNetworkPage() {
       isLoading={isLoading}
       availableSignals={GLOBAL_SIGNALS}
       signals={signals}
-      onSignalsChange={setSignals}
+      onSignalsChange={(next) => setUrlState({ signals: next })}
+      backboneOnly={backbone}
+      onBackboneOnlyChange={(next) => setUrlState({ backbone: next })}
       controls={controls}
       showGroups
     />

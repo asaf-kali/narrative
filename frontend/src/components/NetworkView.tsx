@@ -262,14 +262,16 @@ export interface NetworkViewProps {
   availableSignals: NetworkSignal[]
   signals: NetworkSignal[]
   onSignalsChange: (signals: NetworkSignal[]) => void
+  backboneOnly: boolean
+  onBackboneOnlyChange: (backboneOnly: boolean) => void
   controls?: ReactNode
   showGroups?: boolean
 }
 
 export default function NetworkView({
-  data, isLoading, availableSignals, signals, onSignalsChange, controls, showGroups = false,
+  data, isLoading, availableSignals, signals, onSignalsChange, backboneOnly, onBackboneOnlyChange, controls,
+  showGroups = false,
 }: NetworkViewProps) {
-  const [backboneOnly, setBackboneOnly] = useState(false)
   const [selection, setSelection] = useState<Selection>(null)
 
   // New data (signals, filters) invalidates the selection and re-fits the view once the layout settles.
@@ -375,7 +377,7 @@ export default function NetworkView({
             <input
               type="checkbox"
               checked={backboneOnly}
-              onChange={(e) => setBackboneOnly(e.target.checked)}
+              onChange={(e) => onBackboneOnlyChange(e.target.checked)}
               className="w-3 h-3 accent-accent"
             />
             <span className="text-xs text-tx-secondary">Strongest ties only</span>
