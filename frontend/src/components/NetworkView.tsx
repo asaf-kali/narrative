@@ -11,6 +11,10 @@ const CLUSTER_COLORS = [
   '#c084fc', '#34d399', '#f472b6', '#60a5fa',
 ]
 
+// "Me" stands apart from every community color.
+const ME_ID = 'me'
+const ME_COLOR = '#f8fafc'
+
 export const SIGNAL_INFO: Record<NetworkSignal, { label: string; hint: string }> = {
   replies: { label: 'Replies', hint: 'Quoting each other\'s messages' },
   reactions: { label: 'Reactions', hint: 'Reacting to each other\'s messages' },
@@ -45,8 +49,9 @@ type Selection =
   | { type: 'edge'; edge: NetworkEdge }
   | null
 
-function clusterColor(cluster: number): string {
-  return CLUSTER_COLORS[cluster % CLUSTER_COLORS.length]
+function personColor(node: NetworkNode): string {
+  if (node.id === ME_ID) return ME_COLOR
+  return CLUSTER_COLORS[node.cluster % CLUSTER_COLORS.length]
 }
 
 function touches(edge: NetworkEdge, id: string): boolean {
@@ -114,7 +119,7 @@ function GroupList({ groups }: { groups: string[] }) {
 }
 
 function PersonDot({ node }: { node: NetworkNode | undefined }) {
-  return <div className="w-2 h-2 rounded-full shrink-0" style={{ background: node ? clusterColor(node.cluster) : '#64748b' }} />
+  return <div className="w-2 h-2 rounded-full shrink-0" style={{ background: node ? personColor(node) : '#64748b' }} />
 }
 
 function PairRow({ edge, nodes, value, onClick }: {
@@ -404,7 +409,7 @@ export default function NetworkView({
               nodeColor={(n) => {
                 const node = n as GraphNode
                 const dim = focusIds !== null && !focusIds.has(node.id)
-                return dim ? 'rgba(100,116,139,0.35)' : clusterColor(node.cluster)
+                return dim ? 'rgba(100,116,139,0.35)' : personColor(node)
               }}
               nodeVal={(n) => nodeVal((n as GraphNode).messages, maxMessages)}
               linkColor={linkColor}
@@ -424,7 +429,7 @@ export default function NetworkView({
               nodeCanvasObjectMode={() => 'after'}
               nodeCanvasObject={(node, ctx, globalScale) => {
                 const n = node as GraphNode
-                if (globalScale < 1.5 && n.id !== selectedId) return
+                if (globalScale < 1.5 && n.id !== selectedId && n.id !== ME_ID) return
                 const radius = Math.sqrt(nodeVal(n.messages, maxMessages)) * 4  // force-graph's default nodeRelSize
                 const fontSize = 10 / globalScale
                 ctx.font = `${fontSize}px sans-serif`
