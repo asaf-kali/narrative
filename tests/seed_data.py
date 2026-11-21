@@ -2,7 +2,7 @@
 
 Builds a minimal but representative slice of a real msgstore.db / wa.db: one
 direct chat, one group (with an LID-mapped sender), one broadcast, reactions,
-a reply, a call, and a system message. Every test module that needs concrete
+a reply, a mention, a call, and a system message. Every test module that needs concrete
 IDs/values imports the constants below instead of re-deriving them.
 """
 
@@ -78,6 +78,14 @@ CREATE TABLE message_quoted (
     sender_jid_row_id INTEGER,
     parent_message_chat_row_id INTEGER,
     timestamp INTEGER
+);
+
+CREATE TABLE message_mentions (
+    _id INTEGER PRIMARY KEY,
+    message_row_id INTEGER,
+    jid_row_id INTEGER,
+    display_name TEXT,
+    mention_type INTEGER
 );
 
 CREATE TABLE message_vcard (
@@ -275,6 +283,11 @@ def seed_msgstore(conn: sqlite3.Connection) -> None:
         "(message_row_id, key_id, chat_row_id, from_me, message_type, text_data, sender_jid_row_id, "
         "parent_message_chat_row_id, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (MSG_ME_GROUP, "k5", CHAT_GROUP, 0, 0, "group hello from bob", JID_BOB_LID, CHAT_GROUP, T0 + 30_000),
+    )
+    # Carol @mentions Bob through his LID jid.
+    conn.execute(
+        "INSERT INTO message_mentions (message_row_id, jid_row_id, display_name, mention_type) VALUES (?, ?, ?, ?)",
+        (MSG_CAROL_GROUP_HELLO, JID_BOB_LID, None, 0),
     )
     conn.execute(
         "INSERT INTO call_log (_id, timestamp, call_result, duration, video_call, from_me, jid_row_id) "

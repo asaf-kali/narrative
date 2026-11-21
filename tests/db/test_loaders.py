@@ -6,11 +6,13 @@ import pandas as pd
 from seed_data import (
     ALICE_NAME,
     BOB_NAME,
+    BOB_PHONE,
     CAROL_NAME,
     CHAT_DIRECT,
     CHAT_GROUP,
     GROUP_SUBJECT,
     MSG_BOB_GROUP_HELLO,
+    MSG_CAROL_GROUP_HELLO,
     MSG_ME_GROUP,
 )
 
@@ -122,6 +124,24 @@ def test_load_replies_resolves_quoted_sender(data_loader: DataLoader) -> None:
     assert len(df) == 1
     assert df.iloc[0]["quoted_sender_name"] == BOB_NAME
     assert df.iloc[0]["quoted_message_id"] == MSG_BOB_GROUP_HELLO
+    assert df.iloc[0]["quoted_id"] == BOB_PHONE
+
+
+def test_load_reactions_resolves_reactor_ids(data_loader: DataLoader) -> None:
+    df = data_loader.load_reactions(chat_id=CHAT_GROUP)
+    assert set(df["reactor_id"]) == {"me", BOB_PHONE}
+
+
+def test_load_mentions_resolves_mentioned_id(data_loader: DataLoader) -> None:
+    df = data_loader.load_mentions(chat_id=CHAT_GROUP)
+    assert df["message_id"].tolist() == [MSG_CAROL_GROUP_HELLO]
+    assert df["mentioned_id"].tolist() == [BOB_PHONE]
+
+
+def test_load_mentions_empty_when_no_chat_matches(data_loader: DataLoader) -> None:
+    df = data_loader.load_mentions(chat_id=999)
+    assert df.empty
+    assert "mentioned_id" in df.columns
 
 
 def test_load_calls_normalizes_timestamp(data_loader: DataLoader) -> None:

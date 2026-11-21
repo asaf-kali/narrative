@@ -110,6 +110,12 @@ class RawReplyRow(_RowBase):
     timestamp: int
 
 
+class RawMentionRow(_RowBase):
+    message_id: int
+    chat_row_id: int
+    mentioned_phone: str
+
+
 class RawCallRow(_RowBase):
     call_id: int
     timestamp: int
