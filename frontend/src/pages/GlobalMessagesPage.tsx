@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useCallback, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { api, SemanticUnavailableError } from '../api/client'
-import type { MessagesMetadata } from '../api/types'
+import type { Chat, MessagesMetadata, SenderInfo } from '../api/types'
 import { CardSpinner } from '../components/Spinner'
 import DatetimeInput, { DATETIME_RE, formatDatetime, toApiDatetime } from '../components/DatetimeInput'
-import SearchableChipFilter from '../components/messages/SearchableChipFilter'
+import SearchableChipFilter, { type ChipItem } from '../components/messages/SearchableChipFilter'
 import MessagesCard from '../components/messages/MessagesCard'
 import ExportButton from '../components/ExportButton'
 import { useDebounce } from '../hooks/useDebounce'
@@ -34,6 +34,14 @@ function presetDates(preset: Exclude<Preset, 'all'>): { from: string; to: string
   from.setDate(from.getDate() - days)
   from.setHours(0, 0, 0, 0)
   return { from: formatDatetime(from), to: '' }
+}
+
+function chatChip(c: Chat): ChipItem {
+  return { id: String(c.chat_id), label: c.display_name, searchText: c.display_name }
+}
+
+function senderChip(s: SenderInfo): ChipItem {
+  return { id: s.sender_id, label: s.sender_name, searchText: `${s.sender_name} ${s.phone}` }
 }
 
 function floorToHour(ms: number): string {
@@ -166,38 +174,30 @@ export default function GlobalMessagesPage() {
     enabled: !!metadata,
   })
 
-  // Step 2b: all chats — fires after metadata resolves
-  const { data: chats = [], isLoading: isChatsLoading } = useQuery({
-    queryKey: ['chats'],
-    queryFn: () => api.chats(),
+  // Step 2b: chat / sender filter options for the date range (top 100 each, busiest first)
+  const { data: chatOptions, isLoading: isChatsLoading } = useQuery({
+    queryKey: ['chat-options', apiDateFrom, apiDateTo],
+    queryFn: () => api.chatOptions(apiDateFrom, apiDateTo),
     enabled: !!metadata,
   })
-
-  // Step 2c: sender names — batched at 100 IDs per request to avoid 431 errors
-  const availableSenderIds = useMemo(
-    () => metadata?.available_sender_ids ?? [],
-    [metadata],
-  )
-  const senderIdBatches = useMemo(() => {
-    const batches: string[][] = []
-    for (let i = 0; i < availableSenderIds.length; i += 100) {
-      batches.push(availableSenderIds.slice(i, i + 100))
-    }
-    return batches
-  }, [availableSenderIds])
-
-  const senderBatchResults = useQueries({
-    queries: senderIdBatches.map((batch) => ({
-      queryKey: ['senders', batch],
-      queryFn: () => api.senders(batch),
-      enabled: batch.length > 0,
-    })),
+  const { data: senderOptions, isLoading: isSendersLoading } = useQuery({
+    queryKey: ['sender-options', apiDateFrom, apiDateTo],
+    queryFn: () => api.senderOptions(apiDateFrom, apiDateTo),
+    enabled: !!metadata,
   })
-  const isSendersLoading = senderBatchResults.some((r) => r.isLoading)
-  const senders = useMemo(
-    () => senderBatchResults.flatMap((r) => r.data ?? []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [senderBatchResults.map((r) => r.dataUpdatedAt).join(',')],
+  const searchChats = useCallback(
+    async (q: string) => {
+      const res = await api.chatOptions(apiDateFrom, apiDateTo, q)
+      return { total: res.total, items: res.items.map(chatChip) }
+    },
+    [apiDateFrom, apiDateTo],
+  )
+  const searchSenders = useCallback(
+    async (q: string) => {
+      const res = await api.senderOptions(apiDateFrom, apiDateTo, q)
+      return { total: res.total, items: res.items.map(senderChip) }
+    },
+    [apiDateFrom, apiDateTo],
   )
 
   // semantic query
@@ -214,24 +214,8 @@ export default function GlobalMessagesPage() {
 
   const isUnavailable = semanticError instanceof SemanticUnavailableError
 
-  const availableChatIds = useMemo(
-    () => metadata?.available_chat_ids ? new Set(metadata.available_chat_ids) : null,
-    [metadata],
-  )
-
-  const chatItems = useMemo(
-    () =>
-      chats
-        .filter((c) => !availableChatIds || availableChatIds.has(c.chat_id))
-        .sort((a, b) => b.message_count - a.message_count)
-        .map((c) => ({ id: String(c.chat_id), label: c.display_name, searchText: c.display_name })),
-    [chats, availableChatIds],
-  )
-
-  const senderItems = useMemo(
-    () => senders.map((s) => ({ id: s.sender_id, label: s.sender_name, searchText: `${s.sender_name} ${s.phone}` })),
-    [senders],
-  )
+  const chatItems = useMemo(() => chatOptions?.items.map(chatChip) ?? [], [chatOptions])
+  const senderItems = useMemo(() => senderOptions?.items.map(senderChip) ?? [], [senderOptions])
 
   const total = metadata?.total ?? 0
   const totalPages = Math.ceil(total / PAGE_SIZE)
@@ -401,8 +385,11 @@ export default function GlobalMessagesPage() {
           <div className="flex gap-4 items-start">
             <div className="flex-1 min-w-0">
               <SearchableChipFilter
-                title={`Chats (${isChatsLoading || isMetaLoading ? '…' : chatItems.length})`}
+                title="Chats"
                 items={chatItems}
+                total={chatOptions?.total}
+                remoteSearch={searchChats}
+                remoteKey={['chats', apiDateFrom, apiDateTo]}
                 activeIds={activeChatIds}
                 onToggle={toggleChat}
                 onClear={() => { setActiveChats(new Set()); reset() }}
@@ -411,8 +398,11 @@ export default function GlobalMessagesPage() {
             </div>
             <div className="flex-1 min-w-0">
               <SearchableChipFilter
-                title={`Senders (${isSendersLoading || isMetaLoading ? '…' : senderItems.length})`}
+                title="Senders"
                 items={senderItems}
+                total={senderOptions?.total}
+                remoteSearch={searchSenders}
+                remoteKey={['senders', apiDateFrom, apiDateTo]}
                 activeIds={activeSenders}
                 onToggle={toggleSender}
                 onClear={() => { setActiveSenders(new Set()); reset() }}

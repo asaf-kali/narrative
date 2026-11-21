@@ -80,8 +80,11 @@ function ChatHeader({ chat }: { chat: Chat }) {
 
 export default function ChatLayout() {
   const { chatId } = useParams<{ chatId: string }>()
-  const { data: chats = [] } = useQuery({ queryKey: ['chats'], queryFn: () => api.chats() })
-  const chat = chats.find((c) => c.chat_id === Number(chatId))
+  const { data: chat } = useQuery({
+    queryKey: ['chat', chatId],
+    queryFn: () => api.chat(Number(chatId)),
+    enabled: !!chatId,
+  })
 
   return (
     <div className="flex flex-col h-full">

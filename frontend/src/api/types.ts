@@ -1,8 +1,12 @@
+/** Chat list order, always descending: last message time, total messages, or messages I sent. */
+export type ChatSort = 'last' | 'messages' | 'mine'
+
 export interface Chat {
   chat_id: number
   display_name: string
   chat_type: 'direct' | 'group' | 'broadcast'
   message_count: number
+  my_message_count: number
   date_first: string | null
   date_last: string | null
   phone: string | null
@@ -174,8 +178,12 @@ export interface GlobalMessagesResponse {
 
 export interface MessagesMetadata {
   total: number
-  available_chat_ids: number[]
-  available_sender_ids: string[]
+}
+
+/** Filter options active in a date range: `items` is capped server-side, `total` counts every match. */
+export interface FilterOptions<T> {
+  total: number
+  items: T[]
 }
 
 export interface MessageBounds {

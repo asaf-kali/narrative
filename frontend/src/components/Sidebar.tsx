@@ -1,24 +1,63 @@
 import { useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import logo from '../assets/logo.png'
 import { api } from '../api/client'
+import type { Chat, ChatSort } from '../api/types'
 import { useDebounce } from '../hooks/useDebounce'
 
 const TYPE_ICONS: Record<string, string> = { group: '⬡', direct: '◎', broadcast: '◈' }
 
+const LIST_LIMIT = 100
+const SORT_STORAGE_KEY = 'sidebar-chat-sort'
+
+const SORTS: { value: ChatSort; label: string }[] = [
+  { value: 'last', label: 'Last message' },
+  { value: 'messages', label: 'Total messages' },
+  { value: 'mine', label: 'My messages' },
+]
+
+function loadSort(): ChatSort {
+  try {
+    const stored = localStorage.getItem(SORT_STORAGE_KEY)
+    return SORTS.some((s) => s.value === stored) ? (stored as ChatSort) : 'last'
+  } catch {
+    return 'last'
+  }
+}
+
+function saveSort(sort: ChatSort) {
+  try {
+    localStorage.setItem(SORT_STORAGE_KEY, sort)
+  } catch {
+    // storage unavailable (private window etc.) — the choice just won't persist
+  }
+}
+
+function formatCount(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
+}
+
 export default function Sidebar() {
   const [search, setSearch] = useState('')
-  const [hideEmpty, setHideEmpty] = useState(true)
+  const [sort, setSort] = useState<ChatSort>(loadSort)
   const debouncedSearch = useDebounce(search, 300)
 
-  const { data: chats = [], isLoading } = useQuery({
-    queryKey: ['chats', debouncedSearch],
-    queryFn: () => api.chats(debouncedSearch || undefined),
+  // One extra row tells us whether there are more than LIST_LIMIT chats.
+  const { data = [], isLoading, isFetching } = useQuery({
+    queryKey: ['chats', debouncedSearch, sort],
+    queryFn: () => api.chats({ search: debouncedSearch || undefined, sort, hideEmpty: true, limit: LIST_LIMIT + 1 }),
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   })
+  const hasMore = data.length > LIST_LIMIT
+  const chats = data.slice(0, LIST_LIMIT)
+  const countOf = (chat: Chat) => (sort === 'mine' ? chat.my_message_count : chat.message_count)
 
-  const filtered = hideEmpty ? chats.filter((c) => c.message_count > 0) : chats
+  function changeSort(next: ChatSort) {
+    setSort(next)
+    saveSort(next)
+  }
 
   return (
     <aside className="w-64 bg-app-sidebar border-r border-app-border flex flex-col flex-shrink-0 h-full">
@@ -42,20 +81,25 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Chat count label + hide-empty toggle */}
-      <div className="px-5 pt-3 pb-1 flex items-center justify-between">
-        <span className="text-[10px] font-semibold text-app-muted uppercase tracking-widest">
-          {filtered.length} chats
+      {/* Sort order */}
+      <label className="px-5 pt-3 flex items-center gap-2">
+        <span className="text-[10px] text-app-muted flex-shrink-0">Sort by</span>
+        <select
+          value={sort}
+          onChange={(e) => changeSort(e.target.value as ChatSort)}
+          className="flex-1 min-w-0 bg-app-surface border border-app-border rounded-md px-2 py-1 text-[11px] text-tx-secondary focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 cursor-pointer"
+        >
+          {SORTS.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </label>
+
+      {/* Chat count label (empty chats are always hidden) */}
+      <div className="px-5 pt-2 pb-1">
+        <span className={`text-[10px] font-semibold text-app-muted uppercase tracking-widest transition-opacity ${isFetching ? 'opacity-50' : ''}`}>
+          {hasMore ? `${LIST_LIMIT}+` : chats.length} chats
         </span>
-        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={hideEmpty}
-            onChange={(e) => setHideEmpty(e.target.checked)}
-            className="w-3 h-3 accent-accent"
-          />
-          <span className="text-[10px] text-app-muted">Hide empty</span>
-        </label>
       </div>
 
       {/* Chat list */}
@@ -67,7 +111,7 @@ export default function Sidebar() {
             ))}
           </div>
         )}
-        {filtered.map((chat) => (
+        {chats.map((chat) => (
           <NavLink
             key={chat.chat_id}
             to={`/chat/${chat.chat_id}`}
@@ -81,8 +125,11 @@ export default function Sidebar() {
           >
             <span className="text-[10px] opacity-50 w-3 flex-shrink-0">{TYPE_ICONS[chat.chat_type] ?? '○'}</span>
             <span className="truncate font-medium">{chat.display_name}</span>
-            <span className="ml-auto text-[10px] opacity-40 flex-shrink-0 tabular-nums">
-              {chat.message_count >= 1000 ? `${(chat.message_count / 1000).toFixed(1)}k` : chat.message_count}
+            <span
+              className="ml-auto text-[10px] opacity-40 flex-shrink-0 tabular-nums"
+              title={sort === 'mine' ? 'Messages sent by me' : 'Messages'}
+            >
+              {formatCount(countOf(chat))}
             </span>
           </NavLink>
         ))}
