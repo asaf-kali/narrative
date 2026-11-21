@@ -4,7 +4,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from narrative.models.sender import SenderRegistry
+from narrative.models.sender import PROFILE_NAME_PREFIX, SenderRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +13,6 @@ _MIN_PHONE_DIGITS = 7
 _MAX_PHONE_DIGITS = 15
 # Google Contacts joins multiple values of one field (e.g. two phone numbers) with " ::: ".
 _MULTI_VALUE_SEP = ":::"
-# WhatsApp marks names that come from the sender's own profile (not your address book) with "~".
-_PROFILE_NAME_PREFIX = "~"
 
 
 def build_sender_registry(
@@ -163,7 +161,7 @@ def _load_profile_names(msgstore: sqlite3.Connection) -> dict[str, str]:
     except sqlite3.OperationalError:
         logger.debug("lid_display_name not available — skipping WhatsApp profile names.")
         return {}
-    names = {row["user"]: _PROFILE_NAME_PREFIX + row["display_name"].strip() for row in rows}
+    names = {row["user"]: PROFILE_NAME_PREFIX + row["display_name"].strip() for row in rows}
     logger.info(f"Loaded {len(names)} WhatsApp profile names")
     return names
 

@@ -39,9 +39,10 @@ function optionParams(dateFrom?: string, dateTo?: string, q?: string): URLSearch
   return params
 }
 
-function networkParams(signals: NetworkSignal[]): URLSearchParams {
+function networkParams(signals: NetworkSignal[], contactsOnly: boolean): URLSearchParams {
   const params = new URLSearchParams()
   signals.forEach((s) => params.append('signals', s))
+  params.set('contacts_only', String(contactsOnly))
   return params
 }
 
@@ -157,10 +158,16 @@ export const api = {
     const params = new URLSearchParams({ date_from: from, date_to: to })
     return get(`/api/range?${params}`)
   },
-  network: (chatId: number, signals: NetworkSignal[]): Promise<NetworkGraph> =>
-    get(`/api/chats/${chatId}/network?${networkParams(signals)}`),
-  globalNetwork: (signals: NetworkSignal[], includeMe: boolean, maxNodes: number, dateFrom?: string): Promise<NetworkGraph> => {
-    const params = networkParams(signals)
+  network: (chatId: number, signals: NetworkSignal[], contactsOnly: boolean): Promise<NetworkGraph> =>
+    get(`/api/chats/${chatId}/network?${networkParams(signals, contactsOnly)}`),
+  globalNetwork: (
+    signals: NetworkSignal[],
+    contactsOnly: boolean,
+    includeMe: boolean,
+    maxNodes: number,
+    dateFrom?: string,
+  ): Promise<NetworkGraph> => {
+    const params = networkParams(signals, contactsOnly)
     params.set('include_me', String(includeMe))
     params.set('max_nodes', String(maxNodes))
     if (dateFrom) params.set('date_from', dateFrom)

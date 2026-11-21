@@ -495,3 +495,12 @@ export default function NetworkView({
     </div>
   )
 }
+
+export function ContactsOnlyToggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Hide people who aren't saved in your contacts">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-3 h-3 accent-accent" />
+      <span className="text-xs text-tx-secondary">Contacts only</span>
+    </label>
+  )
+}
