@@ -319,6 +319,7 @@ def get_global_network(
     include_me: bool = True,
     contacts_only: bool = True,
     max_nodes: Annotated[int, Query(ge=2, le=_MAX_NETWORK_NODES)] = _DEFAULT_NETWORK_NODES,
+    clusters: Annotated[int | None, Query(ge=1, le=_MAX_NETWORK_NODES)] = None,
     exclude_system: bool = True,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -327,7 +328,9 @@ def get_global_network(
     df = get_df(request, config)
     frames = cached.interactions(msgstore_path=request.app.state.msgstore_path, chat_id=None)
     allowed_ids = _allowed_ids(request=request, contacts_only=contacts_only)
-    options = _network_options(signals=signals, include_me=include_me, max_nodes=max_nodes, allowed_ids=allowed_ids)
+    options = _network_options(
+        signals=signals, include_me=include_me, max_nodes=max_nodes, clusters=clusters, allowed_ids=allowed_ids
+    )
     with span("analysis.network"):
         return build_global_network(df=df, interactions=frames, options=options)
 
@@ -339,6 +342,7 @@ def get_network(
     signals: Annotated[list[Signal] | None, Query()] = None,
     contacts_only: bool = True,
     max_nodes: Annotated[int, Query(ge=2, le=_MAX_NETWORK_NODES)] = _DEFAULT_NETWORK_NODES,
+    clusters: Annotated[int | None, Query(ge=1, le=_MAX_NETWORK_NODES)] = None,
     exclude_system: bool = True,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -347,16 +351,24 @@ def get_network(
     df = get_df(request, config)
     frames = cached.interactions(msgstore_path=request.app.state.msgstore_path, chat_id=chat_id)
     allowed_ids = _allowed_ids(request=request, contacts_only=contacts_only)
-    options = _network_options(signals=signals, include_me=True, max_nodes=max_nodes, allowed_ids=allowed_ids)
+    options = _network_options(
+        signals=signals, include_me=True, max_nodes=max_nodes, clusters=clusters, allowed_ids=allowed_ids
+    )
     with span("analysis.network"):
         return build_chat_network(df=df, interactions=frames, options=options)
 
 
 def _network_options(
-    signals: list[Signal] | None, include_me: bool, max_nodes: int, allowed_ids: frozenset[str] | None
+    signals: list[Signal] | None,
+    include_me: bool,
+    max_nodes: int,
+    clusters: int | None,
+    allowed_ids: frozenset[str] | None,
 ) -> NetworkOptions:
     selected = frozenset(signals) if signals else frozenset(Signal)
-    return NetworkOptions(signals=selected, include_me=include_me, max_nodes=max_nodes, allowed_ids=allowed_ids)
+    return NetworkOptions(
+        signals=selected, include_me=include_me, max_nodes=max_nodes, clusters=clusters, allowed_ids=allowed_ids
+    )
 
 
 def _allowed_ids(request: Request, contacts_only: bool) -> frozenset[str] | None:

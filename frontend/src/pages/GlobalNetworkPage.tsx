@@ -44,6 +44,7 @@ const URL_DEFAULTS = {
   from: daysAgo(90),
   to: daysAgo(0),
   backbone: false,
+  clusters: 0,  // 0 = let the backend pick
 }
 const URL_CODECS = {
   signals: listParam(GLOBAL_SIGNALS),
@@ -54,6 +55,7 @@ const URL_CODECS = {
   from: stringParam,
   to: stringParam,
   backbone: boolParam,
+  clusters: intParam,
 }
 
 function presetSpan(range: TimeRange): DateSpan {
@@ -68,13 +70,13 @@ function customSpan(custom: DateSpan): DateSpan {
 
 export default function GlobalNetworkPage() {
   const [url, setUrlState] = useUrlState(URL_DEFAULTS, URL_CODECS)
-  const { signals, contacts: contactsOnly, me: includeMe, nodes: maxNodes, range: timeRange, backbone } = url
+  const { signals, contacts: contactsOnly, me: includeMe, nodes: maxNodes, range: timeRange, backbone, clusters } = url
   const custom: DateSpan = { from: url.from, to: url.to }
 
   const span = timeRange === 'custom' ? customSpan(custom) : presetSpan(timeRange)
   const { data, isLoading } = useQuery({
-    queryKey: ['global-network', [...signals].sort(), contactsOnly, includeMe, maxNodes, span.from, span.to],
-    queryFn: () => api.globalNetwork(signals, contactsOnly, includeMe, maxNodes, span.from, span.to),
+    queryKey: ['global-network', [...signals].sort(), contactsOnly, clusters, includeMe, maxNodes, span.from, span.to],
+    queryFn: () => api.globalNetwork(signals, contactsOnly, clusters, includeMe, maxNodes, span.from, span.to),
   })
 
   const controls = (
@@ -132,6 +134,8 @@ export default function GlobalNetworkPage() {
       onSignalsChange={(next) => setUrlState({ signals: next })}
       backboneOnly={backbone}
       onBackboneOnlyChange={(next) => setUrlState({ backbone: next })}
+      clusters={clusters}
+      onClustersChange={(next) => setUrlState({ clusters: next })}
       controls={controls}
       showGroups
     />

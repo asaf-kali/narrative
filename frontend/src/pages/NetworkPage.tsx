@@ -3,12 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { NetworkSignal } from '../api/types'
 import NetworkView, { ContactsOnlyToggle } from '../components/NetworkView'
-import { boolParam, listParam, useUrlState } from '../hooks/useUrlState'
+import { boolParam, intParam, listParam, useUrlState } from '../hooks/useUrlState'
 
 const CHAT_SIGNALS: NetworkSignal[] = ['replies', 'reactions', 'mentions', 'adjacency']
 
-const URL_DEFAULTS = { signals: CHAT_SIGNALS, contacts: true, backbone: false }
-const URL_CODECS = { signals: listParam(CHAT_SIGNALS), contacts: boolParam, backbone: boolParam }
+// clusters 0 = let the backend pick
+const URL_DEFAULTS = { signals: CHAT_SIGNALS, contacts: true, backbone: false, clusters: 0 }
+const URL_CODECS = { signals: listParam(CHAT_SIGNALS), contacts: boolParam, backbone: boolParam, clusters: intParam }
 
 export default function NetworkPage() {
   const { chatId } = useParams<{ chatId: string }>()
@@ -18,12 +19,12 @@ export default function NetworkPage() {
     enabled: !!chatId,
   })
 
-  const [{ signals, contacts: contactsOnly, backbone }, setUrlState] = useUrlState(URL_DEFAULTS, URL_CODECS)
+  const [{ signals, contacts: contactsOnly, backbone, clusters }, setUrlState] = useUrlState(URL_DEFAULTS, URL_CODECS)
   const isGroup = chat?.chat_type === 'group'
 
   const { data, isLoading } = useQuery({
-    queryKey: ['network', chatId, [...signals].sort(), contactsOnly],
-    queryFn: () => api.network(Number(chatId), signals, contactsOnly),
+    queryKey: ['network', chatId, [...signals].sort(), contactsOnly, clusters],
+    queryFn: () => api.network(Number(chatId), signals, contactsOnly, clusters),
     enabled: !!chatId && isGroup,
   })
 
@@ -47,6 +48,8 @@ export default function NetworkPage() {
       onSignalsChange={(next) => setUrlState({ signals: next })}
       backboneOnly={backbone}
       onBackboneOnlyChange={(next) => setUrlState({ backbone: next })}
+      clusters={clusters}
+      onClustersChange={(next) => setUrlState({ clusters: next })}
       controls={<ContactsOnlyToggle checked={contactsOnly} onChange={(next) => setUrlState({ contacts: next })} />}
     />
   )
