@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, SemanticUnavailableError } from '../api/client'
 import type { Chat, MessagesMetadata, SenderInfo } from '../api/types'
@@ -8,6 +8,7 @@ import SearchableChipFilter, { type ChipItem } from '../components/messages/Sear
 import MessagesCard from '../components/messages/MessagesCard'
 import ExportButton from '../components/ExportButton'
 import { useDebounce } from '../hooks/useDebounce'
+import { enumParam, intListParam, intParam, listParam, stringParam, useUrlState } from '../hooks/useUrlState'
 import { formatDateTime } from '../utils/datetime'
 import type { SemanticSearchHit } from '../api/types'
 
@@ -16,7 +17,8 @@ import type { SemanticSearchHit } from '../api/types'
 const PAGE_SIZE = 100
 
 type Preset = '7d' | '30d' | '90d' | '1y' | 'all'
-type SearchMode = 'keyword' | 'semantic'
+const SEARCH_MODES = ['keyword', 'semantic'] as const
+type SearchMode = (typeof SEARCH_MODES)[number]
 
 const PRESETS: { label: string; value: Preset }[] = [
   { label: '7d', value: '7d' },
@@ -57,6 +59,28 @@ function ceilToHour(ms: number): string {
   }
   d.setMinutes(0, 0, 0)
   return formatDatetime(d)
+}
+
+// Module-level so the hook sees stable references; the default range is the 30 days before page load.
+const URL_DEFAULTS = {
+  mode: 'keyword' as SearchMode,
+  from: presetDates('30d').from,
+  to: '',
+  q: '',
+  chats: [] as number[],
+  senders: [] as string[],
+  offset: 0,
+  sq: '',
+}
+const URL_CODECS = {
+  mode: enumParam(SEARCH_MODES),
+  from: stringParam,
+  to: stringParam,
+  q: stringParam,
+  chats: intListParam,
+  senders: listParam<string>(),
+  offset: intParam,
+  sq: stringParam,
 }
 
 // ── semantic results ──────────────────────────────────────────────────────────
@@ -125,20 +149,21 @@ function SemanticHitCard({ hit }: { hit: SemanticSearchHit }) {
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export default function GlobalMessagesPage() {
-  const [searchMode, setSearchMode] = useState<SearchMode>('keyword')
+  // Every filter lives in the URL so a refresh restores the same view; text inputs keep a local draft.
+  const [url, setUrlState] = useUrlState(URL_DEFAULTS, URL_CODECS)
+  const { mode: searchMode, from: dateFrom, to: dateTo, offset, sq: semanticQuery } = url
+  const activeChats = useMemo(() => new Set(url.chats), [url.chats])
+  const activeSenders = useMemo(() => new Set(url.senders), [url.senders])
 
   // keyword mode state
-  const [dateFrom, setDateFrom] = useState(() => presetDates('30d').from)
-  const [dateTo, setDateTo] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [activeChats, setActiveChats] = useState<Set<number>>(new Set())
-  const [activeSenders, setActiveSenders] = useState<Set<string>>(new Set())
-  const [offset, setOffset] = useState(0)
+  const [searchInput, setSearchInput] = useState(url.q)
   const searchTerm = useDebounce(searchInput, 300)
+  useEffect(() => {
+    if (searchTerm !== url.q) setUrlState({ q: searchTerm, offset: 0 })
+  }, [searchTerm, url.q, setUrlState])
 
   // semantic mode state
-  const [semanticInput, setSemanticInput] = useState('')
-  const [semanticQuery, setSemanticQuery] = useState('')
+  const [semanticInput, setSemanticInput] = useState(semanticQuery)
 
   const fromValid = !dateFrom || DATETIME_RE.test(dateFrom)
   const toValid = !dateTo || DATETIME_RE.test(dateTo)
@@ -221,39 +246,29 @@ export default function GlobalMessagesPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const currentPage = Math.floor(offset / PAGE_SIZE)
 
-  function reset() { setOffset(0) }
+  function setOffset(next: number) { setUrlState({ offset: next }) }
 
   function applyPreset(p: Preset) {
     if (p === 'all') {
-      setDateFrom(bounds?.first_ts ? floorToHour(bounds.first_ts) : '')
-      setDateTo(bounds?.last_ts ? ceilToHour(bounds.last_ts) : '')
+      setUrlState({
+        from: bounds?.first_ts ? floorToHour(bounds.first_ts) : '',
+        to: bounds?.last_ts ? ceilToHour(bounds.last_ts) : '',
+        offset: 0,
+      })
     } else {
-      const { from, to } = presetDates(p)
-      setDateFrom(from)
-      setDateTo(to)
+      setUrlState({ ...presetDates(p), offset: 0 })
     }
-    reset()
   }
 
   function toggleChat(id: string) {
-    setActiveChats((prev) => {
-      const next = new Set(prev)
-      const numId = Number(id)
-      if (next.has(numId)) next.delete(numId)
-      else next.add(numId)
-      return next
-    })
-    reset()
+    const numId = Number(id)
+    const next = activeChats.has(numId) ? url.chats.filter((c) => c !== numId) : [...url.chats, numId]
+    setUrlState({ chats: next, offset: 0 })
   }
 
   function toggleSender(id: string) {
-    setActiveSenders((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-    reset()
+    const next = activeSenders.has(id) ? url.senders.filter((s) => s !== id) : [...url.senders, id]
+    setUrlState({ senders: next, offset: 0 })
   }
 
   const activeChatIds = useMemo(() => new Set([...activeChats].map(String)), [activeChats])
@@ -285,7 +300,7 @@ export default function GlobalMessagesPage() {
         {(['keyword', 'semantic'] as SearchMode[]).map((mode) => (
           <button
             key={mode}
-            onClick={() => setSearchMode(mode)}
+            onClick={() => setUrlState({ mode })}
             className={`px-3 py-1 rounded text-xs font-medium transition-colors capitalize ${
               searchMode === mode
                 ? 'bg-accent/20 text-accent-light border border-accent/30'
@@ -310,7 +325,7 @@ export default function GlobalMessagesPage() {
                   type="text"
                   placeholder="Search messages…"
                   value={searchInput}
-                  onChange={(e) => { setSearchInput(e.target.value); reset() }}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="bg-app-surface-2 border border-app-border rounded-lg pl-7 pr-7 py-1.5 text-xs text-tx-secondary placeholder-tx-muted focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 w-44"
                 />
                 {searchInput && (
@@ -324,13 +339,13 @@ export default function GlobalMessagesPage() {
               <div className="flex items-center gap-2 text-xs">
                 <DatetimeInput
                   value={dateFrom}
-                  onChange={(v) => { setDateFrom(v); reset() }}
+                  onChange={(v) => setUrlState({ from: v, offset: 0 })}
                   isInvalid={(!!dateFrom && !fromValid) || rangeInvalid}
                 />
                 <span className={rangeInvalid ? 'text-red-400' : 'text-tx-muted'}>→</span>
                 <DatetimeInput
                   value={dateTo}
-                  onChange={(v) => { setDateTo(v); reset() }}
+                  onChange={(v) => setUrlState({ to: v, offset: 0 })}
                   isInvalid={(!!dateTo && !toValid) || rangeInvalid}
                 />
                 {(rangeInvalid || (dateFrom && !fromValid) || (dateTo && !toValid)) && (
@@ -392,7 +407,7 @@ export default function GlobalMessagesPage() {
                 remoteKey={['chats', apiDateFrom, apiDateTo]}
                 activeIds={activeChatIds}
                 onToggle={toggleChat}
-                onClear={() => { setActiveChats(new Set()); reset() }}
+                onClear={() => setUrlState({ chats: [], offset: 0 })}
                 isLoading={isChatsLoading || isMetaLoading}
               />
             </div>
@@ -405,7 +420,7 @@ export default function GlobalMessagesPage() {
                 remoteKey={['senders', apiDateFrom, apiDateTo]}
                 activeIds={activeSenders}
                 onToggle={toggleSender}
-                onClear={() => { setActiveSenders(new Set()); reset() }}
+                onClear={() => setUrlState({ senders: [], offset: 0 })}
                 isLoading={isSendersLoading || isMetaLoading}
               />
             </div>
@@ -443,7 +458,7 @@ export default function GlobalMessagesPage() {
               className="flex gap-2"
               onSubmit={(e) => {
                 e.preventDefault()
-                setSemanticQuery(semanticInput.trim())
+                setUrlState({ sq: semanticInput.trim() })
               }}
             >
               <div className="relative flex-1">
