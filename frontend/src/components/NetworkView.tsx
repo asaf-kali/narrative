@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { stringParam, useUrlState } from '../hooks/useUrlState'
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject, type LinkObject } from 'react-force-graph-2d'
 import type { NetworkEdge, NetworkGraph, NetworkNode, NetworkSignal } from '../api/types'
 import { CardSpinner } from './Spinner'
@@ -64,6 +65,23 @@ type Selection =
   | { type: 'edge'; edge: NetworkEdge }
   | { type: 'group'; name: string }
   | null
+
+// The selection lives in the URL so a refresh or a shared link reopens the same panel.
+interface SelectionParams { node: string; tie: string; group: string }
+const SELECTION_DEFAULTS: SelectionParams = { node: '', tie: '', group: '' }
+const SELECTION_CODECS = { node: stringParam, tie: stringParam, group: stringParam }
+
+function tieKey(edge: NetworkEdge): string {
+  return `${edge.source}~${edge.target}`
+}
+
+function selectionParams(selection: Selection): SelectionParams {
+  return {
+    node: selection?.type === 'node' ? selection.id : '',
+    tie: selection?.type === 'edge' ? tieKey(selection.edge) : '',
+    group: selection?.type === 'group' ? selection.name : '',
+  }
+}
 
 function clusterColor(cluster: number): string {
   if (cluster < CLUSTER_COLORS.length) return CLUSTER_COLORS[cluster]
@@ -395,14 +413,12 @@ export default function NetworkView({
   data, isLoading, availableSignals, signals, onSignalsChange, backboneOnly, onBackboneOnlyChange,
   clusters, onClustersChange, controls, showGroups = false,
 }: NetworkViewProps) {
-  const [selection, setSelection] = useState<Selection>(null)
+  const [params, setParams] = useUrlState(SELECTION_DEFAULTS, SELECTION_CODECS)
+  const setSelection = useCallback((next: Selection) => setParams(selectionParams(next)), [setParams])
 
-  // New data (signals, filters) invalidates the selection and re-fits the view once the layout settles.
+  // New data (signals, filters) re-fits the view once the layout settles.
   const needsFit = useRef(true)
-  useEffect(() => {
-    setSelection(null)
-    needsFit.current = true
-  }, [data])
+  useEffect(() => { needsFit.current = true }, [data])
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [dims, setDims] = useState({ width: 800, height: 500 })
@@ -421,6 +437,14 @@ export default function NetworkView({
   const edges = useMemo(() => data?.edges ?? [], [data])
   const nodeById = useMemo(() => new Map((data?.nodes ?? []).map((n) => [n.id, n])), [data])
 
+  // A selection missing from the current data (e.g. after a filter change) shows as no selection.
+  const selection = useMemo((): Selection => {
+    if (params.node && nodeById.has(params.node)) return { type: 'node', id: params.node }
+    const edge = params.tie ? edges.find((e) => tieKey(e) === params.tie) : undefined
+    if (edge) return { type: 'edge', edge }
+    if (params.group && data?.nodes.some((n) => n.groups.includes(params.group))) return { type: 'group', name: params.group }
+    return null
+  }, [params, nodeById, edges, data])
 
   const visibleEdges = useMemo(() => (backboneOnly ? edges.filter((e) => e.backbone) : edges), [edges, backboneOnly])
   const maxWeight = useMemo(() => Math.max(1, ...edges.map((e) => e.weight)), [edges])
