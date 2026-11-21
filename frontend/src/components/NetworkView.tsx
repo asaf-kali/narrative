@@ -23,8 +23,6 @@ export const SIGNAL_INFO: Record<NetworkSignal, { label: string; hint: string }>
   groups: { label: 'Shared groups', hint: 'Shared group membership; small groups count more' },
 }
 
-// Show only the backbone by default once the full graph gets busy.
-const BACKBONE_DEFAULT_EDGES = 200
 const LIST_SIZE = 6
 const NODE_SCALE = 5
 const MAX_FIT_ZOOM = 2  // small graphs would otherwise zoom in until nodes are huge
@@ -271,7 +269,7 @@ export interface NetworkViewProps {
 export default function NetworkView({
   data, isLoading, availableSignals, signals, onSignalsChange, controls, showGroups = false,
 }: NetworkViewProps) {
-  const [backboneOverride, setBackboneOverride] = useState<boolean | null>(null)
+  const [backboneOnly, setBackboneOnly] = useState(false)
   const [selection, setSelection] = useState<Selection>(null)
 
   // New data (signals, filters) invalidates the selection and re-fits the view once the layout settles.
@@ -297,7 +295,6 @@ export default function NetworkView({
 
   const edges = useMemo(() => data?.edges ?? [], [data])
   const nodeById = useMemo(() => new Map((data?.nodes ?? []).map((n) => [n.id, n])), [data])
-  const backboneOnly = backboneOverride ?? edges.length > BACKBONE_DEFAULT_EDGES
 
   const visibleEdges = useMemo(() => (backboneOnly ? edges.filter((e) => e.backbone) : edges), [edges, backboneOnly])
   const maxWeight = useMemo(() => Math.max(1, ...edges.map((e) => e.weight)), [edges])
@@ -378,7 +375,7 @@ export default function NetworkView({
             <input
               type="checkbox"
               checked={backboneOnly}
-              onChange={(e) => setBackboneOverride(e.target.checked)}
+              onChange={(e) => setBackboneOnly(e.target.checked)}
               className="w-3 h-3 accent-accent"
             />
             <span className="text-xs text-tx-secondary">Strongest ties only</span>
