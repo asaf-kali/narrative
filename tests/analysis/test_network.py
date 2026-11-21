@@ -216,6 +216,22 @@ def test_chat_network_detects_communities_and_bridges() -> None:
     assert {n.id for n in top_bridges} == {"x", "a1", "b1"}
 
 
+@pytest.mark.parametrize("count", [1, 2, 3, 7])
+def test_chat_network_honors_requested_cluster_count(count: int) -> None:
+    df, frames = _two_cliques_with_bridge()
+    options = _ONLY.model_copy(update={"clusters": count})
+    graph = build_chat_network(df=df, interactions=frames, options=options)
+    assert graph.communities == count
+    assert len({n.cluster for n in graph.nodes}) == count
+
+
+def test_chat_network_caps_cluster_count_at_node_count() -> None:
+    df, frames = _two_cliques_with_bridge()
+    options = _ONLY.model_copy(update={"clusters": 50})
+    graph = build_chat_network(df=df, interactions=frames, options=options)
+    assert graph.communities == len(graph.nodes)
+
+
 def test_global_network_weights_shared_small_groups_above_large_ones() -> None:
     small = [Msg(message_id=i, sender=s, seconds=i * _HOUR, chat=1) for i, s in enumerate(["111", "222"], start=1)]
     big_senders = ["111", "333", *[f"9{i}" for i in range(20)]]

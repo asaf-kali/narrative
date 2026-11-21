@@ -64,9 +64,15 @@ type Selection =
   | { type: 'edge'; edge: NetworkEdge }
   | null
 
+function clusterColor(cluster: number): string {
+  if (cluster < CLUSTER_COLORS.length) return CLUSTER_COLORS[cluster]
+  // Past the palette (a manual cluster count), spread hues by the golden angle so neighbors differ.
+  return `hsl(${Math.round((cluster * 137.5) % 360)}, 70%, 65%)`
+}
+
 function personColor(node: NetworkNode): string {
   if (node.id === ME_ID) return ME_COLOR
-  return CLUSTER_COLORS[node.cluster % CLUSTER_COLORS.length]
+  return clusterColor(node.cluster)
 }
 
 function touches(edge: NetworkEdge, id: string): boolean {
@@ -281,13 +287,15 @@ export interface NetworkViewProps {
   onSignalsChange: (signals: NetworkSignal[]) => void
   backboneOnly: boolean
   onBackboneOnlyChange: (backboneOnly: boolean) => void
+  clusters: number  // 0 = automatic
+  onClustersChange: (clusters: number) => void
   controls?: ReactNode
   showGroups?: boolean
 }
 
 export default function NetworkView({
-  data, isLoading, availableSignals, signals, onSignalsChange, backboneOnly, onBackboneOnlyChange, controls,
-  showGroups = false,
+  data, isLoading, availableSignals, signals, onSignalsChange, backboneOnly, onBackboneOnlyChange,
+  clusters, onClustersChange, controls, showGroups = false,
 }: NetworkViewProps) {
   const [selection, setSelection] = useState<Selection>(null)
 
@@ -319,10 +327,18 @@ export default function NetworkView({
   const maxWeight = useMemo(() => Math.max(1, ...edges.map((e) => e.weight)), [edges])
   const maxMessages = useMemo(() => Math.max(1, ...(data?.nodes ?? []).map((n) => n.messages)), [data])
 
-  const graphData = useMemo(() => ({
-    nodes: (data?.nodes ?? []).map((n) => ({ ...n })) as GraphNode[],
-    links: visibleEdges.map((e) => ({ source: e.source, target: e.target, edge: e })) as GraphLink[],
-  }), [data, visibleEdges])
+  // Refetches (e.g. a new cluster count) start each person where they were, so the layout doesn't jump.
+  const prevNodes = useRef<GraphNode[]>([])
+  const graphData = useMemo(() => {
+    const prev = new Map(prevNodes.current.map((n) => [n.id, n]))
+    const nodes = (data?.nodes ?? []).map((n) => {
+      const p = prev.get(n.id)
+      return p?.x !== undefined && p.y !== undefined ? { ...n, x: p.x, y: p.y } : { ...n }
+    }) as GraphNode[]
+    const links = visibleEdges.map((e) => ({ source: e.source, target: e.target, edge: e })) as GraphLink[]
+    return { nodes, links }
+  }, [data, visibleEdges])
+  useEffect(() => { prevNodes.current = graphData.nodes }, [graphData])
 
   useEffect(() => {
     const fg = fgRef.current
@@ -402,6 +418,14 @@ export default function NetworkView({
             ))}
           </div>
           {controls}
+          {data && data.nodes.length > 0 && (
+            <ClustersControl
+              value={clusters || data.communities}
+              isAuto={clusters === 0}
+              max={data.nodes.length}
+              onChange={onClustersChange}
+            />
+          )}
           <label className="flex items-center gap-1.5 cursor-pointer select-none ml-auto" title="Hide ties that are weak relative to both people's other ties">
             <input
               type="checkbox"
@@ -526,6 +550,48 @@ export default function NetworkView({
         )}
       </div>
     </div>
+  )
+}
+
+const CLUSTERS_DEBOUNCE_MS = 400
+
+/** Number of communities: shows the automatic pick until the user sets one; "Auto" goes back. */
+function ClustersControl({ value, isAuto, max, onChange }: {
+  value: number
+  isAuto: boolean
+  max: number
+  onChange: (clusters: number) => void
+}) {
+  const [draft, setDraft] = useState(String(value))
+  useEffect(() => setDraft(String(value)), [value])
+
+  // Typing "12" shouldn't fetch for "1" first.
+  useEffect(() => {
+    const n = Number(draft)
+    if (!Number.isInteger(n) || n < 1 || n === value) return
+    const timer = setTimeout(() => onChange(Math.min(n, max)), CLUSTERS_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [draft, value, max, onChange])
+
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-tx-secondary" title="Number of communities (colors)">
+      Clusters
+      <input
+        type="number"
+        min={1}
+        max={max}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        className="w-12 bg-app-surface-2 border border-app-border rounded-full px-2 py-0.5 text-xs text-tx-secondary"
+      />
+      {isAuto ? (
+        <span className="text-[10px] text-tx-muted">auto</span>
+      ) : (
+        <button onClick={() => onChange(0)} className="text-[10px] text-tx-muted hover:text-tx-secondary transition-colors">
+          Auto
+        </button>
+      )}
+    </label>
   )
 }
 

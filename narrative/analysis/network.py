@@ -17,7 +17,8 @@ Edge weight is a weighted sum of the selected signals. On top of it every edge g
 - backbone: survives the disparity filter (or is an endpoint's strongest tie), which prunes
             the hairball that heavy posters create
 
-Nodes get Louvain communities and bridging (weighted betweenness).
+Nodes get communities and bridging (weighted betweenness). Communities come from Louvain, which
+picks their number from the graph; a requested number uses greedy modularity merging instead.
 """
 
 import logging
@@ -84,6 +85,7 @@ class NetworkOptions(BaseModel):
     max_nodes: int = 150
     include_me: bool = True
     allowed_ids: frozenset[str] | None = None  # restrict nodes to these people ("me" always allowed)
+    clusters: int | None = None  # number of communities; None lets Louvain pick it
 
 
 SIGNAL_WEIGHTS: dict[Signal, float] = {
@@ -138,7 +140,7 @@ def _build_network(
     pairs = _flag_backbone(pairs=pairs)
 
     graph = _to_networkx(pairs=pairs, node_ids=top_ids)
-    clusters = _communities(graph=graph)
+    clusters = _communities(graph=graph, count=options.clusters)
     bridging = _bridging(graph=graph)
     strength = _strength(pairs=pairs)
 
@@ -394,10 +396,16 @@ def _to_networkx(pairs: pd.DataFrame, node_ids: set[str]) -> PeopleGraph:
     return graph
 
 
-def _communities(graph: PeopleGraph) -> dict[str, int]:
+def _communities(graph: PeopleGraph, count: int | None) -> dict[str, int]:
     if graph.number_of_edges() == 0:
         return dict.fromkeys(graph.nodes, 0)
-    parts = nx.community.louvain_communities(graph, weight="weight", seed=0)
+    parts: list[set[str]] | list[frozenset[str]]
+    if count is None:
+        parts = nx.community.louvain_communities(graph, weight="weight", seed=0)
+    else:
+        # cutoff = best_n stops merging at exactly `size` communities, before or past the modularity peak.
+        size = min(count, graph.number_of_nodes())
+        parts = nx.community.greedy_modularity_communities(graph, weight="weight", cutoff=size, best_n=size)
     ordered = sorted(parts, key=len, reverse=True)
     return {node: index for index, part in enumerate(ordered) for node in part}
 
