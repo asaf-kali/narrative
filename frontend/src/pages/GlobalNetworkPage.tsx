@@ -30,7 +30,7 @@ function dateFrom(range: TimeRange): string | undefined {
 export default function GlobalNetworkPage() {
   const [signals, setSignals] = useState<NetworkSignal[]>(GLOBAL_SIGNALS)
   const [contactsOnly, setContactsOnly] = useState(true)
-  const [includeMe, setIncludeMe] = useState(false)
+  const [includeMe, setIncludeMe] = useState(true)
   const [maxNodes, setMaxNodes] = useState(150)
   const [timeRange, setTimeRange] = useState<TimeRange>('90d')
 

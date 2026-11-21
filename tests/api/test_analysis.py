@@ -111,20 +111,20 @@ def test_engagement_returns_all_four_sections(api_client: TestClient) -> None:
     assert len(body["top_reacted"]) == 2
 
 
-def test_global_network_defaults_to_all_signals_without_me(api_client: TestClient) -> None:
+def test_global_network_defaults_to_all_signals_with_me(api_client: TestClient) -> None:
     resp = api_client.get("/api/network")
     assert resp.status_code == 200
     body = resp.json()
     assert set(body["signals"]) == {"replies", "reactions", "mentions", "adjacency", "groups"}
-    assert "me" not in {n["id"] for n in body["nodes"]}
+    assert "me" in {n["id"] for n in body["nodes"]}
 
 
-def test_global_network_include_me_and_signal_filter(api_client: TestClient) -> None:
-    resp = api_client.get("/api/network", params={"include_me": True, "signals": ["replies", "mentions"]})
+def test_global_network_exclude_me_and_signal_filter(api_client: TestClient) -> None:
+    resp = api_client.get("/api/network", params={"include_me": False, "signals": ["replies", "mentions"]})
     assert resp.status_code == 200
     body = resp.json()
     assert body["signals"] == ["mentions", "replies"]
-    assert "me" in {n["id"] for n in body["nodes"]}
+    assert "me" not in {n["id"] for n in body["nodes"]}
 
 
 def test_global_network_rejects_unknown_signal(api_client: TestClient) -> None:
