@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from narrative.api.routes import analysis, chats, day, messages, range_detail, search, stats
 from narrative.db.connection import DBConnection
 from narrative.db.contacts import build_sender_registry
+from narrative.tracing import TracingMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,8 @@ def create_api(
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
+    # Added last so it is the outermost middleware and times the whole request.
+    app.add_middleware(TracingMiddleware)
 
     app.include_router(chats.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")
