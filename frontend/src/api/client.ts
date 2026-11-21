@@ -166,11 +166,13 @@ export const api = {
     includeMe: boolean,
     maxNodes: number,
     dateFrom?: string,
+    dateTo?: string,
   ): Promise<NetworkGraph> => {
     const params = networkParams(signals, contactsOnly)
     params.set('include_me', String(includeMe))
     params.set('max_nodes', String(maxNodes))
     if (dateFrom) params.set('date_from', dateFrom)
+    if (dateTo) params.set('date_to', dateTo)
     return get(`/api/network?${params}`)
   },
 }
