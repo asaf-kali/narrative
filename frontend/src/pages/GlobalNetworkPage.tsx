@@ -4,21 +4,25 @@ import { api } from '../api/client'
 import type { NetworkSignal } from '../api/types'
 import NetworkView, { ContactsOnlyToggle } from '../components/NetworkView'
 
-type TimeRange = '7d' | '30d' | '90d' | 'all'
+type TimeRange = '7d' | '30d' | '90d' | '180d' | '1y' | '2y' | '5y' | 'all'
 
 const GLOBAL_SIGNALS: NetworkSignal[] = ['replies', 'reactions', 'mentions', 'adjacency', 'groups']
 const NODE_LIMITS = [50, 100, 150, 300]
 
-const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
-  { value: '7d', label: '7 days' },
-  { value: '30d', label: '30 days' },
-  { value: '90d', label: '90 days' },
+const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; days?: number }[] = [
+  { value: '7d', label: '7 days', days: 7 },
+  { value: '30d', label: '30 days', days: 30 },
+  { value: '90d', label: '90 days', days: 90 },
+  { value: '180d', label: '180 days', days: 180 },
+  { value: '1y', label: '1 year', days: 365 },
+  { value: '2y', label: '2 years', days: 730 },
+  { value: '5y', label: '5 years', days: 1826 },
   { value: 'all', label: 'All time' },
 ]
 
 function dateFrom(range: TimeRange): string | undefined {
-  if (range === 'all') return undefined
-  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90
+  const days = TIME_RANGE_OPTIONS.find((opt) => opt.value === range)?.days
+  if (days === undefined) return undefined
   const d = new Date(Date.now() - days * 86_400_000)
   return d.toISOString().slice(0, 10)
 }
