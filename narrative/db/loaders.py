@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from narrative.db.connection import DBConnection
 from narrative.db.queries.calls import fetch_calls
 from narrative.db.queries.chats import fetch_chats
+from narrative.db.queries.mentions import fetch_mentions
 from narrative.db.queries.messages import (
     fetch_all_messages,
     fetch_index_rows_paged,
@@ -87,7 +88,9 @@ _REPLY_COLUMNS = [
     "chat_phone",
     "timestamp",
     "quoted_sender_name",
+    "quoted_id",
 ]
+_MENTION_COLUMNS = ["message_id", "chat_row_id", "mentioned_phone", "mentioned_id"]
 
 # Use the system local timezone for timestamp display
 _LOCAL_TZ: datetime.tzinfo = datetime.datetime.now().astimezone().tzinfo or datetime.UTC
@@ -141,6 +144,14 @@ class DataLoader:
             return pd.DataFrame(columns=_REPLY_COLUMNS)
         df = pd.DataFrame([r.model_dump() for r in rows])
         return _resolve_quoted_names(df, self._registry)
+
+    def load_mentions(self, chat_id: int | None = None) -> pd.DataFrame:
+        rows = list(fetch_mentions(self._db.msgstore, chat_id=chat_id))
+        if not rows:
+            return pd.DataFrame(columns=_MENTION_COLUMNS)
+        df = pd.DataFrame([r.model_dump() for r in rows])
+        df["mentioned_id"] = df["mentioned_phone"].replace("", "unknown")
+        return df
 
     def iter_chat_messages(
         self,
@@ -387,11 +398,16 @@ def _resolve_display_names(
     return names.where(from_me != 1, registry.me_name)
 
 
+def _resolve_sender_ids(phone: pd.Series, chat_phone: pd.Series, from_me: pd.Series) -> pd.Series:
+    """Stable sender ids matching the network's: "me", else phone (1-on-1 falls back to the chat party)."""
+    effective = phone.fillna("").astype(str)
+    effective = effective.where(effective != "", chat_phone.fillna("").astype(str))
+    return effective.where(from_me != 1, "me").replace("", "unknown")
+
+
 def _resolve_reactor_names(df: pd.DataFrame, registry: SenderRegistry) -> pd.DataFrame:
-    effective = df["reactor_phone"].fillna("").astype(str)
-    effective = effective.where(effective != "", df["chat_phone"].fillna("").astype(str))
     df["reactor_name"] = _resolve_display_names(df["reactor_phone"], df["chat_phone"], df["from_me"], registry)
-    df["reactor_id"] = effective.where(df["from_me"] != 1, "me").replace("", "unknown")
+    df["reactor_id"] = _resolve_sender_ids(df["reactor_phone"], df["chat_phone"], df["from_me"])
     return df
 
 
@@ -399,6 +415,7 @@ def _resolve_quoted_names(df: pd.DataFrame, registry: SenderRegistry) -> pd.Data
     df["quoted_sender_name"] = _resolve_display_names(
         df["quoted_phone"], df["chat_phone"], df["quoted_from_me"], registry
     )
+    df["quoted_id"] = _resolve_sender_ids(df["quoted_phone"], df["chat_phone"], df["quoted_from_me"])
     return df
 
 
