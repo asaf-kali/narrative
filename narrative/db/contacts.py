@@ -13,6 +13,8 @@ _MIN_PHONE_DIGITS = 7
 _MAX_PHONE_DIGITS = 15
 # Google Contacts joins multiple values of one field (e.g. two phone numbers) with " ::: ".
 _MULTI_VALUE_SEP = ":::"
+# WhatsApp marks names that come from the sender's own profile (not your address book) with "~".
+_PROFILE_NAME_PREFIX = "~"
 
 
 def build_sender_registry(
@@ -23,12 +25,14 @@ def build_sender_registry(
 ) -> SenderRegistry:
     """Merge all contact sources into a single SenderRegistry.
 
-    Priority (highest wins): CSV > wa_contacts > bare phone number.
+    Priority (highest wins): CSV > wa_contacts > WhatsApp profile name (~Name) > bare phone number.
     LID JIDs (WhatsApp privacy IDs) are resolved via jid_map in msgstore.
     When local_code is set (e.g. '972'), local-format numbers in the
     CSV (leading 0) are converted to international format ('054...' → '97254...').
     """
     contacts: dict[str, str] = {}
+    if msgstore is not None:
+        contacts.update(_load_profile_names(msgstore))
     if wadb is not None:
         contacts.update(_load_wa_contacts(wadb))
     if csv_path is not None:
@@ -140,6 +144,28 @@ def _resolve_lids(msgstore: sqlite3.Connection, contacts: dict[str, str]) -> dic
             resolved[row["lid_user"]] = phone
     logger.info(f"Resolved {len(resolved)} LIDs via jid_map ({named} with names, {len(resolved) - named} phone-only)")
     return resolved
+
+
+def _load_profile_names(msgstore: sqlite3.Connection) -> dict[str, str]:
+    """Load WhatsApp profile names from lid_display_name as {phone_or_lid: "~Name"}.
+
+    Keyed by the phone number when jid_map links the LID to one, else by the LID itself.
+    """
+    try:
+        rows = msgstore.execute("""
+            SELECT COALESCE(phone_jid.user, lid_jid.user) AS user, ldn.display_name
+            FROM lid_display_name ldn
+            JOIN jid lid_jid ON ldn.lid_row_id = lid_jid._id
+            LEFT JOIN jid_map jm ON jm.lid_row_id = ldn.lid_row_id
+            LEFT JOIN jid phone_jid ON jm.jid_row_id = phone_jid._id AND phone_jid.server = 's.whatsapp.net'
+            WHERE TRIM(ldn.display_name) != ''
+        """).fetchall()
+    except sqlite3.OperationalError:
+        logger.debug("lid_display_name not available — skipping WhatsApp profile names.")
+        return {}
+    names = {row["user"]: _PROFILE_NAME_PREFIX + row["display_name"].strip() for row in rows}
+    logger.info(f"Loaded {len(names)} WhatsApp profile names")
+    return names
 
 
 def _load_wa_contacts(wadb: sqlite3.Connection) -> dict[str, str]:
