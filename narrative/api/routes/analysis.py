@@ -316,7 +316,7 @@ def get_engagement(
 def get_global_network(
     request: Request,
     signals: Annotated[list[Signal] | None, Query()] = None,
-    include_me: bool = False,
+    include_me: bool = True,
     contacts_only: bool = True,
     max_nodes: Annotated[int, Query(ge=2, le=_MAX_NETWORK_NODES)] = _DEFAULT_NETWORK_NODES,
     exclude_system: bool = True,
