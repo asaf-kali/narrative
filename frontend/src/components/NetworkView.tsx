@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { stringParam, useUrlState } from '../hooks/useUrlState'
+import { intParam, stringParam, useUrlState } from '../hooks/useUrlState'
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject, type LinkObject } from 'react-force-graph-2d'
 import type { NetworkEdge, NetworkGraph, NetworkNode, NetworkSignal } from '../api/types'
 import { CardSpinner } from './Spinner'
@@ -64,12 +64,14 @@ type Selection =
   | { type: 'node'; id: string }
   | { type: 'edge'; edge: NetworkEdge }
   | { type: 'group'; name: string }
+  | { type: 'cluster'; cluster: number }
   | null
 
 // The selection lives in the URL so a refresh or a shared link reopens the same panel.
-interface SelectionParams { node: string; tie: string; group: string }
-const SELECTION_DEFAULTS: SelectionParams = { node: '', tie: '', group: '' }
-const SELECTION_CODECS = { node: stringParam, tie: stringParam, group: stringParam }
+// `cluster` is 1-based, as shown in the panels, so 0 can mean "none".
+interface SelectionParams { node: string; tie: string; group: string; cluster: number }
+const SELECTION_DEFAULTS: SelectionParams = { node: '', tie: '', group: '', cluster: 0 }
+const SELECTION_CODECS = { node: stringParam, tie: stringParam, group: stringParam, cluster: intParam }
 
 function tieKey(edge: NetworkEdge): string {
   return `${edge.source}~${edge.target}`
@@ -80,6 +82,7 @@ function selectionParams(selection: Selection): SelectionParams {
     node: selection?.type === 'node' ? selection.id : '',
     tie: selection?.type === 'edge' ? tieKey(selection.edge) : '',
     group: selection?.type === 'group' ? selection.name : '',
+    cluster: selection?.type === 'cluster' ? selection.cluster + 1 : 0,
   }
 }
 
@@ -317,12 +320,13 @@ function EdgePanel({ edge, nodes, showGroups, onSelectNode, onSelectGroup, onClo
   )
 }
 
-function NodePanel({ node, edges, nodes, onSelectEdge, onSelectGroup, onClose }: {
+function NodePanel({ node, edges, nodes, onSelectEdge, onSelectGroup, onSelectCluster, onClose }: {
   node: NetworkNode
   edges: NetworkEdge[]
   nodes: Map<string, NetworkNode>
   onSelectEdge: (edge: NetworkEdge) => void
   onSelectGroup: (group: string) => void
+  onSelectCluster: (cluster: number) => void
   onClose: () => void
 }) {
   const ties = edges.filter((e) => touches(e, node.id)).sort((x, y) => y.weight - x.weight).slice(0, LIST_SIZE)
@@ -340,7 +344,17 @@ function NodePanel({ node, edges, nodes, onSelectEdge, onSelectGroup, onClose }:
         <StatRow label="Messages" value={node.messages.toLocaleString()} />
         <StatRow label="Total ties" value={node.strength.toFixed(0)} hint="Sum of tie strengths" />
         <StatRow label="Bridging" value={pct(node.bridging)} hint="Share of shortest paths through this person" />
-        <StatRow label="Community" value={node.cluster + 1} />
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-tx-muted shrink-0">Community</span>
+          <button
+            onClick={() => onSelectCluster(node.cluster)}
+            title="Highlight this community"
+            className="flex items-center gap-1.5 text-xs font-semibold text-tx-secondary tabular-nums hover:text-accent hover:underline transition-colors"
+          >
+            <span className="w-2 h-2 rounded-full" style={{ background: clusterColor(node.cluster) }} />
+            {node.cluster + 1}
+          </button>
+        </div>
       </div>
       {ties.length > 0 && (
         <div className="mb-3">
@@ -367,9 +381,10 @@ function NodePanel({ node, edges, nodes, onSelectEdge, onSelectGroup, onClose }:
   )
 }
 
-function GroupPanel({ name, chatId, members, onSelectNode, onClose }: {
+function MembersPanel({ name, color, chatId, members, onSelectNode, onClose }: {
   name: string
-  chatId: number | undefined
+  color?: string
+  chatId?: number
   members: NetworkNode[]  // most active first
   onSelectNode: (id: string) => void
   onClose: () => void
@@ -378,7 +393,10 @@ function GroupPanel({ name, chatId, members, onSelectNode, onClose }: {
     <Card>
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-tx-primary leading-tight truncate" title={name}>{name}</div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-tx-primary leading-tight" title={name}>
+            {color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />}
+            <span className="truncate">{name}</span>
+          </div>
           <div className="text-[10px] text-tx-muted mt-0.5">{members.length} people in this network</div>
           {chatId != null && <ChatLink chatId={chatId} />}
         </div>
@@ -443,6 +461,8 @@ export default function NetworkView({
     const edge = params.tie ? edges.find((e) => tieKey(e) === params.tie) : undefined
     if (edge) return { type: 'edge', edge }
     if (params.group && data?.nodes.some((n) => n.groups.includes(params.group))) return { type: 'group', name: params.group }
+    const cluster = params.cluster - 1
+    if (cluster >= 0 && data?.nodes.some((n) => n.cluster === cluster)) return { type: 'cluster', cluster }
     return null
   }, [params, nodeById, edges, data])
 
@@ -498,25 +518,32 @@ export default function NetworkView({
   const selectedId = selection?.type === 'node' ? selection.id : null
   const selectedEdge = selection?.type === 'edge' ? selection.edge : null
   const selectedGroup = selection?.type === 'group' ? selection.name : null
-  const groupMembers = useMemo(
-    () => (selectedGroup ? (data?.nodes ?? []).filter((n) => n.groups.includes(selectedGroup)).sort((a, b) => b.messages - a.messages) : []),
-    [data, selectedGroup],
+  const selectedCluster = selection?.type === 'cluster' ? selection.cluster : null
+  const isMember = useMemo(() => {
+    if (selectedGroup) return (n: NetworkNode) => n.groups.includes(selectedGroup)
+    if (selectedCluster !== null) return (n: NetworkNode) => n.cluster === selectedCluster
+    return null
+  }, [selectedGroup, selectedCluster])
+  // Members of the selected group or community, most active first.
+  const members = useMemo(
+    () => (isMember ? (data?.nodes ?? []).filter(isMember).sort((a, b) => b.messages - a.messages) : []),
+    [data, isMember],
   )
   // Nodes kept at full strength; the rest are dimmed. A person brings everyone they're tied to,
   // a tie only its two people, a group its members.
   const focusIds = useMemo(() => {
     if (selectedEdge) return new Set([selectedEdge.source, selectedEdge.target])
-    if (selectedGroup) return new Set(groupMembers.map((n) => n.id))
+    if (isMember) return new Set(members.map((n) => n.id))
     if (!selectedId) return null
     return new Set([selectedId, ...edges.filter((e) => touches(e, selectedId)).map((e) => other(e, selectedId))])
-  }, [edges, selectedId, selectedEdge, selectedGroup, groupMembers])
+  }, [edges, selectedId, selectedEdge, isMember, members])
 
   const isHighlighted = useCallback((edge: NetworkEdge) => {
     if (selectedId) return touches(edge, selectedId)
     if (selectedEdge) return edge === selectedEdge
-    if (selectedGroup) return focusIds !== null && focusIds.has(edge.source) && focusIds.has(edge.target)
+    if (isMember) return focusIds !== null && focusIds.has(edge.source) && focusIds.has(edge.target)
     return false
-  }, [selectedId, selectedEdge, selectedGroup, focusIds])
+  }, [selectedId, selectedEdge, isMember, focusIds])
 
   const linkColor = useCallback((l: LinkObject) => {
     const edge = (l as GraphLink).edge
@@ -541,12 +568,14 @@ export default function NetworkView({
     }
   }
 
-  const focusGroup = (name: string) => {
+  const focusMembers = (next: Selection, isIn: (n: NetworkNode) => boolean) => {
     stopAutoFit()
-    setSelection({ type: 'group', name })
-    const members = new Set((data?.nodes ?? []).filter((n) => n.groups.includes(name)).map((n) => n.id))
-    if (members.size > 0) fgRef.current?.zoomToFit(500, FIT_PADDING * 2, (n) => members.has((n as GraphNode).id))
+    setSelection(next)
+    const ids = new Set((data?.nodes ?? []).filter(isIn).map((n) => n.id))
+    if (ids.size > 0) fgRef.current?.zoomToFit(500, FIT_PADDING * 2, (n) => ids.has((n as GraphNode).id))
   }
+  const focusGroup = (name: string) => focusMembers({ type: 'group', name }, (n) => n.groups.includes(name))
+  const focusCluster = (cluster: number) => focusMembers({ type: 'cluster', cluster }, (n) => n.cluster === cluster)
 
   const selectedNode = selectedId ? nodeById.get(selectedId) : undefined
 
@@ -673,11 +702,21 @@ export default function NetworkView({
             nodes={nodeById}
             onSelectEdge={(edge) => setSelection({ type: 'edge', edge })}
             onSelectGroup={focusGroup}
+            onSelectCluster={focusCluster}
             onClose={() => setSelection(null)}
           />
         )}
         {selectedGroup && (
-          <GroupPanel name={selectedGroup} chatId={data?.group_chats[selectedGroup]} members={groupMembers} onSelectNode={focusNode} onClose={() => setSelection(null)} />
+          <MembersPanel name={selectedGroup} chatId={data?.group_chats[selectedGroup]} members={members} onSelectNode={focusNode} onClose={() => setSelection(null)} />
+        )}
+        {selectedCluster !== null && (
+          <MembersPanel
+            name={`Community ${selectedCluster + 1}`}
+            color={clusterColor(selectedCluster)}
+            members={members}
+            onSelectNode={focusNode}
+            onClose={() => setSelection(null)}
+          />
         )}
 
         {!selection && (
