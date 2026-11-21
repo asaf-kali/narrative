@@ -35,6 +35,7 @@ class RawChatRow(_RowBase):
     chat_phone: str
     chat_server: str
     message_count: int
+    my_message_count: int
     first_timestamp: int | None
     last_timestamp: int | None
 

@@ -13,11 +13,18 @@ class ChatType(StrEnum):
     BROADCAST = "broadcast"
 
 
+class ChatSort(StrEnum):
+    LAST_MESSAGE = "last"  # most recent message first
+    MESSAGES = "messages"  # most messages first
+    MINE = "mine"  # most messages sent by me first
+
+
 class ChatSummary(BaseModel):
     chat_id: int
     display_name: str
     chat_type: ChatType
     message_count: int
+    my_message_count: int = 0
     participant_count: int | None
     date_first: datetime | None
     date_last: datetime | None
