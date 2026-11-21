@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { NetworkSignal } from '../api/types'
-import NetworkView from '../components/NetworkView'
+import NetworkView, { ContactsOnlyToggle } from '../components/NetworkView'
 
 const CHAT_SIGNALS: NetworkSignal[] = ['replies', 'reactions', 'mentions', 'adjacency']
 
@@ -16,11 +16,12 @@ export default function NetworkPage() {
   })
 
   const [signals, setSignals] = useState<NetworkSignal[]>(CHAT_SIGNALS)
+  const [contactsOnly, setContactsOnly] = useState(true)
   const isGroup = chat?.chat_type === 'group'
 
   const { data, isLoading } = useQuery({
-    queryKey: ['network', chatId, [...signals].sort()],
-    queryFn: () => api.network(Number(chatId), signals),
+    queryKey: ['network', chatId, [...signals].sort(), contactsOnly],
+    queryFn: () => api.network(Number(chatId), signals, contactsOnly),
     enabled: !!chatId && isGroup,
   })
 
@@ -42,6 +43,7 @@ export default function NetworkPage() {
       availableSignals={CHAT_SIGNALS}
       signals={signals}
       onSignalsChange={setSignals}
+      controls={<ContactsOnlyToggle checked={contactsOnly} onChange={setContactsOnly} />}
     />
   )
 }

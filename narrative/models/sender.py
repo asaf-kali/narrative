@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 GROUP_SERVER = "g.us"
 BROADCAST_SERVER = "broadcast"
+# WhatsApp marks names that come from the sender's own profile (not your address book) with "~".
+PROFILE_NAME_PREFIX = "~"
 
 
 class Sender(BaseModel):
@@ -51,6 +53,14 @@ class SenderRegistry:
     @property
     def me_name(self) -> str:
         return self._me.display_name
+
+    def contact_ids(self) -> frozenset[str]:
+        """Ids saved in the address book: a real name, not a ~profile name or a bare number."""
+        return frozenset(
+            sender_id
+            for sender_id, name in self._contacts.items()
+            if not name.isdigit() and not name.startswith(PROFILE_NAME_PREFIX)
+        )
 
     def as_dict(self) -> dict[str, str]:
         """Back-compat for DataFrame pipeline: return {phone: display_name}."""

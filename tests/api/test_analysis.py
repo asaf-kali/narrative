@@ -1,5 +1,7 @@
+from collections.abc import Iterator
 from unittest import mock
 
+import pytest
 from fastapi.testclient import TestClient
 from seed_data import (
     BOB_PHONE,
@@ -12,6 +14,8 @@ from seed_data import (
     MSG_ME_CONTACTS,
     MSG_ME_GROUP,
 )
+
+from narrative.models.sender import SenderRegistry
 
 
 def test_overview_returns_totals_and_breakdown(api_client: TestClient) -> None:
@@ -139,6 +143,36 @@ def test_chat_network_reports_seeded_interactions(api_client: TestClient) -> Non
     assert (me_bob["replies"], me_bob["reactions"]) == (1, 1)
     bob_carol = edges[frozenset((BOB_PHONE, CAROL_PHONE))]
     assert (bob_carol["reactions"], bob_carol["mentions"]) == (1, 1)
+
+
+@pytest.fixture
+def only_bob_is_contact() -> Iterator[mock.MagicMock]:
+    with mock.patch.object(SenderRegistry, "contact_ids", return_value=frozenset({BOB_PHONE})) as patched:
+        yield patched
+
+
+def test_chat_network_contacts_only_hides_non_contacts(
+    api_client: TestClient, only_bob_is_contact: mock.MagicMock
+) -> None:
+    resp = api_client.get(f"/api/chats/{CHAT_GROUP}/network")
+    assert {n["id"] for n in resp.json()["nodes"]} == {"me", BOB_PHONE}
+    only_bob_is_contact.assert_called_once()
+
+
+def test_chat_network_contacts_only_can_be_disabled(
+    api_client: TestClient, only_bob_is_contact: mock.MagicMock
+) -> None:
+    resp = api_client.get(f"/api/chats/{CHAT_GROUP}/network", params={"contacts_only": False})
+    assert {n["id"] for n in resp.json()["nodes"]} == {"me", BOB_PHONE, CAROL_PHONE}
+    only_bob_is_contact.assert_not_called()
+
+
+def test_global_network_contacts_only_hides_non_contacts(
+    api_client: TestClient, only_bob_is_contact: mock.MagicMock
+) -> None:
+    resp = api_client.get("/api/network")
+    assert CAROL_PHONE not in {n["id"] for n in resp.json()["nodes"]}
+    only_bob_is_contact.assert_called_once()
 
 
 def test_words_wordcloud_generation_failure_returns_empty_string(api_client: TestClient) -> None:

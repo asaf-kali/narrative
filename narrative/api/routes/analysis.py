@@ -317,6 +317,7 @@ def get_global_network(
     request: Request,
     signals: Annotated[list[Signal] | None, Query()] = None,
     include_me: bool = False,
+    contacts_only: bool = True,
     max_nodes: Annotated[int, Query(ge=2, le=_MAX_NETWORK_NODES)] = _DEFAULT_NETWORK_NODES,
     exclude_system: bool = True,
     date_from: datetime | None = None,
@@ -325,7 +326,8 @@ def get_global_network(
     config = AnalysisConfig(chat_id=None, exclude_system=exclude_system, date_from=date_from, date_to=date_to)
     df = get_df(request, config)
     frames = cached.interactions(msgstore_path=request.app.state.msgstore_path, chat_id=None)
-    options = _network_options(signals=signals, include_me=include_me, max_nodes=max_nodes)
+    allowed_ids = _allowed_ids(request=request, contacts_only=contacts_only)
+    options = _network_options(signals=signals, include_me=include_me, max_nodes=max_nodes, allowed_ids=allowed_ids)
     with span("analysis.network"):
         return build_global_network(df=df, interactions=frames, options=options)
 
@@ -335,6 +337,7 @@ def get_network(
     chat_id: int,
     request: Request,
     signals: Annotated[list[Signal] | None, Query()] = None,
+    contacts_only: bool = True,
     max_nodes: Annotated[int, Query(ge=2, le=_MAX_NETWORK_NODES)] = _DEFAULT_NETWORK_NODES,
     exclude_system: bool = True,
     date_from: datetime | None = None,
@@ -343,14 +346,24 @@ def get_network(
     config = _config(chat_id, exclude_system, date_from, date_to)
     df = get_df(request, config)
     frames = cached.interactions(msgstore_path=request.app.state.msgstore_path, chat_id=chat_id)
-    options = _network_options(signals=signals, include_me=True, max_nodes=max_nodes)
+    allowed_ids = _allowed_ids(request=request, contacts_only=contacts_only)
+    options = _network_options(signals=signals, include_me=True, max_nodes=max_nodes, allowed_ids=allowed_ids)
     with span("analysis.network"):
         return build_chat_network(df=df, interactions=frames, options=options)
 
 
-def _network_options(signals: list[Signal] | None, include_me: bool, max_nodes: int) -> NetworkOptions:
+def _network_options(
+    signals: list[Signal] | None, include_me: bool, max_nodes: int, allowed_ids: frozenset[str] | None
+) -> NetworkOptions:
     selected = frozenset(signals) if signals else frozenset(Signal)
-    return NetworkOptions(signals=selected, include_me=include_me, max_nodes=max_nodes)
+    return NetworkOptions(signals=selected, include_me=include_me, max_nodes=max_nodes, allowed_ids=allowed_ids)
+
+
+def _allowed_ids(request: Request, contacts_only: bool) -> frozenset[str] | None:
+    if not contacts_only:
+        return None
+    registry: SenderRegistry = request.app.state.sender_registry
+    return registry.contact_ids()
 
 
 def _generate_wordcloud(df: pd.DataFrame) -> str:

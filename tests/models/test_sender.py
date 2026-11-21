@@ -79,3 +79,8 @@ def test_as_dict_is_a_copy_not_a_reference() -> None:
     result = registry.as_dict()
     result["222"] = "Injected"
     assert "222" not in registry.as_dict()
+
+
+def test_contact_ids_excludes_profile_names_and_bare_numbers() -> None:
+    registry = SenderRegistry(contacts={"111": "Alice", "222": "~Bob", "lid333": "333", "444": "444"})
+    assert registry.contact_ids() == frozenset({"111"})

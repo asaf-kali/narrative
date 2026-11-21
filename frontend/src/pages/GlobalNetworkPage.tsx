@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { NetworkSignal } from '../api/types'
-import NetworkView from '../components/NetworkView'
+import NetworkView, { ContactsOnlyToggle } from '../components/NetworkView'
 
 type TimeRange = '7d' | '30d' | '90d' | 'all'
 
@@ -25,13 +25,14 @@ function dateFrom(range: TimeRange): string | undefined {
 
 export default function GlobalNetworkPage() {
   const [signals, setSignals] = useState<NetworkSignal[]>(GLOBAL_SIGNALS)
+  const [contactsOnly, setContactsOnly] = useState(true)
   const [includeMe, setIncludeMe] = useState(false)
   const [maxNodes, setMaxNodes] = useState(150)
   const [timeRange, setTimeRange] = useState<TimeRange>('90d')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['global-network', [...signals].sort(), includeMe, maxNodes, timeRange],
-    queryFn: () => api.globalNetwork(signals, includeMe, maxNodes, dateFrom(timeRange)),
+    queryKey: ['global-network', [...signals].sort(), contactsOnly, includeMe, maxNodes, timeRange],
+    queryFn: () => api.globalNetwork(signals, contactsOnly, includeMe, maxNodes, dateFrom(timeRange)),
   })
 
   const controls = (
@@ -51,6 +52,7 @@ export default function GlobalNetworkPage() {
       >
         {NODE_LIMITS.map((n) => <option key={n} value={n}>Top {n} people</option>)}
       </select>
+      <ContactsOnlyToggle checked={contactsOnly} onChange={setContactsOnly} />
       <label className="flex items-center gap-1.5 cursor-pointer select-none">
         <input type="checkbox" checked={includeMe} onChange={(e) => setIncludeMe(e.target.checked)} className="w-3 h-3 accent-accent" />
         <span className="text-xs text-tx-secondary">Include me</span>

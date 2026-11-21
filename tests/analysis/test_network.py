@@ -177,6 +177,13 @@ def test_chat_network_max_nodes_keeps_strongest() -> None:
     assert set(_nodes(graph)) == {"111", "222"}
 
 
+def test_chat_network_allowed_ids_restricts_nodes_but_keeps_me() -> None:
+    messages = [*_CHAT, Msg(message_id=5, sender="me", seconds=5 * _HOUR + 30)]
+    options = NetworkOptions(allowed_ids=frozenset({"333"}))
+    graph = build_chat_network(df=_messages_df(messages), interactions=_frames(), options=options)
+    assert set(_nodes(graph)) == {"me", "333"}
+
+
 def test_chat_network_scores_lift_and_keeps_every_node_on_backbone() -> None:
     graph = build_chat_network(df=_messages_df(_CHAT), interactions=_frames(), options=NetworkOptions())
     assert graph.edges

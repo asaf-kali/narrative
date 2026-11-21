@@ -83,6 +83,7 @@ class NetworkOptions(BaseModel):
     signals: frozenset[Signal] = frozenset(Signal)
     max_nodes: int = 150
     include_me: bool = True
+    allowed_ids: frozenset[str] | None = None  # restrict nodes to these people ("me" always allowed)
 
 
 SIGNAL_WEIGHTS: dict[Signal, float] = {
@@ -131,7 +132,8 @@ def _build_network(
     pairs = _aggregate_pairs(events=events, members=members, signals=signals)
 
     node_stats = _node_stats(annotated=annotated, pairs=pairs)
-    top_ids = set(node_stats.head(options.max_nodes)["id"])
+    candidates = _allowed_nodes(node_stats=node_stats, allowed_ids=options.allowed_ids)
+    top_ids = set(candidates.head(options.max_nodes)["id"])
     pairs = pairs[pairs["a"].isin(top_ids) & pairs["b"].isin(top_ids)]
     pairs = _flag_backbone(pairs=pairs)
 
@@ -319,6 +321,13 @@ def _membership_pairs(members: pd.DataFrame) -> pd.DataFrame:
         shared_groups=("chat_row_id", "size"), group_affinity=("affinity", "sum")
     )
     return grouped.rename_axis(["a", "b"])
+
+
+def _allowed_nodes(node_stats: pd.DataFrame, allowed_ids: frozenset[str] | None) -> pd.DataFrame:
+    if allowed_ids is None:
+        return node_stats
+    allowed = allowed_ids | {_ME}
+    return node_stats[node_stats["id"].isin(allowed)]
 
 
 def _node_stats(annotated: pd.DataFrame, pairs: pd.DataFrame) -> pd.DataFrame:
