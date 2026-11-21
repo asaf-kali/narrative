@@ -9,6 +9,7 @@ from narrative import cache
 from narrative.db.loaders import DataLoader, open_connection
 from narrative.models.config import AnalysisConfig
 from narrative.models.sender import SenderRegistry
+from narrative.tracing import span
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ def get_df(request: Request, config: AnalysisConfig) -> pd.DataFrame:
         wadb: Path | None = request.app.state.wadb_path
         registry: SenderRegistry = request.app.state.sender_registry
         logger.info(f"Loading messages for chat_id [{config.chat_id}]")
-        with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+        with span("db.load_df"), open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
             df: pd.DataFrame = DataLoader(db, registry=registry).load_messages(config)
         logger.info(f"Loaded {len(df)} messages")
         cache.set_cached(key, df)
