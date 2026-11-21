@@ -22,6 +22,7 @@ from narrative.db.queries.replies import fetch_replies
 from narrative.db.row_types import RawChatRow, RawMessageRow
 from narrative.models.chat import ChatSort, ChatSummary, ChatType
 from narrative.models.config import AnalysisConfig
+from narrative.models.interactions import InteractionFrames
 from narrative.models.message import MessageType
 from narrative.models.sender import BROADCAST_SERVER, GROUP_SERVER, SenderRegistry
 
@@ -152,6 +153,13 @@ class DataLoader:
         df = pd.DataFrame([r.model_dump() for r in rows])
         df["mentioned_id"] = df["mentioned_phone"].replace("", "unknown")
         return df
+
+    def load_interactions(self, chat_id: int | None = None) -> InteractionFrames:
+        return InteractionFrames(
+            replies=self.load_replies(chat_id=chat_id),
+            reactions=self.load_reactions(chat_id=chat_id),
+            mentions=self.load_mentions(chat_id=chat_id),
+        )
 
     def iter_chat_messages(
         self,

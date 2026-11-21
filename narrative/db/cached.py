@@ -12,10 +12,12 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from narrative.db.connection import DBConnection
+from narrative.db.loaders import DataLoader
 from narrative.db.queries.chats import fetch_chats
 from narrative.db.queries.messages import fetch_messages_metadata, fetch_sender_counts
 from narrative.db.queries.stats import fetch_daily_counts
 from narrative.db.row_types import MessagesMetadata, RawChatRow, RawSenderCount
+from narrative.models.interactions import InteractionFrames
 from narrative.tracing import span
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,7 @@ class MetadataFilters(BaseModel):
 
 _SINGLE_DB_CACHE_SIZE = 4
 _METADATA_CACHE_SIZE = 256
+_INTERACTIONS_CACHE_SIZE = 16
 
 
 @lru_cache(maxsize=_SINGLE_DB_CACHE_SIZE)
@@ -76,6 +79,13 @@ def messages_metadata(msgstore_path: Path, filters: MetadataFilters) -> Messages
         )
 
 
+@lru_cache(maxsize=_INTERACTIONS_CACHE_SIZE)
+def interactions(msgstore_path: Path, chat_id: int | None) -> InteractionFrames:
+    """Load replies, reactions and mentions (whole DB, or one chat); ids need no contact registry."""
+    with span("db.interactions"), DBConnection(msgstore_path=msgstore_path) as db:
+        return DataLoader(db).load_interactions(chat_id=chat_id)
+
+
 def clear_caches() -> None:
-    for cached in (chat_rows, daily_counts, sender_counts, messages_metadata):
+    for cached in (chat_rows, daily_counts, sender_counts, messages_metadata, interactions):
         cached.cache_clear()

@@ -4,20 +4,27 @@ from base64 import b64encode
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Annotated, Any, Literal, cast
 
 import pandas as pd
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from narrative.analysis.content import build_word_cloud_text, emoji_counts, word_frequencies
 from narrative.analysis.media import media_breakdown, media_over_time
-from narrative.analysis.network import NetworkGraph, build_coactivity_graph, build_global_graph, build_reaction_graph
+from narrative.analysis.network import (
+    NetworkGraph,
+    NetworkOptions,
+    Signal,
+    build_chat_network,
+    build_global_network,
+)
 from narrative.analysis.participants import per_sender_stats
 from narrative.analysis.reactions import emoji_reaction_breakdown, reaction_leaderboard, top_reacted_messages
 from narrative.analysis.replies import reply_leaderboard
 from narrative.analysis.timeline import active_days_count, daily_timeline, hourly_heatmap, monthly_timeline
 from narrative.api.deps import get_df
 from narrative.api.routes.messages import _df_to_message_list, _load_engagement_lookups
+from narrative.db import cached
 from narrative.db.attachments import load_message_attachments
 from narrative.db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
 from narrative.db.queries.messages import count_filtered_messages, fetch_messages_page
@@ -28,6 +35,9 @@ from narrative.tracing import span
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+_DEFAULT_NETWORK_NODES = 150
+_MAX_NETWORK_NODES = 1000
 
 
 def _config(
@@ -305,41 +315,42 @@ def get_engagement(
 @router.get("/network")
 def get_global_network(
     request: Request,
-    mode: str = "coactivity",
-    include_me: bool = True,
+    signals: Annotated[list[Signal] | None, Query()] = None,
+    include_me: bool = False,
+    max_nodes: Annotated[int, Query(ge=2, le=_MAX_NETWORK_NODES)] = _DEFAULT_NETWORK_NODES,
     exclude_system: bool = True,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> NetworkGraph:
     config = AnalysisConfig(chat_id=None, exclude_system=exclude_system, date_from=date_from, date_to=date_to)
     df = get_df(request, config)
-    if mode == "reactions":
-        msgstore: Path = request.app.state.msgstore_path
-        wadb: Path | None = request.app.state.wadb_path
-        with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-            reactions_df = DataLoader(db).load_reactions()
-        return build_reaction_graph(df, reactions_df, AnalysisConfig())
-    return build_global_graph(df, include_me=include_me)
+    frames = cached.interactions(msgstore_path=request.app.state.msgstore_path, chat_id=None)
+    options = _network_options(signals=signals, include_me=include_me, max_nodes=max_nodes)
+    with span("analysis.network"):
+        return build_global_network(df=df, interactions=frames, options=options)
 
 
 @router.get("/chats/{chat_id}/network")
 def get_network(
     chat_id: int,
     request: Request,
-    mode: str = "coactivity",
+    signals: Annotated[list[Signal] | None, Query()] = None,
+    max_nodes: Annotated[int, Query(ge=2, le=_MAX_NETWORK_NODES)] = _DEFAULT_NETWORK_NODES,
     exclude_system: bool = True,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> NetworkGraph:
     config = _config(chat_id, exclude_system, date_from, date_to)
     df = get_df(request, config)
-    if mode == "reactions":
-        msgstore: Path = request.app.state.msgstore_path
-        wadb: Path | None = request.app.state.wadb_path
-        with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-            reactions_df = DataLoader(db).load_reactions()
-        return build_reaction_graph(df, reactions_df, config)
-    return build_coactivity_graph(df, config)
+    frames = cached.interactions(msgstore_path=request.app.state.msgstore_path, chat_id=chat_id)
+    options = _network_options(signals=signals, include_me=True, max_nodes=max_nodes)
+    with span("analysis.network"):
+        return build_chat_network(df=df, interactions=frames, options=options)
+
+
+def _network_options(signals: list[Signal] | None, include_me: bool, max_nodes: int) -> NetworkOptions:
+    selected = frozenset(signals) if signals else frozenset(Signal)
+    return NetworkOptions(signals=selected, include_me=include_me, max_nodes=max_nodes)
 
 
 def _generate_wordcloud(df: pd.DataFrame) -> str:
