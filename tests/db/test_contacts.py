@@ -157,3 +157,59 @@ def test_build_sender_registry_priority_csv_over_wa_contacts(tmp_path: Path) -> 
 def test_build_sender_registry_no_sources_returns_empty_registry() -> None:
     registry = build_sender_registry(wadb=None, csv_path=None, msgstore=None)
     assert registry.as_dict() == {}
+
+
+def _profile_msgstore(path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    conn.executescript(
+        "CREATE TABLE jid (_id INTEGER PRIMARY KEY, user TEXT, server TEXT, type INTEGER);"
+        "CREATE TABLE jid_map (lid_row_id INTEGER, jid_row_id INTEGER);"
+        "CREATE TABLE lid_display_name (lid_row_id INTEGER PRIMARY KEY, display_name TEXT NOT NULL, username TEXT);"
+    )
+    conn.executemany(
+        "INSERT INTO jid (_id, user, server, type) VALUES (?, ?, ?, ?)",
+        [
+            (1, "lidmapped", "lid", 0),
+            (2, "1111111", "s.whatsapp.net", 0),
+            (3, "lidunmapped", "lid", 0),
+            (4, "lidblank", "lid", 0),
+        ],
+    )
+    conn.execute("INSERT INTO jid_map (lid_row_id, jid_row_id) VALUES (1, 2)")
+    conn.executemany(
+        "INSERT INTO lid_display_name (lid_row_id, display_name) VALUES (?, ?)",
+        [(1, " Dana "), (3, "Eli"), (4, "  ")],
+    )
+    conn.commit()
+    return conn
+
+
+def test_build_sender_registry_uses_profile_names_as_fallback(tmp_path: Path) -> None:
+    conn = _profile_msgstore(tmp_path / "msgstore.db")
+    registry = build_sender_registry(wadb=None, csv_path=None, msgstore=conn)
+    contacts = registry.as_dict()
+    assert contacts["1111111"] == "~Dana"
+    assert contacts["lidmapped"] == "~Dana"
+    assert contacts["lidunmapped"] == "~Eli"
+    assert "lidblank" not in contacts
+    conn.close()
+
+
+def test_build_sender_registry_csv_name_beats_profile_name(tmp_path: Path) -> None:
+    conn = _profile_msgstore(tmp_path / "msgstore.db")
+    csv_path = tmp_path / "contacts.csv"
+    csv_path.write_text("First Name,Phone 1 - Value\nDana Saved,1111111\n", encoding="utf-8")
+    registry = build_sender_registry(wadb=None, csv_path=csv_path, msgstore=conn)
+    contacts = registry.as_dict()
+    assert contacts["1111111"] == "Dana Saved"
+    assert contacts["lidmapped"] == "Dana Saved"
+    conn.close()
+
+
+def test_build_sender_registry_without_profile_table_still_resolves_lids(tmp_path: Path) -> None:
+    conn = _profile_msgstore(tmp_path / "msgstore.db")
+    conn.execute("DROP TABLE lid_display_name")
+    registry = build_sender_registry(wadb=None, csv_path=None, msgstore=conn)
+    assert registry.as_dict() == {"lidmapped": "1111111"}
+    conn.close()
