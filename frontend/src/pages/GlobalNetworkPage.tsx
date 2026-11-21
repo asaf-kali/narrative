@@ -1,19 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import ForceGraph2D, { type ForceGraphMethods, type NodeObject, type LinkObject } from 'react-force-graph-2d'
 import { api } from '../api/client'
-import type { NetworkNode } from '../api/types'
-import { CardSpinner } from '../components/Spinner'
+import type { NetworkSignal } from '../api/types'
+import NetworkView from '../components/NetworkView'
 
-const CLUSTER_COLORS = [
-  '#7c5af6', '#0891b2', '#db2777', '#f59e0b',
-  '#84cc16', '#6366f1', '#0d9488', '#f97316',
-  '#a78bfa', '#22d3ee', '#fb7185', '#fbbf24',
-  '#c084fc', '#34d399', '#f472b6', '#60a5fa',
-]
-
-type Mode = 'coactivity' | 'reactions'
 type TimeRange = '7d' | '30d' | '90d' | 'all'
+
+const GLOBAL_SIGNALS: NetworkSignal[] = ['replies', 'reactions', 'mentions', 'adjacency', 'groups']
+const NODE_LIMITS = [50, 100, 150, 300]
 
 const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
   { value: '7d', label: '7 days' },
@@ -29,297 +23,50 @@ function dateFrom(range: TimeRange): string | undefined {
   return d.toISOString().slice(0, 10)
 }
 
-interface GraphNode extends NodeObject {
-  id: string; label: string; messages: number
-  cluster: number; centrality: number; groups: string[]
-}
-interface GraphLink extends LinkObject {
-  source: string | GraphNode; target: string | GraphNode; weight: number
-}
-
-function clusterColor(cluster: number) {
-  return CLUSTER_COLORS[cluster % CLUSTER_COLORS.length]
-}
-
-function sharedGroups(a: NetworkNode | undefined, b: NetworkNode | undefined): string[] {
-  if (!a || !b) return []
-  const bs = new Set(b.groups)
-  return a.groups.filter((g) => bs.has(g))
-}
-
-// ── sub-components ─────────────────────────────────────────────────────────
-
-function StatRow({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-xs text-tx-muted shrink-0">{label}</span>
-      <span className="text-xs font-semibold text-tx-secondary tabular-nums text-right">{value}</span>
-    </div>
-  )
-}
-
-function NodePanel({ node, onClose }: { node: NetworkNode; onClose: () => void }) {
-  return (
-    <div className="bg-app-surface border border-app-border rounded-xl p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="text-sm font-semibold text-tx-primary leading-tight">{node.label}</div>
-          <div className="text-[10px] text-tx-muted font-mono mt-0.5">{node.id}</div>
-        </div>
-        <button onClick={onClose} className="text-tx-muted hover:text-tx-secondary text-lg leading-none mt-0.5">×</button>
-      </div>
-
-      <div className="space-y-1.5">
-        <StatRow label="Messages" value={node.messages.toLocaleString()} />
-        <StatRow label="Centrality" value={`${(node.centrality * 100).toFixed(1)}%`} />
-        <StatRow label="Community" value={node.cluster} />
-      </div>
-
-      {node.groups.length > 0 && (
-        <div>
-          <div className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-2">
-            Groups ({node.groups.length})
-          </div>
-          <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-            {node.groups.map((g) => (
-              <div key={g} className="text-[11px] text-tx-secondary bg-app-surface-2 rounded px-2 py-0.5 truncate">{g}</div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function EdgePanel({ shared, labelA, labelB, weight, onClose }: {
-  shared: string[]; labelA: string; labelB: string; weight: number; onClose: () => void
-}) {
-  return (
-    <div className="bg-app-surface border border-app-border rounded-xl p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-xs text-tx-secondary leading-snug">
-          <span className="font-semibold text-tx-primary">{labelA}</span>
-          <span className="text-tx-muted"> & </span>
-          <span className="font-semibold text-tx-primary">{labelB}</span>
-        </div>
-        <button onClick={onClose} className="text-tx-muted hover:text-tx-secondary text-lg leading-none shrink-0">×</button>
-      </div>
-      <StatRow label="Shared groups" value={weight} />
-      <div>
-        <div className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-2">Common groups</div>
-        <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-          {shared.map((g) => (
-            <div key={g} className="text-[11px] text-tx-secondary bg-app-surface-2 rounded px-2 py-0.5 truncate">{g}</div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── main page ──────────────────────────────────────────────────────────────
-
-type Selection =
-  | { type: 'node'; node: NetworkNode }
-  | { type: 'edge'; nodeA: NetworkNode; nodeB: NetworkNode; weight: number }
-  | null
-
 export default function GlobalNetworkPage() {
-  const [mode, setMode] = useState<Mode>('coactivity')
+  const [signals, setSignals] = useState<NetworkSignal[]>(GLOBAL_SIGNALS)
   const [includeMe, setIncludeMe] = useState(false)
-  const [minWeight, setMinWeight] = useState(1)
-  const [timeRange, setTimeRange] = useState<TimeRange>('7d')
-  const [selection, setSelection] = useState<Selection>(null)
+  const [maxNodes, setMaxNodes] = useState(150)
+  const [timeRange, setTimeRange] = useState<TimeRange>('90d')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['global-network', mode, includeMe, timeRange],
-    queryFn: () => api.globalNetwork(mode, includeMe, dateFrom(timeRange)),
+    queryKey: ['global-network', [...signals].sort(), includeMe, maxNodes, timeRange],
+    queryFn: () => api.globalNetwork(signals, includeMe, maxNodes, dateFrom(timeRange)),
   })
 
-  // Container sizing
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [dims, setDims] = useState({ width: 800, height: 500 })
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const obs = new ResizeObserver(([entry]) => {
-      setDims({ width: entry.contentRect.width, height: entry.contentRect.height })
-    })
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [])
-
-  const fgRef = useRef<ForceGraphMethods<GraphNode, GraphLink>>()
-
-  // Build node lookup for click handlers
-  const nodeById = useMemo<Map<string, NetworkNode>>(() => {
-    const map = new Map<string, NetworkNode>()
-    data?.nodes.forEach((n) => map.set(n.id, n))
-    return map
-  }, [data])
-
-  const maxWeight = useMemo(() => Math.max(2, ...(data?.edges.map((e) => e.weight) ?? [2])), [data])
-
-  const graphData = useMemo(() => {
-    if (!data) return { nodes: [], links: [] }
-    const visibleLinks = data.edges.filter((e) => e.weight >= minWeight)
-    const visibleIds = new Set(visibleLinks.flatMap((e) => [e.source, e.target]))
-    return {
-      nodes: data.nodes.filter((n) => visibleIds.has(n.id)) as GraphNode[],
-      links: visibleLinks.map((e) => ({ source: e.source, target: e.target, weight: e.weight })) as GraphLink[],
-    }
-  }, [data, minWeight])
-
-  const topNodes = useMemo(
-    () => [...(data?.nodes ?? [])].sort((a, b) => b.centrality - a.centrality).slice(0, 7),
-    [data],
+  const controls = (
+    <>
+      <select
+        value={timeRange}
+        onChange={(e) => setTimeRange(e.target.value as TimeRange)}
+        className="bg-app-surface-2 border border-app-border rounded-full px-2.5 py-1 text-xs text-tx-secondary"
+      >
+        {TIME_RANGE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+      </select>
+      <select
+        value={maxNodes}
+        onChange={(e) => setMaxNodes(Number(e.target.value))}
+        title="Keep the people with the strongest ties"
+        className="bg-app-surface-2 border border-app-border rounded-full px-2.5 py-1 text-xs text-tx-secondary"
+      >
+        {NODE_LIMITS.map((n) => <option key={n} value={n}>Top {n} people</option>)}
+      </select>
+      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+        <input type="checkbox" checked={includeMe} onChange={(e) => setIncludeMe(e.target.checked)} className="w-3 h-3 accent-accent" />
+        <span className="text-xs text-tx-secondary">Include me</span>
+      </label>
+    </>
   )
 
-  const handleNodeClick = useCallback((n: GraphNode) => {
-    const node = nodeById.get(n.id)
-    if (!node) return
-    setSelection({ type: 'node', node })
-    fgRef.current?.centerAt(n.x, n.y, 500)
-    fgRef.current?.zoom(3, 500)
-  }, [nodeById])
-
-  const handleLinkClick = useCallback((link: GraphLink) => {
-    const srcId = typeof link.source === 'string' ? link.source : link.source.id
-    const dstId = typeof link.target === 'string' ? link.target : link.target.id
-    const nodeA = nodeById.get(srcId)
-    const nodeB = nodeById.get(dstId)
-    if (!nodeA || !nodeB) return
-    setSelection({ type: 'edge', nodeA, nodeB, weight: link.weight })
-  }, [nodeById])
-
   return (
-    <div className="flex gap-4 h-full min-h-0">
-      {/* Graph panel */}
-      <div className="flex-1 flex flex-col bg-app-surface border border-app-border rounded-xl overflow-hidden min-w-0">
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-app-border shrink-0">
-          <div className="flex gap-1">
-            {(['coactivity', 'reactions'] as Mode[]).map((m) => (
-              <button key={m} onClick={() => { setMode(m); setMinWeight(m === 'coactivity' ? 1 : 1); setSelection(null) }}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${mode === m
-                  ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                  : 'bg-app-surface-2 text-tx-secondary hover:text-tx-primary border border-app-border'}`}>
-                {m === 'coactivity' ? 'Shared groups' : 'Reactions'}
-              </button>
-            ))}
-          </div>
-
-          <label className="flex items-center gap-1.5 cursor-pointer select-none ml-1">
-            <input type="checkbox" checked={includeMe} onChange={(e) => { setIncludeMe(e.target.checked); setSelection(null) }}
-              className="w-3 h-3 accent-accent" />
-            <span className="text-xs text-tx-secondary">Include me</span>
-          </label>
-
-          <div className="flex gap-1 ml-1">
-            {TIME_RANGE_OPTIONS.map((opt) => (
-              <button key={opt.value} onClick={() => { setTimeRange(opt.value); setMinWeight(1); setSelection(null) }}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${timeRange === opt.value
-                  ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                  : 'bg-app-surface-2 text-tx-secondary hover:text-tx-primary border border-app-border'}`}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs text-tx-muted">Min. shared groups</span>
-            <input type="range" min={1} max={Math.min(maxWeight, 20)} value={minWeight}
-              onChange={(e) => setMinWeight(Number(e.target.value))} className="w-28 accent-accent" />
-            <span className="text-xs text-tx-secondary tabular-nums w-4 text-right">{minWeight}</span>
-          </div>
-
-          <button onClick={() => fgRef.current?.zoomToFit(400, 20)}
-            className="text-[10px] text-tx-muted hover:text-tx-secondary transition-colors">
-            Fit
-          </button>
-        </div>
-
-        {/* Canvas */}
-        <div ref={containerRef} className="flex-1 min-h-0">
-          {isLoading ? (
-            <CardSpinner className="h-full" />
-          ) : graphData.nodes.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-tx-muted text-sm">
-              No data — lower the min. shared groups slider.
-            </div>
-          ) : (
-            <ForceGraph2D
-              ref={fgRef}
-              graphData={graphData}
-              width={dims.width}
-              height={dims.height}
-              backgroundColor="#0d0f17"
-              nodeLabel={(n) => `${(n as GraphNode).label} · ${(n as GraphNode).groups.length} groups`}
-              nodeColor={(n) => clusterColor((n as GraphNode).cluster)}
-              nodeVal={(n) => Math.max(1, Math.sqrt((n as GraphNode).messages / 100))}
-              linkColor={() => 'rgba(255,255,255,0.05)'}
-              linkWidth={(l) => Math.log1p((l as GraphLink).weight) * 0.5}
-              linkDirectionalArrowLength={mode === 'reactions' ? 4 : 0}
-              linkDirectionalArrowRelPos={1}
-              onNodeClick={(n) => handleNodeClick(n as GraphNode)}
-              onLinkClick={(l) => handleLinkClick(l as GraphLink)}
-              nodeCanvasObjectMode={() => 'after'}
-              nodeCanvasObject={(node, ctx, globalScale) => {
-                const n = node as GraphNode
-                if (globalScale < 2) return
-                const label = n.label.split(' ')[0]
-                const fontSize = 10 / globalScale
-                ctx.font = `${fontSize}px sans-serif`
-                ctx.fillStyle = 'rgba(226,232,240,0.85)'
-                ctx.textAlign = 'center'
-                ctx.textBaseline = 'top'
-                ctx.fillText(label, node.x ?? 0, (node.y ?? 0) + Math.sqrt(n.messages / 100) + 2)
-              }}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Sidebar */}
-      <div className="w-52 shrink-0 flex flex-col gap-3 overflow-y-auto">
-        <div className="bg-app-surface border border-app-border rounded-xl p-4 space-y-1.5 shrink-0">
-          <h3 className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-3">Stats</h3>
-          <StatRow label="Contacts" value={data?.nodes.length.toLocaleString() ?? '—'} />
-          <StatRow label="Visible" value={graphData.nodes.length.toLocaleString()} />
-          <StatRow label="Connections" value={graphData.links.length.toLocaleString()} />
-          <StatRow label="Communities" value={data?.communities ?? '—'} />
-        </div>
-
-        {selection && (
-          selection.type === 'node'
-            ? <NodePanel node={selection.node} onClose={() => setSelection(null)} />
-            : <EdgePanel
-                labelA={selection.nodeA.label} labelB={selection.nodeB.label}
-                weight={selection.weight}
-                shared={sharedGroups(selection.nodeA, selection.nodeB)}
-                onClose={() => setSelection(null)}
-              />
-        )}
-
-        {!selection && (
-          <div className="bg-app-surface border border-app-border rounded-xl p-4 flex-1">
-            <h3 className="text-[9px] font-semibold text-tx-muted uppercase tracking-widest mb-3">Most Connected</h3>
-            <div className="space-y-2.5">
-              {topNodes.map((node, i) => (
-                <div key={node.id} className="flex items-center gap-2">
-                  <span className="text-[10px] text-tx-muted w-3 shrink-0">{i + 1}</span>
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: clusterColor(node.cluster) }} />
-                  <span className="text-xs text-tx-secondary truncate">{node.label}</span>
-                  <span className="text-[10px] text-tx-muted ml-auto shrink-0 tabular-nums">
-                    {node.groups.length}g
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="text-[10px] text-tx-muted mt-4">Click a node or edge for details.</p>
-          </div>
-        )}
-      </div>
-    </div>
+    <NetworkView
+      data={data}
+      isLoading={isLoading}
+      availableSignals={GLOBAL_SIGNALS}
+      signals={signals}
+      onSignalsChange={setSignals}
+      controls={controls}
+      showGroups
+    />
   )
 }
