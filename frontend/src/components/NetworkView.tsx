@@ -133,11 +133,16 @@ function Pill({ active, onClick, title, children }: { active: boolean; onClick: 
 export const CONTROL_CLASS =
   'h-7 bg-app-surface-2 border border-app-border rounded-full px-2.5 text-xs text-tx-secondary disabled:cursor-not-allowed'
 
-/** One toolbar row of related controls; labels form a fixed column and controls wrap beside it. */
-function ToolbarGroup({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * A labeled run of related controls; controls wrap beside the label, never under it.
+ * `fixedLabel` puts the label in the shared column so row-starting groups line up.
+ */
+function ToolbarGroup({ label, fixedLabel = true, children }: { label: string; fixedLabel?: boolean; children: ReactNode }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="w-14 shrink-0 h-7 flex items-center text-[10px] font-semibold uppercase tracking-wider text-tx-muted">
+      <span
+        className={`${fixedLabel ? 'w-14' : ''} shrink-0 h-7 flex items-center text-[10px] font-semibold uppercase tracking-wider text-tx-muted`}
+      >
         {label}
       </span>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">{children}</div>
@@ -456,22 +461,25 @@ export default function NetworkView({
               ))}
             </div>
           </ToolbarGroup>
-          {controls && <ToolbarGroup label="Scope">{controls}</ToolbarGroup>}
-          <ToolbarGroup label="View">
-            <ClustersControl
-              value={clusters || (data?.communities ?? lastCommunities.current)}
-              isAuto={clusters === 0}
-              max={data?.nodes.length ?? 1}
-              disabled={isLoading || !data || data.nodes.length === 0}
-              onChange={onClustersChange}
-            />
-            <Toggle
-              checked={backboneOnly}
-              onChange={onBackboneOnlyChange}
-              label="Strongest ties only"
-              title="Hide ties that are weak relative to both people's other ties"
-            />
-          </ToolbarGroup>
+          {/* Scope and View share a row when it fits; View wraps below, keeping the label column. */}
+          <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
+            {controls && <ToolbarGroup label="Scope">{controls}</ToolbarGroup>}
+            <ToolbarGroup label="View" fixedLabel={!controls}>
+              <ClustersControl
+                value={clusters || (data?.communities ?? lastCommunities.current)}
+                isAuto={clusters === 0}
+                max={data?.nodes.length ?? 1}
+                disabled={isLoading || !data || data.nodes.length === 0}
+                onChange={onClustersChange}
+              />
+              <Toggle
+                checked={backboneOnly}
+                onChange={onBackboneOnlyChange}
+                label="Strongest ties only"
+                title="Hide ties that are weak relative to both people's other ties"
+              />
+            </ToolbarGroup>
+          </div>
         </div>
 
         <div ref={containerRef} className="relative flex-1 min-h-0" onPointerDown={stopAutoFit} onWheel={stopAutoFit}>
