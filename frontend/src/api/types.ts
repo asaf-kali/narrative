@@ -228,26 +228,37 @@ export interface RangeBucket {
   count: number
 }
 
+export type NetworkSignal = 'replies' | 'reactions' | 'mentions' | 'adjacency' | 'groups'
+
 export interface NetworkNode {
   id: string
   label: string
   messages: number
   cluster: number
-  centrality: number
-  groups: string[]
+  strength: number   // weighted degree
+  bridging: number   // normalized betweenness on the backbone, 0..1
+  groups: string[]   // populated by the global graph only
 }
 
 export interface NetworkEdge {
   source: string
   target: string
-  weight: number
+  weight: number       // weighted sum of the selected signals
+  lift: number         // observed / expected weight; > 1 = closer than chance
+  backbone: boolean    // survives the disparity filter
+  reciprocity: number  // 0 = one-sided, 1 = perfectly mutual
+  replies: number
+  reactions: number
+  mentions: number
+  adjacency: number    // decayed turn-adjacency score
+  shared_groups: number
 }
 
 export interface NetworkGraph {
   nodes: NetworkNode[]
   edges: NetworkEdge[]
   communities: number
-  mode: string
+  signals: NetworkSignal[]
 }
 
 export interface SenderInfo {

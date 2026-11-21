@@ -14,6 +14,7 @@ import type {
   MessageBounds,
   MessagesMetadata,
   NetworkGraph,
+  NetworkSignal,
   OverviewData,
   Participant,
   RangeDetail,
@@ -35,6 +36,12 @@ function optionParams(dateFrom?: string, dateTo?: string, q?: string): URLSearch
   if (dateFrom) params.set('date_from', dateFrom)
   if (dateTo) params.set('date_to', dateTo)
   if (q) params.set('q', q)
+  return params
+}
+
+function networkParams(signals: NetworkSignal[]): URLSearchParams {
+  const params = new URLSearchParams()
+  signals.forEach((s) => params.append('signals', s))
   return params
 }
 
@@ -150,14 +157,12 @@ export const api = {
     const params = new URLSearchParams({ date_from: from, date_to: to })
     return get(`/api/range?${params}`)
   },
-  network: (chatId: number, mode: 'coactivity' | 'reactions' = 'coactivity'): Promise<NetworkGraph> =>
-    get(`/api/chats/${chatId}/network?mode=${mode}`),
-  globalNetwork: (
-    mode: 'coactivity' | 'reactions' = 'coactivity',
-    includeMe = true,
-    dateFrom?: string,
-  ): Promise<NetworkGraph> => {
-    const params = new URLSearchParams({ mode, include_me: String(includeMe) })
+  network: (chatId: number, signals: NetworkSignal[]): Promise<NetworkGraph> =>
+    get(`/api/chats/${chatId}/network?${networkParams(signals)}`),
+  globalNetwork: (signals: NetworkSignal[], includeMe: boolean, maxNodes: number, dateFrom?: string): Promise<NetworkGraph> => {
+    const params = networkParams(signals)
+    params.set('include_me', String(includeMe))
+    params.set('max_nodes', String(maxNodes))
     if (dateFrom) params.set('date_from', dateFrom)
     return get(`/api/network?${params}`)
   },
