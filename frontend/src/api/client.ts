@@ -1,11 +1,13 @@
 import type {
   Chat,
+  ChatSort,
   ChatIndexStatus,
   ChatMessagesResponse,
   DayCount,
   DayDetail,
   EmojiItem,
   EngagementData,
+  FilterOptions,
   GlobalMessagesResponse,
   HeatmapPoint,
   MediaData,
@@ -28,6 +30,14 @@ async function get<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+function optionParams(dateFrom?: string, dateTo?: string, q?: string): URLSearchParams {
+  const params = new URLSearchParams()
+  if (dateFrom) params.set('date_from', dateFrom)
+  if (dateTo) params.set('date_to', dateTo)
+  if (q) params.set('q', q)
+  return params
+}
+
 export class SemanticUnavailableError extends Error {
   constructor() {
     super('Semantic search index not available')
@@ -35,12 +45,16 @@ export class SemanticUnavailableError extends Error {
 }
 
 export const api = {
-  chats: (search?: string): Promise<Chat[]> => {
+  chats: (opts: { search?: string; sort?: ChatSort; hideEmpty?: boolean; limit?: number } = {}): Promise<Chat[]> => {
     const params = new URLSearchParams()
-    if (search) params.set('search', search)
+    if (opts.search) params.set('search', opts.search)
+    if (opts.sort) params.set('sort', opts.sort)
+    if (opts.hideEmpty) params.set('hide_empty', 'true')
+    if (opts.limit !== undefined) params.set('limit', String(opts.limit))
     const qs = params.toString()
     return get(`/api/chats${qs ? `?${qs}` : ''}`)
   },
+  chat: (chatId: number): Promise<Chat> => get(`/api/chats/${chatId}`),
   dailyCounts: (): Promise<DayCount[]> => get('/api/stats/daily'),
   overview: (chatId: number): Promise<OverviewData> => get(`/api/chats/${chatId}/overview`),
   timeline: (chatId: number, period: 'daily' | 'monthly'): Promise<TimelinePoint[]> =>
@@ -109,12 +123,10 @@ export const api = {
     if (sort) params.set('sort', sort)
     return get(`/api/messages?${params}`)
   },
-  senders: (senderIds?: string[]): Promise<SenderInfo[]> => {
-    const params = new URLSearchParams()
-    senderIds?.forEach((id) => params.append('sender_ids', id))
-    const qs = params.toString()
-    return get(`/api/senders${qs ? `?${qs}` : ''}`)
-  },
+  chatOptions: (dateFrom?: string, dateTo?: string, q?: string): Promise<FilterOptions<Chat>> =>
+    get(`/api/messages/chat-options?${optionParams(dateFrom, dateTo, q)}`),
+  senderOptions: (dateFrom?: string, dateTo?: string, q?: string): Promise<FilterOptions<SenderInfo>> =>
+    get(`/api/messages/sender-options?${optionParams(dateFrom, dateTo, q)}`),
   search: (q: string, limit = 50): Promise<SearchResult[]> =>
     get(`/api/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   semanticSearch: async (q: string, limit = 10, chatId?: number): Promise<SemanticSearchHit[]> => {

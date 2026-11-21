@@ -55,8 +55,11 @@ function TopNode({ rank, node }: { rank: number; node: NetworkNode }) {
 
 export default function NetworkPage() {
   const { chatId } = useParams<{ chatId: string }>()
-  const { data: chats = [] } = useQuery({ queryKey: ['chats'], queryFn: () => api.chats() })
-  const chat = chats.find((c) => c.chat_id === Number(chatId))
+  const { data: chat } = useQuery({
+    queryKey: ['chat', chatId],
+    queryFn: () => api.chat(Number(chatId)),
+    enabled: !!chatId,
+  })
 
   const [mode, setMode] = useState<Mode>('coactivity')
   const [minWeight, setMinWeight] = useState(1)
