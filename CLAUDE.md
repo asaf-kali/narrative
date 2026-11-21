@@ -12,8 +12,6 @@ just frontend-dev         # start Vite dev server (:8050, proxies /api to :8051)
 just frontend-build       # build React app into frontend/dist/
 ```
 
-mypy runs via `uv run dmypy run .` (daemon).
-
 ## Architecture
 
 4 strict layers. `narrative` is the root package (repo root on `sys.path`), so imports are e.g. `from narrative.db.loaders import DataLoader`.
@@ -24,15 +22,7 @@ mypy runs via `uv run dmypy run .` (daemon).
 
 **`narrative/analysis/`** — Pure functions `(pd.DataFrame, AnalysisConfig) → pd.DataFrame`. Register with `@analysis(...)` decorator.
 
-**`narrative/api/`** — FastAPI backend. `server.py` creates the app with lifespan (stores db paths in `app.state`). Routes in `routes/chats.py`, `routes/analysis.py`, and `routes/messages.py`. `deps.py` provides `get_df()` with LRU cache. In production, serves the built frontend from `frontend/dist/`. CORS allows `localhost:8050`. `TracingMiddleware` (`narrative/tracing.py`) logs every `/api` request and sets a `Server-Timing` header; wrap slow steps in `span("name")`. On startup `ensure_indexes()` (`narrative/db/indexes.py`) adds secondary indexes that crypt15 backups strip. Whole-DB aggregates are memoized in `narrative/db/cached.py` (DB is read-only).
-
-**`frontend/`** — React 18 + TypeScript + Vite + Tailwind CSS + Recharts + TanStack Query + React Router v6. API client in `src/api/client.ts`. Top-level pages: Summary (`/`), Messages (`/messages`), Network (`/network`). Chat pages under `/chat/:chatId`: Overview, Timeline, Participants, Content (words/emoji), Media, Messages, Network.
-
-## Dev workflow
-
-`just run-dev --msgstore data/msgstore.db` — backend on :8051 (reload) + Vite on :8050 (proxies /api to :8051). The UI is on :8050 in both dev and prod.
-
-For production: `just frontend-build` then `just run --msgstore data/msgstore.db`
+**`narrative/api/`** — FastAPI backend. `server.py` creates the app with lifespan (stores db paths in `app.state`). `deps.py` provides `get_df()` with LRU cache. In production, serves the built frontend from `frontend/dist/`. CORS allows `localhost:8050`. `TracingMiddleware` (`narrative/tracing.py`) logs every `/api` request and sets a `Server-Timing` header; wrap slow steps in `span("name")`. On startup `ensure_indexes()` (`narrative/db/indexes.py`) adds secondary indexes that crypt15 backups strip. Whole-DB aggregates are memoized in `narrative/db/cached.py` (DB is read-only).
 
 ## UI Testing with Playwright
 
@@ -78,7 +68,7 @@ Contact name resolution order: `wa_contacts.display_name` → `jid.user` (phone 
 
 ## Linting Notes
 
-Ruff runs `select = ["ALL"]` with a targeted ignore list. Notable active rules: `ANN` (type annotations required everywhere), `S` (security), `PERF`, `UP` (pyupgrade). `disallow_untyped_decorators = false` is set globally because the `@analysis` TypeVar decorator pattern is correct but mypy can't verify it.
+`disallow_untyped_decorators = false` is set globally because the `@analysis` TypeVar decorator pattern is correct but mypy can't verify it.
 
 Never use `# noqa: PLC0415` (imports not at top of file). If you think a deferred import is needed, ask the user first.
 
