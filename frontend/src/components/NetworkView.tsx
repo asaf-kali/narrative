@@ -404,11 +404,13 @@ export default function NetworkView({
 
   const selectedId = selection?.type === 'node' ? selection.id : null
   const selectedEdge = selection?.type === 'edge' ? selection.edge : null
-  // The selected person plus everyone they're tied to; other nodes are dimmed.
+  // Nodes kept at full strength; the rest are dimmed. A person brings everyone they're tied to,
+  // a tie only its two people.
   const focusIds = useMemo(() => {
+    if (selectedEdge) return new Set([selectedEdge.source, selectedEdge.target])
     if (!selectedId) return null
     return new Set([selectedId, ...edges.filter((e) => touches(e, selectedId)).map((e) => other(e, selectedId))])
-  }, [edges, selectedId])
+  }, [edges, selectedId, selectedEdge])
 
   const isHighlighted = useCallback((edge: NetworkEdge) => {
     if (selectedId) return touches(edge, selectedId)
@@ -519,7 +521,8 @@ export default function NetworkView({
               nodeCanvasObjectMode={() => 'after'}
               nodeCanvasObject={(node, ctx, globalScale) => {
                 const n = node as GraphNode
-                if (globalScale < 1.5 && n.id !== selectedId && n.id !== ME_ID) return
+                const named = n.id === selectedId || n.id === ME_ID || (selectedEdge !== null && touches(selectedEdge, n.id))
+                if (globalScale < 1.5 && !named) return
                 const radius = Math.sqrt(nodeVal(n.messages, maxMessages)) * 4  // force-graph's default nodeRelSize
                 const fontSize = 10 / globalScale
                 ctx.font = `${fontSize}px sans-serif`
