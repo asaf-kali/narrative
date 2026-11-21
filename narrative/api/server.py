@@ -11,7 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from narrative.api.routes import analysis, chats, day, messages, range_detail, search, stats
 from narrative.db.connection import DBConnection
 from narrative.db.contacts import build_sender_registry
-from narrative.tracing import TracingMiddleware
+from narrative.db.indexes import ensure_indexes
+from narrative.tracing import TracingMiddleware, span
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,8 @@ def create_api(
         app.state.msgstore_path = msgstore_path
         app.state.wadb_path = wadb_path
         app.state.search_dir = search_dir
+        with span("startup.indexes"):
+            ensure_indexes(msgstore_path=msgstore_path)
         with DBConnection(msgstore_path=msgstore_path, wadb_path=wadb_path) as db:
             app.state.sender_registry = build_sender_registry(
                 wadb=db.wadb,
