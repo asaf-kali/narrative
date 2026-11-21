@@ -5,21 +5,46 @@ from typing import Annotated, Any, Literal
 
 import pandas as pd
 from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel
 
 from narrative.analysis.reactions import MessageReactions, reactions_by_message
 from narrative.analysis.replies import ReplyPreview, replies_by_message
 from narrative.db import cached
 from narrative.db.attachments import MessageAttachments, load_message_attachments
 from narrative.db.cached import MetadataFilters
-from narrative.db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
+from narrative.db.loaders import DataLoader, build_messages_df, chat_summaries, datetime_to_ms, open_connection
 from narrative.db.queries.messages import fetch_message_bounds, fetch_messages_page
-from narrative.db.row_types import RawMessageRow
+from narrative.db.row_types import MessagesMetadata, RawMessageRow, RawSenderCount
+from narrative.models.chat import ChatSort, ChatSummary
 from narrative.models.message import message_display_text
 from narrative.models.sender import SenderRegistry
 from narrative.tracing import span
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+_OPTIONS_LIMIT = 100
+
+
+class SenderInfo(BaseModel):
+    sender_id: str
+    sender_name: str
+    phone: str
+    message_count: int
+
+
+class ChatOptions(BaseModel):
+    """Chats with messages in the date range; `items` is capped, `total` counts every match."""
+
+    total: int
+    items: list[ChatSummary]
+
+
+class SenderOptions(BaseModel):
+    """Senders with messages in the date range; `items` is capped, `total` counts every match."""
+
+    total: int
+    items: list[SenderInfo]
 
 
 @router.get("/messages/bounds")
@@ -53,12 +78,62 @@ def get_global_messages_metadata(
         search=search,
     )
     meta = cached.messages_metadata(msgstore_path=msgstore, filters=filters)
+    return {"total": meta.total}
 
-    return {
-        "total": meta.total,
-        "available_chat_ids": meta.available_chat_ids,
-        "available_sender_ids": meta.available_sender_ids,
-    }
+
+@router.get("/messages/chat-options", response_model=ChatOptions)
+def get_chat_options(
+    request: Request,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    q: str | None = None,
+    limit: int = _OPTIONS_LIMIT,
+) -> ChatOptions:
+    """Chats active in the date range, busiest first, optionally filtered by name."""
+    msgstore: Path = request.app.state.msgstore_path
+    registry: SenderRegistry = request.app.state.sender_registry
+    available = set(_date_range_metadata(msgstore, date_from=date_from, date_to=date_to).available_chat_ids)
+    rows = [r for r in cached.chat_rows(msgstore_path=msgstore) if r.chat_id in available]
+    summaries = chat_summaries(rows=rows, registry=registry, search=q, sort=ChatSort.MESSAGES, limit=None)
+    return ChatOptions(total=len(summaries), items=summaries[:limit])
+
+
+@router.get("/messages/sender-options", response_model=SenderOptions)
+def get_sender_options(
+    request: Request,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    q: str | None = None,
+    limit: int = _OPTIONS_LIMIT,
+) -> SenderOptions:
+    """Senders active in the date range, busiest first, optionally filtered by name or phone."""
+    msgstore: Path = request.app.state.msgstore_path
+    registry: SenderRegistry = request.app.state.sender_registry
+    available = set(_date_range_metadata(msgstore, date_from=date_from, date_to=date_to).available_sender_ids)
+    rows = [r for r in cached.sender_counts(msgstore_path=msgstore) if r.sender_id in available]
+    senders = [_sender_info(row, registry) for row in rows]
+    if q:
+        needle = q.lower()
+        senders = [s for s in senders if needle in s.sender_name.lower() or needle in s.phone]
+    return SenderOptions(total=len(senders), items=senders[:limit])
+
+
+def _date_range_metadata(msgstore: Path, date_from: datetime | None, date_to: datetime | None) -> MessagesMetadata:
+    filters = MetadataFilters(
+        date_from_ms=datetime_to_ms(date_from) if date_from else None,
+        date_to_ms=datetime_to_ms(date_to) if date_to else None,
+    )
+    return cached.messages_metadata(msgstore_path=msgstore, filters=filters)
+
+
+def _sender_info(row: RawSenderCount, registry: SenderRegistry) -> SenderInfo:
+    if row.from_me:
+        return SenderInfo(
+            sender_id=row.sender_id, sender_name=registry.me_name, phone="", message_count=row.message_count
+        )
+    phone = row.effective_phone
+    name = registry.resolve_sender(phone=phone, from_me=False).display_name
+    return SenderInfo(sender_id=row.sender_id, sender_name=name, phone=phone, message_count=row.message_count)
 
 
 @router.get("/messages")
@@ -112,38 +187,20 @@ def get_global_messages(
     return {"messages": messages}
 
 
-@router.get("/senders")
+@router.get("/senders", response_model=list[SenderInfo])
 def get_senders(
     request: Request,
     sender_ids: Annotated[list[str] | None, Query()] = None,
-) -> list[dict[str, Any]]:
+) -> list[SenderInfo]:
     logger.info("Fetching senders with message counts")
     msgstore: Path = request.app.state.msgstore_path
     registry: SenderRegistry = request.app.state.sender_registry
-    contacts = registry.as_dict()
 
     rows = cached.sender_counts(msgstore_path=msgstore)
     if sender_ids:
         wanted = set(sender_ids)
         rows = [r for r in rows if r.sender_id in wanted]
-
-    result = []
-    for row in rows:
-        if row.from_me:
-            sender_name = registry.me_name
-            phone = ""
-        else:
-            phone = row.effective_phone
-            sender_name = contacts.get(phone) or phone or "Unknown"
-        result.append(
-            {
-                "sender_id": row.sender_id,
-                "sender_name": sender_name,
-                "phone": phone,
-                "message_count": row.message_count,
-            }
-        )
-    return result
+    return [_sender_info(row, registry) for row in rows]
 
 
 def _df_to_message_list(

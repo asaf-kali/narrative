@@ -1,11 +1,15 @@
 from fastapi.testclient import TestClient
 from seed_data import (
+    ALICE_NAME,
+    ALICE_PHONE,
+    CHAT_BROADCAST,
     CHAT_DIRECT,
     CHAT_GROUP,
     DAVE_NAME,
     DAVE_PHONE,
     ERIN_NAME,
     FRANK_NAME,
+    GROUP_SUBJECT,
     MSG_ALICE_CONTACT,
     MSG_ALICE_HELLO,
     MSG_ALICE_LOCATION,
@@ -36,8 +40,45 @@ def test_messages_bounds_scoped_to_chat(api_client: TestClient) -> None:
 def test_messages_metadata_totals(api_client: TestClient) -> None:
     resp = api_client.get("/api/messages/metadata")
     body = resp.json()
-    assert body["total"] == 8
-    assert "me" in body["available_sender_ids"]
+    assert body == {"total": 8}
+
+
+def test_chat_options_lists_all_active_chats_busiest_first(api_client: TestClient) -> None:
+    body = api_client.get("/api/messages/chat-options").json()
+    assert body["total"] == 3
+    counts = [c["message_count"] for c in body["items"]]
+    assert counts == sorted(counts, reverse=True)
+    assert {c["chat_id"] for c in body["items"]} == {CHAT_DIRECT, CHAT_GROUP, CHAT_BROADCAST}
+
+
+def test_chat_options_search_is_case_insensitive(api_client: TestClient) -> None:
+    body = api_client.get("/api/messages/chat-options", params={"q": GROUP_SUBJECT.upper()}).json()
+    assert body["total"] == 1
+    assert body["items"][0]["chat_id"] == CHAT_GROUP
+
+
+def test_chat_options_limit_caps_items_not_total(api_client: TestClient) -> None:
+    body = api_client.get("/api/messages/chat-options", params={"limit": 1}).json()
+    assert body["total"] == 3
+    assert len(body["items"]) == 1
+
+
+def test_chat_options_respects_date_range(api_client: TestClient) -> None:
+    body = api_client.get("/api/messages/chat-options", params={"date_from": "2100-01-01T00:00:00"}).json()
+    assert body == {"total": 0, "items": []}
+
+
+def test_sender_options_search_matches_name_and_phone(api_client: TestClient) -> None:
+    by_name = api_client.get("/api/messages/sender-options", params={"q": ALICE_NAME.split()[0].lower()}).json()
+    by_phone = api_client.get("/api/messages/sender-options", params={"q": ALICE_PHONE[:4]}).json()
+    assert [s["sender_name"] for s in by_name["items"]] == [ALICE_NAME]
+    assert [s["phone"] for s in by_phone["items"]] == [ALICE_PHONE]
+
+
+def test_sender_options_limit_caps_items_not_total(api_client: TestClient) -> None:
+    body = api_client.get("/api/messages/sender-options", params={"limit": 1}).json()
+    assert body["total"] > 1
+    assert len(body["items"]) == 1
 
 
 def test_get_global_messages_returns_engagement_annotations(api_client: TestClient) -> None:
