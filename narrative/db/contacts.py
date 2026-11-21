@@ -13,6 +13,8 @@ _MIN_PHONE_DIGITS = 7
 _MAX_PHONE_DIGITS = 15
 # Google Contacts joins multiple values of one field (e.g. two phone numbers) with " ::: ".
 _MULTI_VALUE_SEP = ":::"
+# lid_display_name stores "+972∙∙∙∙∙∙∙40" (a masked phone, not a name) when the profile name is hidden.
+_MASK_CHAR = "\u2219"
 
 
 def build_sender_registry(
@@ -148,22 +150,34 @@ def _load_profile_names(msgstore: sqlite3.Connection) -> dict[str, str]:
     """Load WhatsApp profile names from lid_display_name as {phone_or_lid: "~Name"}.
 
     Keyed by the phone number when jid_map links the LID to one, else by the LID itself.
+    Masked phones are not names: fall back to the WhatsApp username, else skip the row.
     """
     try:
         rows = msgstore.execute("""
-            SELECT COALESCE(phone_jid.user, lid_jid.user) AS user, ldn.display_name
+            SELECT COALESCE(phone_jid.user, lid_jid.user) AS user, ldn.display_name, ldn.username
             FROM lid_display_name ldn
             JOIN jid lid_jid ON ldn.lid_row_id = lid_jid._id
             LEFT JOIN jid_map jm ON jm.lid_row_id = ldn.lid_row_id
             LEFT JOIN jid phone_jid ON jm.jid_row_id = phone_jid._id AND phone_jid.server = 's.whatsapp.net'
-            WHERE TRIM(ldn.display_name) != ''
         """).fetchall()
     except sqlite3.OperationalError:
         logger.debug("lid_display_name not available — skipping WhatsApp profile names.")
         return {}
-    names = {row["user"]: PROFILE_NAME_PREFIX + row["display_name"].strip() for row in rows}
+    names: dict[str, str] = {}
+    for row in rows:
+        name = _profile_name(display_name=row["display_name"], username=row["username"])
+        if name:
+            names[row["user"]] = PROFILE_NAME_PREFIX + name
     logger.info(f"Loaded {len(names)} WhatsApp profile names")
     return names
+
+
+def _profile_name(display_name: str | None, username: str | None) -> str:
+    """Return the profile name unless blank or a masked phone; else the username (may be empty)."""
+    name = (display_name or "").strip()
+    if name and _MASK_CHAR not in name:
+        return name
+    return (username or "").strip()
 
 
 def _load_wa_contacts(wadb: sqlite3.Connection) -> dict[str, str]:

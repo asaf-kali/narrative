@@ -174,12 +174,20 @@ def _profile_msgstore(path: Path) -> sqlite3.Connection:
             (2, "1111111", "s.whatsapp.net", 0),
             (3, "lidunmapped", "lid", 0),
             (4, "lidblank", "lid", 0),
+            (5, "lidmasked", "lid", 0),
+            (6, "lidusername", "lid", 0),
         ],
     )
     conn.execute("INSERT INTO jid_map (lid_row_id, jid_row_id) VALUES (1, 2)")
     conn.executemany(
-        "INSERT INTO lid_display_name (lid_row_id, display_name) VALUES (?, ?)",
-        [(1, " Dana "), (3, "Eli"), (4, "  ")],
+        "INSERT INTO lid_display_name (lid_row_id, display_name, username) VALUES (?, ?, ?)",
+        [
+            (1, " Dana ", None),
+            (3, "Eli", None),
+            (4, "  ", None),
+            (5, "+972\u2219\u2219\u2219\u2219\u2219\u2219\u221940", None),
+            (6, "+972\u2219\u2219\u2219\u2219\u2219\u2219\u221941", "gil.k"),
+        ],
     )
     conn.commit()
     return conn
@@ -193,6 +201,8 @@ def test_build_sender_registry_uses_profile_names_as_fallback(tmp_path: Path) ->
     assert contacts["lidmapped"] == "~Dana"
     assert contacts["lidunmapped"] == "~Eli"
     assert "lidblank" not in contacts
+    assert "lidmasked" not in contacts
+    assert contacts["lidusername"] == "~gil.k"
     conn.close()
 
 
