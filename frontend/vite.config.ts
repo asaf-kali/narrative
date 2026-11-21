@@ -4,9 +4,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    // Same port as the production server (`just run`), so the URL is identical in dev and prod.
+    port: 8050,
+    strictPort: true,
     proxy: {
-      '/api': 'http://localhost:8050',
+      // Dev backend port — keep in sync with DEV_BACKEND_PORT in the justfile.
+      '/api': 'http://localhost:8051',
     },
   },
   build: {

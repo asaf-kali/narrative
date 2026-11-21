@@ -82,12 +82,9 @@ just run
 ## Development
 
 ```bash
-# Terminal 1 — backend with auto-reload
+# Backend with auto-reload on :8051 + Vite dev server on :8050 (proxies /api → :8051)
 just run-dev --msgstore data/msgstore.db
-
-# Terminal 2 — Vite dev server (proxies /api → :8050)
-just frontend-dev
-# Open http://localhost:5173
+# Open http://<tailscale-ip>:8050 — same port as `just run`
 ```
 
 Other useful commands:

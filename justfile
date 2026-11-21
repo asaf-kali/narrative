@@ -5,6 +5,9 @@ RUN := "uv run"
 NPM := "npm --prefix frontend"
 # Shell substitution, resolved when a recipe runs (not when just parses the file).
 TAILSCALE_IP := "$(tailscale ip -4)"
+# Dev only: Vite serves the UI on 8050 (same port as `just run`) and proxies /api to the backend here.
+# Must match the proxy target in frontend/vite.config.ts.
+DEV_BACKEND_PORT := "8051"
 
 # Install
 
@@ -50,15 +53,16 @@ backend *args:
     {{ RUN }} python -m narrative.main serve {{ args }}
 
 backend-dev *args:
-    just backend {{ args }} --reload
+    just backend --port {{ DEV_BACKEND_PORT }} {{ args }} --reload
 
 # Run
 
 # `run` and `run-dev` bind to this machine's Tailscale IP so tailnet devices can reach them (not exposed to LAN).
+# Both serve the UI on port 8050.
 run *args: frontend-build
     just backend --host "{{ TAILSCALE_IP }}" {{ args }}
 
-# Backend stays on localhost; Vite (exposed) proxies /api to it.
+# Backend stays on localhost:{{ DEV_BACKEND_PORT }}; Vite (exposed, port 8050) proxies /api to it.
 run-dev *args:
     just backend-dev {{ args }} & {{ NPM }} run dev -- --host "{{ TAILSCALE_IP }}"
 
