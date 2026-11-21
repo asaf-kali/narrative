@@ -3,6 +3,8 @@
 OPEN_FILE_COMMAND := "wslview"
 RUN := "uv run"
 NPM := "npm --prefix frontend"
+# Shell substitution, resolved when a recipe runs (not when just parses the file).
+TAILSCALE_IP := "$(tailscale ip -4)"
 
 # Install
 
@@ -52,11 +54,13 @@ backend-dev *args:
 
 # Run
 
+# `run` and `run-dev` bind to this machine's Tailscale IP so tailnet devices can reach them (not exposed to LAN).
 run *args: frontend-build
-    just backend {{ args }}
+    just backend --host "{{ TAILSCALE_IP }}" {{ args }}
 
+# Backend stays on localhost; Vite (exposed) proxies /api to it.
 run-dev *args:
-    just backend-dev {{ args }} & just frontend-dev
+    just backend-dev {{ args }} & {{ NPM }} run dev -- --host "{{ TAILSCALE_IP }}"
 
 # Lint
 
