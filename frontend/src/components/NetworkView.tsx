@@ -27,6 +27,23 @@ const LIST_SIZE = 6
 const NODE_SCALE = 5
 const MAX_FIT_ZOOM = 2  // small graphs would otherwise zoom in until nodes are huge
 const CHARGE_STRENGTH = -120  // d3 default is -30; spread dense groups so labels stay legible
+// Repulsion between far-apart nodes only pushes disconnected parts away from each other; cap its range.
+const CHARGE_DISTANCE_MAX = 300
+const GRAVITY_STRENGTH = 0.05  // weak pull toward the center keeps small disconnected parts near the main one
+const FIT_PADDING = 30
+
+/** d3 force pulling every node toward the origin, proportionally to its distance. */
+function gravityForce(strength: number) {
+  let nodes: NodeObject[] = []
+  const force = (alpha: number) => {
+    for (const n of nodes) {
+      n.vx = (n.vx ?? 0) - (n.x ?? 0) * strength * alpha
+      n.vy = (n.vy ?? 0) - (n.y ?? 0) * strength * alpha
+    }
+  }
+  force.initialize = (all: NodeObject[]) => { nodes = all }
+  return force
+}
 
 function nodeVal(messages: number, maxMessages: number): number {
   return 1 + NODE_SCALE * Math.sqrt(messages / maxMessages)
@@ -308,8 +325,20 @@ export default function NetworkView({
   }), [data, visibleEdges])
 
   useEffect(() => {
-    fgRef.current?.d3Force('charge')?.strength(CHARGE_STRENGTH)
+    const fg = fgRef.current
+    if (!fg) return
+    fg.d3Force('charge')?.strength(CHARGE_STRENGTH).distanceMax(CHARGE_DISTANCE_MAX)
+    fg.d3Force('gravity', gravityForce(GRAVITY_STRENGTH))
   }, [graphData])
+
+  // Keep the whole graph in view while the layout settles, until the user zooms, pans or drags.
+  const fitView = useCallback((durationMs: number) => {
+    const fg = fgRef.current
+    if (!fg) return
+    fg.zoomToFit(durationMs, FIT_PADDING)
+    if (fg.zoom() > MAX_FIT_ZOOM) fg.zoom(MAX_FIT_ZOOM, durationMs)
+  }, [])
+  const stopAutoFit = useCallback(() => { needsFit.current = false }, [])
 
   const strongest = useMemo(() => [...edges].sort((a, b) => b.weight - a.weight).slice(0, LIST_SIZE), [edges])
   // Lift is noisy on tiny ties: rank only ties at least as strong as the median.
@@ -390,7 +419,7 @@ export default function NetworkView({
           </button>
         </div>
 
-        <div ref={containerRef} className="flex-1 min-h-0">
+        <div ref={containerRef} className="flex-1 min-h-0" onPointerDown={stopAutoFit} onWheel={stopAutoFit}>
           {isLoading ? (
             <CardSpinner className="h-full" />
           ) : graphData.nodes.length === 0 ? (
@@ -417,13 +446,13 @@ export default function NetworkView({
               onLinkClick={(l) => setSelection({ type: 'edge', edge: (l as GraphLink).edge })}
               onBackgroundClick={() => setSelection(null)}
               cooldownTicks={150}
+              onEngineTick={() => {
+                if (needsFit.current) fitView(0)
+              }}
               onEngineStop={() => {
                 if (!needsFit.current) return
                 needsFit.current = false
-                const fg = fgRef.current
-                if (!fg) return
-                fg.zoomToFit(0, 30)
-                if (fg.zoom() > MAX_FIT_ZOOM) fg.zoom(MAX_FIT_ZOOM)
+                fitView(300)
               }}
               nodeCanvasObjectMode={() => 'after'}
               nodeCanvasObject={(node, ctx, globalScale) => {
