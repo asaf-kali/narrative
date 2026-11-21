@@ -23,6 +23,7 @@ from narrative.db.loaders import (
     datetime_to_ms,
     open_connection,
 )
+from narrative.db.queries.chats import fetch_chats
 from narrative.db.row_types import RawMessageRow
 from narrative.models.config import AnalysisConfig
 from narrative.models.sender import SenderRegistry
@@ -47,6 +48,16 @@ def test_load_chats_search_filters_case_insensitive(data_loader: DataLoader) -> 
 
 def test_load_chats_search_no_match_returns_empty(data_loader: DataLoader) -> None:
     assert data_loader.load_chats(search="nonexistent") == []
+
+
+def test_load_chats_timestamps_are_utc_datetimes(data_loader: DataLoader, db_connection: DBConnection) -> None:
+    rows = {r.chat_id: r for r in fetch_chats(db_connection.msgstore)}
+    summary = next(c for c in data_loader.load_chats() if c.chat_id == CHAT_DIRECT)
+    raw = rows[CHAT_DIRECT]
+    assert raw.first_timestamp is not None
+    assert summary.date_first == datetime.datetime.fromtimestamp(raw.first_timestamp / 1000, tz=datetime.UTC)
+    assert summary.date_first is not None
+    assert summary.date_first.tzinfo == datetime.UTC
 
 
 def test_load_chats_limit(data_loader: DataLoader) -> None:

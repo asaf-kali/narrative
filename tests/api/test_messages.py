@@ -112,3 +112,18 @@ def test_get_global_messages_attaches_call(attachments_api_client: TestClient) -
     call_msg = next(m for m in resp.json()["messages"] if m["message_id"] == MSG_ALICE_MISSED_CALL)
     assert call_msg["text"] == "[Call]"
     assert call_msg["call"] == {"video": True, "duration_seconds": 0, "outcome": "missed"}
+
+
+def test_get_global_messages_sets_server_timing(api_client: TestClient) -> None:
+    resp = api_client.get("/api/messages")
+    timing = resp.headers["server-timing"]
+    assert "db.page;dur=" in timing
+    assert "db.engagement;dur=" in timing
+
+
+def test_messages_metadata_is_memoized(api_client: TestClient) -> None:
+    first = api_client.get("/api/messages/metadata")
+    second = api_client.get("/api/messages/metadata")
+    assert first.json() == second.json()
+    assert "db.metadata" in first.headers["server-timing"]
+    assert "db.metadata" not in second.headers["server-timing"]

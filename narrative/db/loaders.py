@@ -98,11 +98,8 @@ class DataLoader:
         self._registry = registry or SenderRegistry(contacts={})
 
     def load_chats(self, search: str | None = None, limit: int = 100) -> list[ChatSummary]:
-        summaries = [_row_to_chat_summary(row, self._registry) for row in fetch_chats(self._db.msgstore)]
-        if search:
-            needle = search.lower()
-            return [s for s in summaries if needle in s.display_name.lower()]
-        return summaries[:limit]
+        rows = list(fetch_chats(self._db.msgstore))
+        return chat_summaries(rows=rows, registry=self._registry, search=search, limit=limit)
 
     def load_messages(self, config: AnalysisConfig) -> pd.DataFrame:
         rows = self._fetch_raw_messages(config)
@@ -130,15 +127,15 @@ class DataLoader:
         )
         return list(rows)
 
-    def load_reactions(self, chat_id: int | None = None) -> pd.DataFrame:
-        rows = list(fetch_reactions(self._db.msgstore, chat_id=chat_id))
+    def load_reactions(self, chat_id: int | None = None, message_ids: set[int] | None = None) -> pd.DataFrame:
+        rows = list(fetch_reactions(self._db.msgstore, chat_id=chat_id, message_ids=message_ids))
         if not rows:
             return pd.DataFrame(columns=_REACTION_COLUMNS)
         df = pd.DataFrame([r.model_dump() for r in rows])
         return _resolve_reactor_names(df, self._registry)
 
-    def load_replies(self, chat_id: int | None = None) -> pd.DataFrame:
-        rows = list(fetch_replies(self._db.msgstore, chat_id=chat_id))
+    def load_replies(self, chat_id: int | None = None, message_ids: set[int] | None = None) -> pd.DataFrame:
+        rows = list(fetch_replies(self._db.msgstore, chat_id=chat_id, message_ids=message_ids))
         if not rows:
             return pd.DataFrame(columns=_REPLY_COLUMNS)
         df = pd.DataFrame([r.model_dump() for r in rows])
@@ -278,9 +275,6 @@ def _row_to_chat_summary(row: RawChatRow, registry: SenderRegistry) -> ChatSumma
         chat_type = ChatType.DIRECT
         display_name = registry.resolve_chat_name(row.chat_subject, server, phone)
 
-    first_ts = row.first_timestamp
-    last_ts = row.last_timestamp
-
     is_lid = server == "lid"
     phone_val = phone if chat_type == ChatType.DIRECT else None
 
@@ -290,11 +284,33 @@ def _row_to_chat_summary(row: RawChatRow, registry: SenderRegistry) -> ChatSumma
         chat_type=chat_type,
         message_count=row.message_count or 0,
         participant_count=None,
-        date_first=pd.to_datetime(first_ts, unit="ms", utc=True).to_pydatetime() if first_ts else None,
-        date_last=pd.to_datetime(last_ts, unit="ms", utc=True).to_pydatetime() if last_ts else None,
+        date_first=_ms_to_utc(ms=row.first_timestamp),
+        date_last=_ms_to_utc(ms=row.last_timestamp),
         phone=phone_val,
         is_lid=is_lid,
     )
+
+
+def _ms_to_utc(ms: int | None) -> datetime.datetime | None:
+    # Stdlib, not pd.to_datetime: this runs once per chat, and pandas' per-call overhead
+    # made the chat list (~14k chats) take over a second.
+    if not ms:
+        return None
+    return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC)
+
+
+def chat_summaries(
+    rows: list[RawChatRow],
+    registry: SenderRegistry,
+    search: str | None = None,
+    limit: int = 100,
+) -> list[ChatSummary]:
+    """Resolve chat rows to summaries; `search` filters by name, otherwise the first `limit` are kept."""
+    summaries = [_row_to_chat_summary(row, registry) for row in rows]
+    if search:
+        needle = search.lower()
+        return [s for s in summaries if needle in s.display_name.lower()]
+    return summaries[:limit]
 
 
 def build_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) -> pd.DataFrame:

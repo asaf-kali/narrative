@@ -1,3 +1,4 @@
+import json
 import logging
 import sqlite3
 from collections.abc import Generator
@@ -34,12 +35,24 @@ LEFT JOIN jid cj     ON c.jid_row_id = cj._id
 """
 
 
-def fetch_replies(conn: sqlite3.Connection, chat_id: int | None = None) -> Generator[RawReplyRow]:
-    sql = _REPLIES_SQL
-    params: tuple[int, ...] = ()
+def fetch_replies(
+    conn: sqlite3.Connection,
+    chat_id: int | None = None,
+    message_ids: set[int] | None = None,
+) -> Generator[RawReplyRow]:
+    """Yield replies, optionally scoped to one chat and/or to specific reply messages."""
+    conditions: list[str] = []
+    params: list[int | str] = []
     if chat_id is not None:
-        sql = f"{sql} WHERE mq.chat_row_id = ?"
-        params = (chat_id,)
+        conditions.append("mq.chat_row_id = ?")
+        params.append(chat_id)
+    if message_ids is not None:
+        # One JSON-array parameter instead of N placeholders: no SQLite variable limit.
+        conditions.append("mq.message_row_id IN (SELECT value FROM json_each(?))")
+        ids_json = json.dumps(sorted(message_ids))
+        params.append(ids_json)
+    where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+    sql = _REPLIES_SQL + where
     try:
         for row in conn.execute(sql, params):
             yield RawReplyRow.model_validate(dict(row))

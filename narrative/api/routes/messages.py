@@ -8,16 +8,15 @@ from fastapi import APIRouter, Query, Request
 
 from narrative.analysis.reactions import MessageReactions, reactions_by_message
 from narrative.analysis.replies import ReplyPreview, replies_by_message
+from narrative.db import cached
 from narrative.db.attachments import MessageAttachments, load_message_attachments
+from narrative.db.cached import MetadataFilters
 from narrative.db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
-from narrative.db.queries.messages import (
-    fetch_message_bounds,
-    fetch_messages_metadata,
-    fetch_messages_page,
-    fetch_sender_counts,
-)
+from narrative.db.queries.messages import fetch_message_bounds, fetch_messages_page
+from narrative.db.row_types import RawMessageRow
 from narrative.models.message import message_display_text
 from narrative.models.sender import SenderRegistry
+from narrative.tracing import span
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -46,17 +45,14 @@ def get_global_messages_metadata(
     date_from_ms = datetime_to_ms(date_from) if date_from else None
     date_to_ms = datetime_to_ms(date_to) if date_to else None
     msgstore: Path = request.app.state.msgstore_path
-    wadb: Path | None = request.app.state.wadb_path
-
-    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        meta = fetch_messages_metadata(
-            db.msgstore,
-            chat_ids=chat_ids,
-            date_from_ms=date_from_ms,
-            date_to_ms=date_to_ms,
-            sender_ids=sender_ids,
-            search=search,
-        )
+    filters = MetadataFilters(
+        chat_ids=frozenset(chat_ids) if chat_ids else None,
+        sender_ids=frozenset(sender_ids) if sender_ids else None,
+        date_from_ms=date_from_ms,
+        date_to_ms=date_to_ms,
+        search=search,
+    )
+    meta = cached.messages_metadata(msgstore_path=msgstore, filters=filters)
 
     return {
         "total": meta.total,
@@ -87,7 +83,7 @@ def get_global_messages(
     wadb: Path | None = request.app.state.wadb_path
     registry: SenderRegistry = request.app.state.sender_registry
 
-    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+    with span("db.page"), open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
         raw_rows = fetch_messages_page(
             db.msgstore,
             chat_ids=chat_ids,
@@ -103,15 +99,16 @@ def get_global_messages(
 
     if not raw_rows:
         return {"messages": []}
-    reactions_by_msg, replies_by_msg = _load_engagement_lookups(request, chat_id=None)
-    df = build_messages_df(raw_rows, registry)
-    messages = _df_to_message_list(
-        df,
-        include_chat_id=True,
-        reactions_by_msg=reactions_by_msg,
-        replies_by_msg=replies_by_msg,
-        attachments=attachments,
-    )
+    reactions_by_msg, replies_by_msg = _load_engagement_lookups(request, rows=raw_rows)
+    with span("serialize"):
+        df = build_messages_df(raw_rows, registry)
+        messages = _df_to_message_list(
+            df,
+            include_chat_id=True,
+            reactions_by_msg=reactions_by_msg,
+            replies_by_msg=replies_by_msg,
+            attachments=attachments,
+        )
     return {"messages": messages}
 
 
@@ -122,13 +119,13 @@ def get_senders(
 ) -> list[dict[str, Any]]:
     logger.info("Fetching senders with message counts")
     msgstore: Path = request.app.state.msgstore_path
-    wadb: Path | None = request.app.state.wadb_path
     registry: SenderRegistry = request.app.state.sender_registry
     contacts = registry.as_dict()
 
-    sender_id_set = set(sender_ids) if sender_ids else None
-    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        rows = fetch_sender_counts(db.msgstore, sender_ids=sender_id_set)
+    rows = cached.sender_counts(msgstore_path=msgstore)
+    if sender_ids:
+        wanted = set(sender_ids)
+        rows = [r for r in rows if r.sender_id in wanted]
 
     result = []
     for row in rows:
@@ -190,14 +187,15 @@ def _df_to_message_list(
 
 
 def _load_engagement_lookups(
-    request: Request, chat_id: int | None
+    request: Request, rows: list[RawMessageRow]
 ) -> tuple[dict[int, MessageReactions], dict[int, ReplyPreview]]:
-    """Load reaction + reply lookups keyed by message id (chat-scoped or global)."""
+    """Load reaction + reply lookups, keyed by message id, for just the given page of messages."""
     msgstore: Path = request.app.state.msgstore_path
     wadb: Path | None = request.app.state.wadb_path
     registry: SenderRegistry = request.app.state.sender_registry
-    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+    message_ids = {r.message_id for r in rows}
+    with span("db.engagement"), open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
         loader = DataLoader(db, registry=registry)
-        reactions_df = loader.load_reactions(chat_id=chat_id)
-        replies_df = loader.load_replies(chat_id=chat_id)
+        reactions_df = loader.load_reactions(message_ids=message_ids)
+        replies_df = loader.load_replies(message_ids=message_ids)
     return reactions_by_message(reactions_df), replies_by_message(replies_df)

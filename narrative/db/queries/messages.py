@@ -39,6 +39,8 @@ LEFT JOIN jid cj       ON c.jid_row_id = cj._id
 WHERE m.chat_row_id > 0
 """
 
+_BARE_FROM_SQL = "\nFROM message m\nWHERE m.chat_row_id > 0\n"
+
 _SYSTEM_TYPE = 7
 
 # Derives a stable sender_id from raw DB columns without requiring the contacts registry.
@@ -154,8 +156,10 @@ def count_filtered_messages(
         sender_ids=sender_ids,
         search=search,
     )
-    # Reuse full JOIN set so sender_ids CASE expression resolves correctly.
-    count_sql = "SELECT COUNT(*) FROM (SELECT m._id" + _MESSAGES_SQL[_MESSAGES_SQL.index("\nFROM") :] + where + ")"  # noqa: S608
+    # Only the sender_ids CASE expression needs the jid/chat JOINs; every other filter is on
+    # `message` alone, and skipping the JOINs lets SQLite count straight off an index.
+    from_clause = _MESSAGES_SQL[_MESSAGES_SQL.index("\nFROM") :] if sender_ids else _BARE_FROM_SQL
+    count_sql = "SELECT COUNT(*) FROM (SELECT m._id" + from_clause + where + ")"  # noqa: S608
     row = conn.execute(count_sql, params).fetchone()
     return int(row[0]) if row else 0
 
