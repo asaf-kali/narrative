@@ -1,6 +1,7 @@
 import logging
 import sqlite3
 from collections.abc import Generator
+from datetime import UTC, datetime, time
 
 from narrative.db.row_types import RawDayMessageRow
 
@@ -29,12 +30,26 @@ LEFT JOIN chat c       ON m.chat_row_id = c._id
 LEFT JOIN jid cj       ON c.jid_row_id = cj._id
 WHERE m.chat_row_id > 0
   AND m.message_type != 7
+  AND m.timestamp >= ?
+  AND m.timestamp < ?
   AND date(m.timestamp / 1000, 'unixepoch', 'localtime') = ?
 ORDER BY m.timestamp
 """
 
+# No timezone is more than 14h from UTC, so a local calendar day always lies inside
+# [UTC midnight - 1 day, UTC midnight + 2 days). That coarse window lets SQLite use the
+# timestamp index; the exact `date(..., 'localtime')` check above keeps the result precise.
+_DAY_MS = 86_400_000
+
 
 def fetch_day_messages(conn: sqlite3.Connection, date: str) -> Generator[RawDayMessageRow]:
-    """Yield all non-system messages for `date` (YYYY-MM-DD) sorted by time."""
-    for row in conn.execute(_DAY_MESSAGES_SQL, (date,)):
+    """Yield all non-system messages for `date` (YYYY-MM-DD) sorted by time.
+
+    Raises ValueError if `date` is not a valid ISO calendar date.
+    """
+    day = datetime.fromisoformat(date).date()
+    utc_midnight = datetime.combine(day, time(), tzinfo=UTC)
+    midnight_ms = int(utc_midnight.timestamp() * 1000)
+    params = (midnight_ms - _DAY_MS, midnight_ms + 2 * _DAY_MS, date)
+    for row in conn.execute(_DAY_MESSAGES_SQL, params):
         yield RawDayMessageRow.model_validate(dict(row))

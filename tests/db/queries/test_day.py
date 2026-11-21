@@ -1,5 +1,6 @@
 import sqlite3
 
+import pytest
 from seed_data import T0, local_date
 
 from narrative.db.queries.day import fetch_day_messages
@@ -21,3 +22,8 @@ def test_fetch_day_messages_sorted_ascending(msgstore_conn: sqlite3.Connection) 
 
 def test_fetch_day_messages_empty_for_other_date(msgstore_conn: sqlite3.Connection) -> None:
     assert list(fetch_day_messages(msgstore_conn, "1999-01-01")) == []
+
+
+def test_fetch_day_messages_invalid_date_raises(msgstore_conn: sqlite3.Connection) -> None:
+    with pytest.raises(ValueError, match="month"):
+        list(fetch_day_messages(msgstore_conn, "2024-13-45"))

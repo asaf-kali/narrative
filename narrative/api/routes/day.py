@@ -1,3 +1,4 @@
+import datetime
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,6 +10,7 @@ from narrative.db.loaders import open_connection
 from narrative.db.queries.day import fetch_day_messages
 from narrative.models.message import message_display_text
 from narrative.models.sender import GROUP_SERVER, SenderRegistry
+from narrative.tracing import span
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -45,8 +47,7 @@ class DayDetail(BaseModel):
 
 @router.get("/day/{date}", response_model=DayDetail)
 def get_day_detail(date: str, request: Request) -> DayDetail:
-    _DATE_LEN = 10
-    if len(date) != _DATE_LEN or date[4] != "-" or date[7] != "-":
+    if not _is_iso_date(date=date):
         raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
 
     msgstore: Path = request.app.state.msgstore_path
@@ -54,7 +55,7 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
     registry: SenderRegistry = request.app.state.sender_registry
 
     logger.info(f"Loading day detail for {date}")
-    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+    with span("db.day"), open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
         rows = list(fetch_day_messages(db.msgstore, date))
 
     if not rows:
@@ -108,3 +109,15 @@ def get_day_detail(date: str, request: Request) -> DayDetail:
         timeline=timeline,
         messages=messages,
     )
+
+
+def _is_iso_date(date: str) -> bool:
+    """Check that `date` is a real calendar date written exactly as YYYY-MM-DD."""
+    _iso_date_len = 10
+    if len(date) != _iso_date_len:
+        return False
+    try:
+        datetime.date.fromisoformat(date)
+    except ValueError:
+        return False
+    return True
