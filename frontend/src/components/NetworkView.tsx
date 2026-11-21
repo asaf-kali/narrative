@@ -190,6 +190,20 @@ function PersonName({ id, node, onSelect }: { id: string; node: NetworkNode | un
   )
 }
 
+function ChatLink({ chatId }: { chatId: number }) {
+  return (
+    <a
+      href={`/chat/${chatId}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Open this chat in a new tab"
+      className="inline-block mt-1 text-[11px] text-accent hover:underline"
+    >
+      Open chat ↗
+    </a>
+  )
+}
+
 function PersonDot({ node }: { node: NetworkNode | undefined }) {
   return <div className="w-2 h-2 rounded-full shrink-0" style={{ background: node ? personColor(node) : '#64748b' }} />
 }
@@ -300,6 +314,7 @@ function NodePanel({ node, edges, nodes, onSelectEdge, onSelectGroup, onClose }:
         <div>
           <div className="text-sm font-semibold text-tx-primary leading-tight">{node.label}</div>
           <div className="text-[10px] text-tx-muted font-mono mt-0.5">{node.id}</div>
+          {node.chat_id != null && <ChatLink chatId={node.chat_id} />}
         </div>
         <CloseButton onClick={onClose} />
       </div>
@@ -334,8 +349,9 @@ function NodePanel({ node, edges, nodes, onSelectEdge, onSelectGroup, onClose }:
   )
 }
 
-function GroupPanel({ name, members, onSelectNode, onClose }: {
+function GroupPanel({ name, chatId, members, onSelectNode, onClose }: {
   name: string
+  chatId: number | undefined
   members: NetworkNode[]  // most active first
   onSelectNode: (id: string) => void
   onClose: () => void
@@ -346,6 +362,7 @@ function GroupPanel({ name, members, onSelectNode, onClose }: {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-tx-primary leading-tight truncate" title={name}>{name}</div>
           <div className="text-[10px] text-tx-muted mt-0.5">{members.length} people in this network</div>
+          {chatId != null && <ChatLink chatId={chatId} />}
         </div>
         <CloseButton onClick={onClose} />
       </div>
@@ -403,6 +420,7 @@ export default function NetworkView({
 
   const edges = useMemo(() => data?.edges ?? [], [data])
   const nodeById = useMemo(() => new Map((data?.nodes ?? []).map((n) => [n.id, n])), [data])
+
 
   const visibleEdges = useMemo(() => (backboneOnly ? edges.filter((e) => e.backbone) : edges), [edges, backboneOnly])
   const maxWeight = useMemo(() => Math.max(1, ...edges.map((e) => e.weight)), [edges])
@@ -635,7 +653,7 @@ export default function NetworkView({
           />
         )}
         {selectedGroup && (
-          <GroupPanel name={selectedGroup} members={groupMembers} onSelectNode={focusNode} onClose={() => setSelection(null)} />
+          <GroupPanel name={selectedGroup} chatId={data?.group_chats[selectedGroup]} members={groupMembers} onSelectNode={focusNode} onClose={() => setSelection(null)} />
         )}
 
         {!selection && (

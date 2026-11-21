@@ -30,7 +30,7 @@ from narrative.db.loaders import DataLoader, build_messages_df, datetime_to_ms, 
 from narrative.db.queries.messages import count_filtered_messages, fetch_messages_page
 from narrative.models.config import AnalysisConfig
 from narrative.models.message import AUDIO_TYPES, MEDIA_TYPES, MessageType
-from narrative.models.sender import SenderRegistry
+from narrative.models.sender import GROUP_SERVER, SenderRegistry
 from narrative.tracing import span
 
 logger = logging.getLogger(__name__)
@@ -329,7 +329,12 @@ def get_global_network(
     frames = cached.interactions(msgstore_path=request.app.state.msgstore_path, chat_id=None)
     allowed_ids = _allowed_ids(request=request, contacts_only=contacts_only)
     options = _network_options(
-        signals=signals, include_me=include_me, max_nodes=max_nodes, clusters=clusters, allowed_ids=allowed_ids
+        request=request,
+        signals=signals,
+        include_me=include_me,
+        max_nodes=max_nodes,
+        clusters=clusters,
+        allowed_ids=allowed_ids,
     )
     with span("analysis.network"):
         return build_global_network(df=df, interactions=frames, options=options)
@@ -352,13 +357,19 @@ def get_network(
     frames = cached.interactions(msgstore_path=request.app.state.msgstore_path, chat_id=chat_id)
     allowed_ids = _allowed_ids(request=request, contacts_only=contacts_only)
     options = _network_options(
-        signals=signals, include_me=True, max_nodes=max_nodes, clusters=clusters, allowed_ids=allowed_ids
+        request=request,
+        signals=signals,
+        include_me=True,
+        max_nodes=max_nodes,
+        clusters=clusters,
+        allowed_ids=allowed_ids,
     )
     with span("analysis.network"):
         return build_chat_network(df=df, interactions=frames, options=options)
 
 
 def _network_options(
+    request: Request,
     signals: list[Signal] | None,
     include_me: bool,
     max_nodes: int,
@@ -367,8 +378,19 @@ def _network_options(
 ) -> NetworkOptions:
     selected = frozenset(signals) if signals else frozenset(Signal)
     return NetworkOptions(
-        signals=selected, include_me=include_me, max_nodes=max_nodes, clusters=clusters, allowed_ids=allowed_ids
+        signals=selected,
+        include_me=include_me,
+        max_nodes=max_nodes,
+        clusters=clusters,
+        allowed_ids=allowed_ids,
+        private_chats=_private_chats(request),
     )
+
+
+def _private_chats(request: Request) -> dict[str, int]:
+    """{phone: chat id} of 1-on-1 chats; a phone with several chats maps to the busiest."""
+    rows = sorted(cached.chat_rows(msgstore_path=request.app.state.msgstore_path), key=lambda row: row.message_count)
+    return {row.chat_phone: row.chat_id for row in rows if row.chat_server != GROUP_SERVER and row.chat_phone}
 
 
 def _allowed_ids(request: Request, contacts_only: bool) -> frozenset[str] | None:
