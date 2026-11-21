@@ -1,7 +1,17 @@
 from unittest import mock
 
 from fastapi.testclient import TestClient
-from seed_data import CHAT_DIRECT, CHAT_GROUP, DAVE_NAME, ERIN_NAME, FRANK_NAME, MSG_ME_CONTACTS, MSG_ME_GROUP
+from seed_data import (
+    BOB_PHONE,
+    CAROL_PHONE,
+    CHAT_DIRECT,
+    CHAT_GROUP,
+    DAVE_NAME,
+    ERIN_NAME,
+    FRANK_NAME,
+    MSG_ME_CONTACTS,
+    MSG_ME_GROUP,
+)
 
 
 def test_overview_returns_totals_and_breakdown(api_client: TestClient) -> None:
@@ -97,29 +107,38 @@ def test_engagement_returns_all_four_sections(api_client: TestClient) -> None:
     assert len(body["top_reacted"]) == 2
 
 
-def test_global_network_coactivity_mode(api_client: TestClient) -> None:
+def test_global_network_defaults_to_all_signals_without_me(api_client: TestClient) -> None:
     resp = api_client.get("/api/network")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["mode"] == "coactivity"
+    assert set(body["signals"]) == {"replies", "reactions", "mentions", "adjacency", "groups"}
+    assert "me" not in {n["id"] for n in body["nodes"]}
 
 
-def test_global_network_reactions_mode(api_client: TestClient) -> None:
-    resp = api_client.get("/api/network", params={"mode": "reactions"})
+def test_global_network_include_me_and_signal_filter(api_client: TestClient) -> None:
+    resp = api_client.get("/api/network", params={"include_me": True, "signals": ["replies", "mentions"]})
     assert resp.status_code == 200
-    assert resp.json()["mode"] == "reactions"
+    body = resp.json()
+    assert body["signals"] == ["mentions", "replies"]
+    assert "me" in {n["id"] for n in body["nodes"]}
 
 
-def test_chat_network_coactivity_mode(api_client: TestClient) -> None:
+def test_global_network_rejects_unknown_signal(api_client: TestClient) -> None:
+    resp = api_client.get("/api/network", params={"signals": ["telepathy"]})
+    assert resp.status_code == 422
+
+
+def test_chat_network_reports_seeded_interactions(api_client: TestClient) -> None:
     resp = api_client.get(f"/api/chats/{CHAT_GROUP}/network")
     assert resp.status_code == 200
-    assert resp.json()["mode"] == "coactivity"
-
-
-def test_chat_network_reactions_mode(api_client: TestClient) -> None:
-    resp = api_client.get(f"/api/chats/{CHAT_GROUP}/network", params={"mode": "reactions"})
-    assert resp.status_code == 200
-    assert resp.json()["mode"] == "reactions"
+    body = resp.json()
+    assert "groups" not in body["signals"]
+    edges = {frozenset((e["source"], e["target"])): e for e in body["edges"]}
+    # Me replied to and reacted to Bob; Bob reacted to Carol; Carol @mentioned Bob.
+    me_bob = edges[frozenset(("me", BOB_PHONE))]
+    assert (me_bob["replies"], me_bob["reactions"]) == (1, 1)
+    bob_carol = edges[frozenset((BOB_PHONE, CAROL_PHONE))]
+    assert (bob_carol["reactions"], bob_carol["mentions"]) == (1, 1)
 
 
 def test_words_wordcloud_generation_failure_returns_empty_string(api_client: TestClient) -> None:
