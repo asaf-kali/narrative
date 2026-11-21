@@ -298,3 +298,24 @@ def test_global_network_membership_only_ties_have_zero_lift() -> None:
     edge = _edge(graph, "111", "222")
     assert edge is not None
     assert edge.lift == 0
+
+
+def test_global_network_links_groups_and_people_to_their_chats() -> None:
+    messages = [
+        Msg(message_id=1, sender="111", seconds=0, chat=1),
+        Msg(message_id=2, sender="222", seconds=60, chat=1),
+        Msg(message_id=3, sender="111", seconds=0, chat=2),
+    ]
+    options = NetworkOptions(private_chats={"111": 7})
+    graph = build_global_network(df=_messages_df(messages), interactions=_frames(), options=options)
+    assert graph.group_chats == {"G1": 1, "G2": 2}
+    nodes = _nodes(graph)
+    assert nodes["111"].chat_id == 7
+    assert nodes["222"].chat_id is None
+
+
+def test_global_network_omits_group_chats_without_the_groups_signal() -> None:
+    messages = [Msg(message_id=1, sender="111", seconds=0), Msg(message_id=2, sender="222", seconds=60)]
+    options = NetworkOptions(signals=frozenset({Signal.ADJACENCY}))
+    graph = build_global_network(df=_messages_df(messages), interactions=_frames(), options=options)
+    assert graph.group_chats == {}

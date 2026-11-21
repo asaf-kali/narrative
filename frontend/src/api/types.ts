@@ -238,6 +238,7 @@ export interface NetworkNode {
   strength: number   // weighted degree
   bridging: number   // normalized betweenness on the backbone, 0..1
   groups: string[]   // populated by the global graph only
+  chat_id: number | null  // this person's 1-on-1 chat
 }
 
 export interface NetworkEdge {
@@ -259,6 +260,7 @@ export interface NetworkGraph {
   edges: NetworkEdge[]
   communities: number
   signals: NetworkSignal[]
+  group_chats: Record<string, number>  // group name -> chat id
 }
 
 export interface SenderInfo {

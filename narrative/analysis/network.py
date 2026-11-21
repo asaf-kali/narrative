@@ -55,6 +55,7 @@ class NetworkNode(BaseModel):
     strength: float  # weighted degree
     bridging: float  # normalized weighted betweenness
     groups: list[str] = []  # groups this person posted in; populated by the global graph
+    chat_id: int | None = None  # this person's 1-on-1 chat, when there is one
 
 
 class NetworkEdge(BaseModel):
@@ -76,6 +77,7 @@ class NetworkGraph(BaseModel):
     edges: list[NetworkEdge]
     communities: int
     signals: list[Signal]
+    group_chats: dict[str, int] = {}  # group name -> chat id, for the names in `NetworkNode.groups`
 
 
 class NetworkOptions(BaseModel):
@@ -86,6 +88,7 @@ class NetworkOptions(BaseModel):
     include_me: bool = True
     allowed_ids: frozenset[str] | None = None  # restrict nodes to these people ("me" always allowed)
     clusters: int | None = None  # number of communities; None lets Louvain pick it
+    private_chats: dict[str, int] = {}  # person id -> their 1-on-1 chat id
 
 
 SIGNAL_WEIGHTS: dict[Signal, float] = {
@@ -150,9 +153,14 @@ def _build_network(
         _to_node(record=record, clusters=clusters, bridging=bridging, strength=strength, show_groups=show_groups)
         for record in selected.to_dict("records")
     ]
+    for node in nodes:
+        node.chat_id = options.private_chats.get(node.id)
     edges = [_to_edge(record=record) for record in pairs.to_dict("records")]
     communities = len(set(clusters.values()))
-    return NetworkGraph(nodes=nodes, edges=edges, communities=communities, signals=ordered_signals)
+    group_chats = _group_chats(annotated=annotated, nodes=nodes)
+    return NetworkGraph(
+        nodes=nodes, edges=edges, communities=communities, signals=ordered_signals, group_chats=group_chats
+    )
 
 
 def _annotate(df: pd.DataFrame, include_me: bool) -> pd.DataFrame:
@@ -343,6 +351,16 @@ def _node_stats(annotated: pd.DataFrame, pairs: pd.DataFrame) -> pd.DataFrame:
     stats["strength"] = strength.reindex(stats.index).fillna(0.0)
     stats = stats.rename_axis("id").reset_index()
     return stats.sort_values(["strength", "messages"], ascending=False)
+
+
+def _group_chats(annotated: pd.DataFrame, nodes: list[NetworkNode]) -> dict[str, int]:
+    """Chat id of every group named on a node; a name shared by several groups maps to the busiest."""
+    names = {group for node in nodes for group in node.groups}
+    if not names:
+        return {}
+    chats = annotated[annotated["chat_name"].astype(str).isin(names)]
+    busiest = chats.groupby(["chat_name", "chat_row_id"]).size().sort_values().reset_index()
+    return {str(row["chat_name"]): int(row["chat_row_id"]) for row in busiest.to_dict("records")}
 
 
 def _strength(pairs: pd.DataFrame) -> dict[str, float]:

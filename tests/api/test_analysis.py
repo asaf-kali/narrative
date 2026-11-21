@@ -11,6 +11,7 @@ from seed_data import (
     DAVE_NAME,
     ERIN_NAME,
     FRANK_NAME,
+    GROUP_SUBJECT,
     MSG_ME_CONTACTS,
     MSG_ME_GROUP,
 )
@@ -117,6 +118,7 @@ def test_global_network_defaults_to_all_signals_with_me(api_client: TestClient) 
     body = resp.json()
     assert set(body["signals"]) == {"replies", "reactions", "mentions", "adjacency", "groups"}
     assert "me" in {n["id"] for n in body["nodes"]}
+    assert body["group_chats"] == {GROUP_SUBJECT: CHAT_GROUP}
 
 
 def test_global_network_exclude_me_and_signal_filter(api_client: TestClient) -> None:
