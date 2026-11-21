@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { NetworkSignal } from '../api/types'
-import NetworkView, { ContactsOnlyToggle } from '../components/NetworkView'
+import NetworkView, { CONTROL_CLASS, ContactsOnlyToggle, Toggle } from '../components/NetworkView'
 import { boolParam, enumParam, intParam, listParam, stringParam, useUrlState } from '../hooks/useUrlState'
 
 const TIME_RANGES = ['7d', '30d', '90d', '180d', '1y', '2y', '5y', 'all', 'custom'] as const
@@ -26,8 +26,6 @@ const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; days?: number }[] =
   { value: 'all', label: 'All time' },
   { value: 'custom', label: 'Custom…' },
 ]
-
-const DATE_INPUT_CLASS = 'bg-app-surface-2 border border-app-border rounded-full px-2.5 py-0.5 text-xs text-tx-secondary'
 
 function daysAgo(days: number): string {
   const d = new Date(Date.now() - days * 86_400_000)
@@ -84,7 +82,7 @@ export default function GlobalNetworkPage() {
       <select
         value={timeRange}
         onChange={(e) => setUrlState({ range: e.target.value as TimeRange })}
-        className="bg-app-surface-2 border border-app-border rounded-full px-2.5 py-1 text-xs text-tx-secondary"
+        className={CONTROL_CLASS}
       >
         {TIME_RANGE_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
       </select>
@@ -95,7 +93,7 @@ export default function GlobalNetworkPage() {
             value={custom.from ?? ''}
             max={custom.to}
             onChange={(e) => setUrlState({ from: e.target.value })}
-            className={DATE_INPUT_CLASS}
+            className={CONTROL_CLASS}
             aria-label="From date"
           />
           –
@@ -104,7 +102,7 @@ export default function GlobalNetworkPage() {
             value={custom.to ?? ''}
             min={custom.from}
             onChange={(e) => setUrlState({ to: e.target.value })}
-            className={DATE_INPUT_CLASS}
+            className={CONTROL_CLASS}
             aria-label="To date"
           />
         </span>
@@ -113,15 +111,12 @@ export default function GlobalNetworkPage() {
         value={maxNodes}
         onChange={(e) => setUrlState({ nodes: Number(e.target.value) })}
         title="Keep the people with the strongest ties"
-        className="bg-app-surface-2 border border-app-border rounded-full px-2.5 py-1 text-xs text-tx-secondary"
+        className={CONTROL_CLASS}
       >
         {NODE_LIMITS.map((n) => <option key={n} value={n}>Top {n} people</option>)}
       </select>
       <ContactsOnlyToggle checked={contactsOnly} onChange={(next) => setUrlState({ contacts: next })} />
-      <label className="flex items-center gap-1.5 cursor-pointer select-none">
-        <input type="checkbox" checked={includeMe} onChange={(e) => setUrlState({ me: e.target.checked })} className="w-3 h-3 accent-accent" />
-        <span className="text-xs text-tx-secondary">Include me</span>
-      </label>
+      <Toggle checked={includeMe} onChange={(next) => setUrlState({ me: next })} label="Include me" title="Show yourself and your ties" />
     </>
   )
 

@@ -118,7 +118,7 @@ function Pill({ active, onClick, title, children }: { active: boolean; onClick: 
     <button
       onClick={onClick}
       title={title}
-      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+      className={`h-7 px-2.5 rounded-full text-xs font-medium transition-colors ${
         active
           ? 'bg-accent text-white shadow-lg shadow-accent/20'
           : 'bg-app-surface-2 text-tx-secondary hover:text-tx-primary border border-app-border'
@@ -126,6 +126,36 @@ function Pill({ active, onClick, title, children }: { active: boolean; onClick: 
     >
       {children}
     </button>
+  )
+}
+
+/** Height and look shared by every select / input in the network toolbars. */
+export const CONTROL_CLASS =
+  'h-7 bg-app-surface-2 border border-app-border rounded-full px-2.5 text-xs text-tx-secondary disabled:cursor-not-allowed'
+
+/** One toolbar row of related controls; labels form a fixed column and controls wrap beside it. */
+function ToolbarGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="w-14 shrink-0 h-7 flex items-center text-[10px] font-semibold uppercase tracking-wider text-tx-muted">
+        {label}
+      </span>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">{children}</div>
+    </div>
+  )
+}
+
+export function Toggle({ checked, onChange, label, title }: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  label: string
+  title?: string
+}) {
+  return (
+    <label className="flex items-center gap-1.5 h-7 cursor-pointer select-none" title={title}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-3.5 h-3.5 accent-accent" />
+      <span className="text-xs text-tx-secondary">{label}</span>
+    </label>
   )
 }
 
@@ -413,40 +443,45 @@ export default function NetworkView({
     <div className="flex gap-4 h-full min-h-0">
       {/* Graph panel */}
       <div className="flex-1 flex flex-col bg-app-surface border border-app-border rounded-xl overflow-hidden min-w-0">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 border-b border-app-border shrink-0">
-          <div className="flex flex-wrap gap-1">
-            {availableSignals.map((s) => (
-              <Pill key={s} active={signals.includes(s)} onClick={() => toggleSignal(s)} title={SIGNAL_INFO[s].hint}>
-                {SIGNAL_INFO[s].label}
-              </Pill>
-            ))}
-          </div>
-          {controls}
-          <ClustersControl
-            value={clusters || (data?.communities ?? lastCommunities.current)}
-            isAuto={clusters === 0}
-            max={data?.nodes.length ?? 1}
-            disabled={isLoading || !data || data.nodes.length === 0}
-            onChange={onClustersChange}
-          />
-          <label className="flex items-center gap-1.5 cursor-pointer select-none ml-auto" title="Hide ties that are weak relative to both people's other ties">
-            <input
-              type="checkbox"
-              checked={backboneOnly}
-              onChange={(e) => onBackboneOnlyChange(e.target.checked)}
-              className="w-3 h-3 accent-accent"
+        {/* Toolbar: what counts as a tie, then which people (refetches) and how to show them (local). */}
+        <div className="flex flex-col gap-2 px-4 py-2.5 border-b border-app-border shrink-0">
+          <ToolbarGroup label="Signals">
+            <div className="flex flex-wrap gap-1">
+              {availableSignals.map((s) => (
+                <Pill key={s} active={signals.includes(s)} onClick={() => toggleSignal(s)} title={SIGNAL_INFO[s].hint}>
+                  {SIGNAL_INFO[s].label}
+                </Pill>
+              ))}
+            </div>
+          </ToolbarGroup>
+          {controls && <ToolbarGroup label="Scope">{controls}</ToolbarGroup>}
+          <ToolbarGroup label="View">
+            <ClustersControl
+              value={clusters || (data?.communities ?? lastCommunities.current)}
+              isAuto={clusters === 0}
+              max={data?.nodes.length ?? 1}
+              disabled={isLoading || !data || data.nodes.length === 0}
+              onChange={onClustersChange}
             />
-            <span className="text-xs text-tx-secondary">Strongest ties only</span>
-          </label>
-          <button
-            onClick={() => fgRef.current?.zoomToFit(400, 20)}
-            className="text-[10px] text-tx-muted hover:text-tx-secondary transition-colors"
-          >
-            Fit
-          </button>
+            <Toggle
+              checked={backboneOnly}
+              onChange={onBackboneOnlyChange}
+              label="Strongest ties only"
+              title="Hide ties that are weak relative to both people's other ties"
+            />
+          </ToolbarGroup>
         </div>
 
-        <div ref={containerRef} className="flex-1 min-h-0" onPointerDown={stopAutoFit} onWheel={stopAutoFit}>
+        <div ref={containerRef} className="relative flex-1 min-h-0" onPointerDown={stopAutoFit} onWheel={stopAutoFit}>
+          {!isLoading && graphData.nodes.length > 0 && (
+            <button
+              onClick={() => fgRef.current?.zoomToFit(400, FIT_PADDING)}
+              title="Zoom to show the whole network"
+              className="absolute top-2 right-2 z-10 px-2.5 py-1 rounded-md text-xs text-tx-secondary bg-app-surface-2/90 border border-app-border hover:text-tx-primary transition-colors"
+            >
+              Fit to view
+            </button>
+          )}
           {isLoading ? (
             <CardSpinner className="h-full" />
           ) : graphData.nodes.length === 0 ? (
@@ -594,7 +629,7 @@ function ClustersControl({ value, isAuto, max, disabled, onChange }: {
         value={draft}
         disabled={disabled}
         onChange={(e) => setDraft(e.target.value)}
-        className="w-12 disabled:cursor-not-allowed bg-app-surface-2 border border-app-border rounded-full px-2 py-0.5 text-xs text-tx-secondary"
+        className={`w-14 ${CONTROL_CLASS}`}
       />
       {isAuto ? (
         <span className="text-[10px] text-tx-muted">auto</span>
@@ -612,10 +647,5 @@ function ClustersControl({ value, isAuto, max, disabled, onChange }: {
 }
 
 export function ContactsOnlyToggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
-  return (
-    <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Hide people who aren't saved in your contacts">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-3 h-3 accent-accent" />
-      <span className="text-xs text-tx-secondary">Contacts only</span>
-    </label>
-  )
+  return <Toggle checked={checked} onChange={onChange} label="Contacts only" title="Hide people who aren't saved in your contacts" />
 }
