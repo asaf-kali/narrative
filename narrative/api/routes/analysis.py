@@ -20,10 +20,11 @@ from narrative.api.deps import get_df
 from narrative.api.routes.messages import _df_to_message_list, _load_engagement_lookups
 from narrative.db.attachments import load_message_attachments
 from narrative.db.loaders import DataLoader, build_messages_df, datetime_to_ms, open_connection
-from narrative.db.queries.messages import fetch_messages_metadata, fetch_messages_page
+from narrative.db.queries.messages import count_filtered_messages, fetch_messages_page
 from narrative.models.config import AnalysisConfig
 from narrative.models.message import AUDIO_TYPES, MEDIA_TYPES, MessageType
 from narrative.models.sender import SenderRegistry
+from narrative.tracing import span
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -218,8 +219,9 @@ def get_messages(
     wadb: Path | None = request.app.state.wadb_path
     registry: SenderRegistry = request.app.state.sender_registry
 
-    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        meta = fetch_messages_metadata(
+    # Only the total is needed here; full metadata would also list senders across every chat.
+    with span("db.page"), open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+        total = count_filtered_messages(
             db.msgstore,
             chat_id=chat_id,
             date_from_ms=date_from_ms,
@@ -245,15 +247,16 @@ def get_messages(
     if not raw_rows:
         return {"total": 0, "messages": []}
 
-    reactions_by_msg, replies_by_msg = _load_engagement_lookups(request, chat_id=chat_id)
-    df = build_messages_df(raw_rows, registry)
-    messages = _df_to_message_list(
-        df,
-        reactions_by_msg=reactions_by_msg,
-        replies_by_msg=replies_by_msg,
-        attachments=attachments,
-    )
-    return {"total": meta.total, "messages": messages}
+    reactions_by_msg, replies_by_msg = _load_engagement_lookups(request, rows=raw_rows)
+    with span("serialize"):
+        df = build_messages_df(raw_rows, registry)
+        messages = _df_to_message_list(
+            df,
+            reactions_by_msg=reactions_by_msg,
+            replies_by_msg=replies_by_msg,
+            attachments=attachments,
+        )
+    return {"total": total, "messages": messages}
 
 
 @router.get("/chats/{chat_id}/media")
@@ -287,7 +290,7 @@ def get_engagement(
     msgstore: Path = request.app.state.msgstore_path
     wadb: Path | None = request.app.state.wadb_path
     registry: SenderRegistry = request.app.state.sender_registry
-    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
+    with span("db.engagement"), open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
         loader = DataLoader(db, registry=registry)
         reactions_df = loader.load_reactions(chat_id=chat_id)
         replies_df = loader.load_replies(chat_id=chat_id)

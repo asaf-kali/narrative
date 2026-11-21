@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-from seed_data import CHAT_GROUP, MSG_BOB_GROUP_HELLO, MSG_ME_GROUP
+from seed_data import CHAT_GROUP, MSG_ALICE_HELLO, MSG_BOB_GROUP_HELLO, MSG_ME_GROUP
 
 from narrative.db.queries.replies import fetch_replies
 
@@ -21,6 +21,15 @@ def test_fetch_replies_scoped_to_chat(msgstore_conn: sqlite3.Connection) -> None
 
 def test_fetch_replies_scoped_to_missing_chat_returns_empty(msgstore_conn: sqlite3.Connection) -> None:
     assert list(fetch_replies(msgstore_conn, chat_id=999)) == []
+
+
+def test_fetch_replies_scoped_to_message_ids(msgstore_conn: sqlite3.Connection) -> None:
+    rows = list(fetch_replies(msgstore_conn, message_ids={MSG_ME_GROUP, MSG_ALICE_HELLO}))
+    assert [r.message_id for r in rows] == [MSG_ME_GROUP]
+
+
+def test_fetch_replies_scoped_to_chat_and_message_ids(msgstore_conn: sqlite3.Connection) -> None:
+    assert list(fetch_replies(msgstore_conn, chat_id=999, message_ids={MSG_ME_GROUP})) == []
 
 
 def test_fetch_replies_missing_tables_returns_empty(tmp_path: Path) -> None:

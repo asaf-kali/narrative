@@ -19,6 +19,7 @@ from seed_data import (
 
 from narrative import cache
 from narrative.api.server import create_api
+from narrative.db import cached
 from narrative.db.connection import DBConnection
 from narrative.db.contacts import build_sender_registry
 from narrative.db.loaders import DataLoader
@@ -34,10 +35,12 @@ def _deterministic_random() -> None:
 
 @pytest.fixture(autouse=True)
 def _clean_module_cache() -> Iterator[None]:
-    """`app/cache.py` is a process-wide singleton keyed only on AnalysisConfig — isolate tests from it."""
+    """`cache.py` and `db/cached.py` are process-wide memoizers — isolate tests from them."""
     cache.clear_cache()
+    cached.clear_caches()
     yield
     cache.clear_cache()
+    cached.clear_caches()
 
 
 @pytest.fixture

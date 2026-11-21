@@ -82,6 +82,20 @@ def test_count_filtered_messages_matches_page_length(msgstore_conn: sqlite3.Conn
     assert count == len(rows)
 
 
+def test_count_filtered_messages_by_sender_matches_page_length(msgstore_conn: sqlite3.Connection) -> None:
+    count = count_filtered_messages(msgstore_conn, sender_ids=["me"])
+    rows = fetch_messages_page(msgstore_conn, sender_ids=["me"], limit=1000)
+    assert count == len(rows)
+    assert count > 0
+
+
+def test_count_filtered_messages_by_search(msgstore_conn: sqlite3.Connection) -> None:
+    rows = fetch_messages_page(msgstore_conn, limit=1000)
+    needle = next(r.text_data for r in rows if r.text_data)
+    expected = sum(1 for r in rows if r.text_data and needle in r.text_data)
+    assert count_filtered_messages(msgstore_conn, search=needle) == expected
+
+
 def test_fetch_distinct_chat_ids(msgstore_conn: sqlite3.Connection) -> None:
     ids = fetch_distinct_chat_ids(msgstore_conn)
     assert set(ids) == {CHAT_DIRECT, CHAT_GROUP, CHAT_BROADCAST}

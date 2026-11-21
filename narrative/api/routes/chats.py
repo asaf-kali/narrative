@@ -4,7 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 
-from narrative.db.loaders import DataLoader, open_connection
+from narrative.db import cached
+from narrative.db.loaders import chat_summaries
 from narrative.models.chat import ChatSummary
 from narrative.models.sender import SenderRegistry
 
@@ -18,10 +19,6 @@ def list_chats(
     search: Annotated[str | None, Query(description="Filter chats by name (case-insensitive)")] = None,
 ) -> list[ChatSummary]:
     msgstore: Path = request.app.state.msgstore_path
-    wadb: Path | None = request.app.state.wadb_path
     registry: SenderRegistry = request.app.state.sender_registry
-    logger.info("Loading chat list (search=%r)", search)
-    with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
-        chats: list[ChatSummary] = DataLoader(db, registry=registry).load_chats(search=search)
-    logger.info("Returning %d chats", len(chats))
-    return chats
+    rows = cached.chat_rows(msgstore_path=msgstore)
+    return chat_summaries(rows=rows, registry=registry, search=search)

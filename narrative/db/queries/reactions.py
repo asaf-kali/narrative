@@ -1,3 +1,4 @@
+import json
 import logging
 import sqlite3
 from collections.abc import Generator
@@ -31,12 +32,22 @@ WHERE ao.message_add_on_type = 56 AND aor.reaction != ''
 """
 
 
-def fetch_reactions(conn: sqlite3.Connection, chat_id: int | None = None) -> Generator[RawReactionRow]:
+def fetch_reactions(
+    conn: sqlite3.Connection,
+    chat_id: int | None = None,
+    message_ids: set[int] | None = None,
+) -> Generator[RawReactionRow]:
+    """Yield reactions, optionally scoped to one chat and/or to reactions on specific messages."""
     sql = _REACTIONS_SQL
-    params: tuple[int, ...] = ()
+    params: list[int | str] = []
     if chat_id is not None:
-        sql = f"{sql} AND ao.chat_row_id = ?"
-        params = (chat_id,)
+        sql += " AND ao.chat_row_id = ?"
+        params.append(chat_id)
+    if message_ids is not None:
+        # One JSON-array parameter instead of N placeholders: no SQLite variable limit.
+        sql += " AND ao.parent_message_row_id IN (SELECT value FROM json_each(?))"
+        ids_json = json.dumps(sorted(message_ids))
+        params.append(ids_json)
     try:
         for row in conn.execute(sql, params):
             yield RawReactionRow.model_validate(dict(row))
