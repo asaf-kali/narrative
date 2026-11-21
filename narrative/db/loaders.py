@@ -1,8 +1,9 @@
 import datetime
 import logging
 import sqlite3
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from pydantic import BaseModel
@@ -18,7 +19,7 @@ from narrative.db.queries.messages import (
 from narrative.db.queries.reactions import fetch_reactions
 from narrative.db.queries.replies import fetch_replies
 from narrative.db.row_types import RawChatRow, RawMessageRow
-from narrative.models.chat import ChatSummary, ChatType
+from narrative.models.chat import ChatSort, ChatSummary, ChatType
 from narrative.models.config import AnalysisConfig
 from narrative.models.message import MessageType
 from narrative.models.sender import BROADCAST_SERVER, GROUP_SERVER, SenderRegistry
@@ -283,6 +284,7 @@ def _row_to_chat_summary(row: RawChatRow, registry: SenderRegistry) -> ChatSumma
         display_name=display_name,
         chat_type=chat_type,
         message_count=row.message_count or 0,
+        my_message_count=row.my_message_count or 0,
         participant_count=None,
         date_first=_ms_to_utc(ms=row.first_timestamp),
         date_last=_ms_to_utc(ms=row.last_timestamp),
@@ -299,18 +301,32 @@ def _ms_to_utc(ms: int | None) -> datetime.datetime | None:
     return datetime.datetime.fromtimestamp(ms / 1000, tz=datetime.UTC)
 
 
+_EPOCH = datetime.datetime.min.replace(tzinfo=datetime.UTC)
+
+_CHAT_SORT_KEYS: dict[ChatSort, Callable[[ChatSummary], tuple[Any, ...]]] = {
+    ChatSort.LAST_MESSAGE: lambda s: (s.date_last or _EPOCH,),
+    ChatSort.MESSAGES: lambda s: (s.message_count,),
+    ChatSort.MINE: lambda s: (s.my_message_count, s.message_count),
+}
+
+
 def chat_summaries(
     rows: list[RawChatRow],
     registry: SenderRegistry,
     search: str | None = None,
-    limit: int = 100,
+    sort: ChatSort = ChatSort.LAST_MESSAGE,
+    hide_empty: bool = False,
+    limit: int | None = 100,
 ) -> list[ChatSummary]:
-    """Resolve chat rows to summaries; `search` filters by name, otherwise the first `limit` are kept."""
+    """Resolve chat rows to summaries: filter by name and emptiness, sort descending, keep the first `limit`."""
     summaries = [_row_to_chat_summary(row, registry) for row in rows]
+    if hide_empty:
+        summaries = [s for s in summaries if s.message_count > 0]
     if search:
         needle = search.lower()
-        return [s for s in summaries if needle in s.display_name.lower()]
-    return summaries[:limit]
+        summaries = [s for s in summaries if needle in s.display_name.lower()]
+    summaries.sort(key=_CHAT_SORT_KEYS[sort], reverse=True)
+    return summaries if limit is None else summaries[:limit]
 
 
 def build_messages_df(rows: list[RawMessageRow], registry: SenderRegistry) -> pd.DataFrame:
