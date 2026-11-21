@@ -327,6 +327,10 @@ export default function NetworkView({
   const maxWeight = useMemo(() => Math.max(1, ...edges.map((e) => e.weight)), [edges])
   const maxMessages = useMemo(() => Math.max(1, ...(data?.nodes ?? []).map((n) => n.messages)), [data])
 
+  // While a refetch loads, the clusters control keeps showing the last automatic count.
+  const lastCommunities = useRef(0)
+  if (data && clusters === 0) lastCommunities.current = data.communities
+
   // Refetches (e.g. a new cluster count) start each person where they were, so the layout doesn't jump.
   const prevNodes = useRef<GraphNode[]>([])
   const graphData = useMemo(() => {
@@ -418,14 +422,13 @@ export default function NetworkView({
             ))}
           </div>
           {controls}
-          {data && data.nodes.length > 0 && (
-            <ClustersControl
-              value={clusters || data.communities}
-              isAuto={clusters === 0}
-              max={data.nodes.length}
-              onChange={onClustersChange}
-            />
-          )}
+          <ClustersControl
+            value={clusters || (data?.communities ?? lastCommunities.current)}
+            isAuto={clusters === 0}
+            max={data?.nodes.length ?? 1}
+            disabled={isLoading || !data || data.nodes.length === 0}
+            onChange={onClustersChange}
+          />
           <label className="flex items-center gap-1.5 cursor-pointer select-none ml-auto" title="Hide ties that are weak relative to both people's other ties">
             <input
               type="checkbox"
@@ -555,39 +558,52 @@ export default function NetworkView({
 
 const CLUSTERS_DEBOUNCE_MS = 400
 
-/** Number of communities: shows the automatic pick until the user sets one; "Auto" goes back. */
-function ClustersControl({ value, isAuto, max, onChange }: {
-  value: number
+/**
+ * Number of communities: shows the automatic pick until the user sets one; "Auto" goes back.
+ * Stays in place but disabled while the graph loads, so the toolbar doesn't shift.
+ */
+function ClustersControl({ value, isAuto, max, disabled, onChange }: {
+  value: number  // 0 = not known yet
   isAuto: boolean
   max: number
+  disabled: boolean
   onChange: (clusters: number) => void
 }) {
-  const [draft, setDraft] = useState(String(value))
-  useEffect(() => setDraft(String(value)), [value])
+  const shown = value > 0 ? String(value) : ''
+  const [draft, setDraft] = useState(shown)
+  useEffect(() => setDraft(shown), [shown])
 
   // Typing "12" shouldn't fetch for "1" first.
   useEffect(() => {
     const n = Number(draft)
-    if (!Number.isInteger(n) || n < 1 || n === value) return
+    if (disabled || !Number.isInteger(n) || n < 1 || n === value) return
     const timer = setTimeout(() => onChange(Math.min(n, max)), CLUSTERS_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [draft, value, max, onChange])
+  }, [draft, value, max, disabled, onChange])
 
   return (
-    <label className="flex items-center gap-1.5 text-xs text-tx-secondary" title="Number of communities (colors)">
+    <label
+      className={`flex items-center gap-1.5 text-xs text-tx-secondary ${disabled ? 'opacity-50' : ''}`}
+      title="Number of communities (colors)"
+    >
       Clusters
       <input
         type="number"
         min={1}
         max={max}
         value={draft}
+        disabled={disabled}
         onChange={(e) => setDraft(e.target.value)}
-        className="w-12 bg-app-surface-2 border border-app-border rounded-full px-2 py-0.5 text-xs text-tx-secondary"
+        className="w-12 disabled:cursor-not-allowed bg-app-surface-2 border border-app-border rounded-full px-2 py-0.5 text-xs text-tx-secondary"
       />
       {isAuto ? (
         <span className="text-[10px] text-tx-muted">auto</span>
       ) : (
-        <button onClick={() => onChange(0)} className="text-[10px] text-tx-muted hover:text-tx-secondary transition-colors">
+        <button
+          onClick={() => onChange(0)}
+          disabled={disabled}
+          className="text-[10px] text-tx-muted enabled:hover:text-tx-secondary disabled:cursor-not-allowed transition-colors"
+        >
           Auto
         </button>
       )}
