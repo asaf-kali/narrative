@@ -189,6 +189,9 @@ export interface FilterOptions<T> {
 export interface MessageBounds {
   first_ts: number | null
   last_ts: number | null
+  /** Hour-rounded "YYYY-MM-DD HH:MM" in the server's timezone, which is how the API reads naive datetimes. */
+  range_from: string | null
+  range_to: string | null
 }
 
 export interface DayMessage {

@@ -23,6 +23,8 @@ from seed_data import (
     POLL_QUESTION,
 )
 
+from narrative.db.loaders import ms_to_local_hour
+
 
 def test_messages_bounds_global(api_client: TestClient) -> None:
     resp = api_client.get("/api/messages/bounds")
@@ -34,7 +36,14 @@ def test_messages_bounds_global(api_client: TestClient) -> None:
 
 def test_messages_bounds_scoped_to_chat(api_client: TestClient) -> None:
     resp = api_client.get("/api/messages/bounds", params={"chat_id": 999})
-    assert resp.json() == {"first_ts": None, "last_ts": None}
+    assert resp.json() == {"first_ts": None, "last_ts": None, "range_from": None, "range_to": None}
+
+
+def test_messages_bounds_range_covers_first_and_last_message(api_client: TestClient) -> None:
+    body = api_client.get("/api/messages/bounds").json()
+    assert body["range_from"] == ms_to_local_hour(body["first_ts"])
+    assert body["range_to"] == ms_to_local_hour(body["last_ts"], round_up=True)
+    assert body["range_from"] < body["range_to"]
 
 
 def test_messages_metadata_totals(api_client: TestClient) -> None:

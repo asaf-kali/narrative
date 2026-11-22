@@ -46,21 +46,6 @@ function senderChip(s: SenderInfo): ChipItem {
   return { id: s.sender_id, label: s.sender_name, searchText: `${s.sender_name} ${s.phone}` }
 }
 
-function floorToHour(ms: number): string {
-  const d = new Date(ms)
-  d.setMinutes(0, 0, 0)
-  return formatDatetime(d)
-}
-
-function ceilToHour(ms: number): string {
-  const d = new Date(ms)
-  if (d.getMinutes() !== 0 || d.getSeconds() !== 0 || d.getMilliseconds() !== 0) {
-    d.setHours(d.getHours() + 1)
-  }
-  d.setMinutes(0, 0, 0)
-  return formatDatetime(d)
-}
-
 // Module-level so the hook sees stable references; the default range is the 30 days before page load.
 const URL_DEFAULTS = {
   mode: 'keyword' as SearchMode,
@@ -251,8 +236,8 @@ export default function GlobalMessagesPage() {
   function applyPreset(p: Preset) {
     if (p === 'all') {
       setUrlState({
-        from: bounds?.first_ts ? floorToHour(bounds.first_ts) : '',
-        to: bounds?.last_ts ? ceilToHour(bounds.last_ts) : '',
+        from: bounds?.range_from ?? '',
+        to: bounds?.range_to ?? '',
         offset: 0,
       })
     } else {
@@ -358,7 +343,7 @@ export default function GlobalMessagesPage() {
               <div className="flex gap-1">
                 {PRESETS.map((p) => {
                   const active = p.value === 'all'
-                    ? (bounds?.first_ts ? dateFrom === floorToHour(bounds.first_ts) : !dateFrom)
+                    ? (bounds?.range_from ? dateFrom === bounds.range_from : !dateFrom)
                     : presetDates(p.value).from.slice(0, 10) === dateFrom.slice(0, 10) && !dateTo
                   return (
                     <button

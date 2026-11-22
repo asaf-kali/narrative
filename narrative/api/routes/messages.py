@@ -12,7 +12,14 @@ from narrative.analysis.replies import ReplyPreview, replies_by_message
 from narrative.db import cached
 from narrative.db.attachments import MessageAttachments, load_message_attachments
 from narrative.db.cached import MetadataFilters
-from narrative.db.loaders import DataLoader, build_messages_df, chat_summaries, datetime_to_ms, open_connection
+from narrative.db.loaders import (
+    DataLoader,
+    build_messages_df,
+    chat_summaries,
+    datetime_to_ms,
+    ms_to_local_hour,
+    open_connection,
+)
 from narrative.db.queries.messages import fetch_message_bounds, fetch_messages_page
 from narrative.db.row_types import MessagesMetadata, RawMessageRow, RawSenderCount
 from narrative.models.chat import ChatSort, ChatSummary
@@ -47,15 +54,30 @@ class SenderOptions(BaseModel):
     items: list[SenderInfo]
 
 
+class MessageBounds(BaseModel):
+    """First and last message times; `range_from`/`range_to` are server-local and hour-rounded to cover both."""
+
+    first_ts: int | None = None
+    last_ts: int | None = None
+    range_from: str | None = None
+    range_to: str | None = None
+
+
 @router.get("/messages/bounds")
-def get_messages_bounds(request: Request, chat_id: int | None = None) -> dict[str, Any]:
+def get_messages_bounds(request: Request, chat_id: int | None = None) -> MessageBounds:
     msgstore: Path = request.app.state.msgstore_path
     wadb: Path | None = request.app.state.wadb_path
     with open_connection(msgstore_path=msgstore, wadb_path=wadb) as db:
         bounds = fetch_message_bounds(db.msgstore, chat_id=chat_id)
     if bounds is None:
-        return {"first_ts": None, "last_ts": None}
-    return {"first_ts": bounds[0], "last_ts": bounds[1]}
+        return MessageBounds()
+    first_ts, last_ts = bounds
+    return MessageBounds(
+        first_ts=first_ts,
+        last_ts=last_ts,
+        range_from=ms_to_local_hour(first_ts),
+        range_to=ms_to_local_hour(last_ts, round_up=True),
+    )
 
 
 @router.get("/messages/metadata")
