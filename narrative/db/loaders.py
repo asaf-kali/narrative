@@ -1,9 +1,12 @@
+import contextlib
 import datetime
 import logging
+import os
 import sqlite3
 from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 from pydantic import BaseModel
@@ -93,8 +96,26 @@ _REPLY_COLUMNS = [
 ]
 _MENTION_COLUMNS = ["message_id", "chat_row_id", "mentioned_phone", "mentioned_id"]
 
+_SYSTEM_LOCALTIME = Path("/etc/localtime")
+
+
+def _local_timezone() -> datetime.tzinfo:
+    """Return the system timezone with its DST rules.
+
+    `datetime.now().astimezone().tzinfo` is a fixed offset frozen at startup, which puts every
+    timestamp from the other half of the year an hour off.
+    """
+    name = os.environ.get("TZ", "").removeprefix(":")
+    if name:
+        with contextlib.suppress(ZoneInfoNotFoundError, ValueError):
+            return ZoneInfo(name)
+    with contextlib.suppress(OSError, ValueError), _SYSTEM_LOCALTIME.open("rb") as f:
+        return ZoneInfo.from_file(f)
+    return datetime.datetime.now().astimezone().tzinfo or datetime.UTC
+
+
 # Use the system local timezone for timestamp display
-_LOCAL_TZ: datetime.tzinfo = datetime.datetime.now().astimezone().tzinfo or datetime.UTC
+_LOCAL_TZ: datetime.tzinfo = _local_timezone()
 
 
 class DataLoader:
@@ -460,6 +481,19 @@ def datetime_to_ms(dt: datetime.datetime) -> int:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=_LOCAL_TZ)
     return int(dt.timestamp() * 1000)
+
+
+def ms_to_local_hour(ms: int, *, round_up: bool = False) -> str:
+    """Format a UTC-ms timestamp as server-local "YYYY-MM-DD HH:MM", rounded to a whole hour.
+
+    The frontend sends naive datetimes, which `datetime_to_ms` reads as server-local, so range
+    bounds must be computed here rather than in the browser, which may sit in another timezone.
+    """
+    dt = datetime.datetime.fromtimestamp(ms / 1000, tz=_LOCAL_TZ)
+    hour = dt.replace(minute=0, second=0, microsecond=0)
+    if round_up and hour != dt:
+        hour += datetime.timedelta(hours=1)
+    return hour.strftime("%Y-%m-%d %H:%M")
 
 
 def open_connection(msgstore_path: Path, wadb_path: Path | None = None) -> DBConnection:

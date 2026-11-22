@@ -1,8 +1,10 @@
 import datetime
 import sqlite3
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
+import pytest
 from seed_data import (
     ALICE_NAME,
     BOB_NAME,
@@ -16,6 +18,7 @@ from seed_data import (
     MSG_ME_GROUP,
 )
 
+from narrative.db import loaders
 from narrative.db.connection import DBConnection
 from narrative.db.loaders import (
     DataLoader,
@@ -23,6 +26,7 @@ from narrative.db.loaders import (
     _to_index_message,
     build_messages_df,
     datetime_to_ms,
+    ms_to_local_hour,
     open_connection,
 )
 from narrative.db.queries.chats import fetch_chats
@@ -310,3 +314,30 @@ def test_to_index_message_from_me_uses_me_name() -> None:
     registry = SenderRegistry(contacts={}, me_name="Asaf")
     result = _to_index_message(row, registry, registry.as_dict())
     assert result.sender_name == "Asaf"
+
+
+JERUSALEM = ZoneInfo("Asia/Jerusalem")
+# 2020-04-01 14:43:28 UTC: 17:43 in Jerusalem summer time (+03), one hour off under the +02 winter offset.
+SUMMER_MS = 1585752208000
+
+
+def test_local_timezone_follows_tz_env_with_dst(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TZ", "Asia/Jerusalem")
+    tz = loaders._local_timezone()
+    assert datetime.datetime(2020, 4, 1, tzinfo=tz).utcoffset() == datetime.timedelta(hours=3)
+    assert datetime.datetime(2020, 12, 1, tzinfo=tz).utcoffset() == datetime.timedelta(hours=2)
+
+
+def test_naive_datetime_uses_dst_offset_of_its_own_date(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(loaders, "_LOCAL_TZ", JERUSALEM)
+    assert datetime_to_ms(datetime.datetime.fromisoformat("2020-04-01T17:43:28")) == SUMMER_MS
+
+
+def test_ms_to_local_hour_rounds_in_server_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(loaders, "_LOCAL_TZ", JERUSALEM)
+    assert ms_to_local_hour(SUMMER_MS) == "2020-04-01 17:00"
+    assert ms_to_local_hour(SUMMER_MS, round_up=True) == "2020-04-01 18:00"
+    assert (
+        ms_to_local_hour(datetime_to_ms(datetime.datetime.fromisoformat("2020-04-01T18:00")), round_up=True)
+        == "2020-04-01 18:00"
+    )
